@@ -1,5 +1,5 @@
 // src/js/config/api.js
-export const API_BASE_URL = "http://localhost:3000/api";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const endpoints = {
   login: `${API_BASE_URL}/auth/login`,
@@ -19,9 +19,6 @@ export const endpoints = {
   getUbicaciones: `${API_BASE_URL}/vehiculos/ubicaciones`,
   getEmpleados: `${API_BASE_URL}/empleados/`,
   Reservas: `${API_BASE_URL}/reservas`,
-
-  // aquí podrías agregar más como:
-  // register: `${API_BASE_URL}/auth/register`,
 };
 
 // src/js/config/variables.js
