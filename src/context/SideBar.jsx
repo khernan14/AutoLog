@@ -71,7 +71,7 @@ export default function Sidebar() {
     }).then((result) => {
       if (result.isConfirmed) {
         localStorage.clear();
-        window.location.href = "/auth/login";
+        navigate("/auth/login");
       }
     });
   };
