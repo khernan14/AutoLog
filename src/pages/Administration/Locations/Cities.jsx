@@ -13,6 +13,8 @@ import CitiesToolBar from "../../../components/Administration/Locations/Cities/C
 import CitiesTable from "../../../components/Administration/Locations/Cities/CitiesTable";
 import CitiesModal from "../../../components/Administration/Locations/Cities/CitiesModal";
 
+import { useAuth } from "../../../context/AuthContext";
+
 export default function Cities() {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,9 @@ export default function Cities() {
   const [openModal, setOpenModal] = useState(false);
   const [editCity, setEditCity] = useState(null);
   const [searchText, setSearchText] = useState("");
+
+  const { user } = useAuth();
+  const esAdmin = user?.rol?.toLowerCase() === "admin";
 
   const loadCities = useCallback(async () => {
     setLoading(true);
@@ -50,7 +55,7 @@ export default function Cities() {
   }, [loadCities]);
 
   const handleAddCity = () => {
-    if (cities.length === 0) {
+    if (cities.length === 0 && !esAdmin) {
       toast.error(
         "No puedes agregar ciudades porque no tienes permiso para ver las ciudades."
       );

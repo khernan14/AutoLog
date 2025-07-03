@@ -12,6 +12,7 @@ import {
 import ParkingsTable from "../../../components/Administration/Parkings/ParkingsTable";
 import ParkingsModal from "../../../components/Administration/Parkings/ParkingsModal";
 import ParkingsToolBar from "../../../components/Administration/Parkings/ParkingsToolBar";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function Parkings() {
   const [parkings, setParkings] = useState([]);
@@ -20,6 +21,9 @@ export default function Parkings() {
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const { user } = useAuth();
+  const esAdmin = user?.rol?.toLowerCase() === "admin";
 
   const loadParkings = useCallback(async () => {
     setLoading(true);
@@ -46,9 +50,9 @@ export default function Parkings() {
   }, [loadParkings]);
 
   const handleAddParking = () => {
-    if (parkings.length === 0) {
+    if (parkings.length === 0 && !esAdmin) {
       toast.error(
-        "No puedes agregar estacionamientos porque no tienes permiso para ver los estacionamientos."
+        "No puedes agregar estacionamientos porque no tienes permiso para ver los estacionamientossss."
       );
       return;
     }
@@ -57,12 +61,6 @@ export default function Parkings() {
   };
 
   const handleEdit = (parking) => {
-    if (parkings.length === 0) {
-      toast.error(
-        "No puedes editar estacionamientos porque no tienes permiso para ver los estacionamientos."
-      );
-      return;
-    }
     setEditParking(parking);
     setOpenModal(true);
   };

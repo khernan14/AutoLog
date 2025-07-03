@@ -10,6 +10,7 @@ import VehicleTable from "../../components/RegisterForm/VehicleTable";
 import { obtenerVehiculos } from "../../services/VehiculosService";
 import { getReservasPorUsuario } from "../../services/ReservaServices";
 import { STORAGE_KEYS } from "../../config/variables";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Register() {
   const [vehicles, setVehicles] = useState([]);
@@ -17,6 +18,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  const { user } = useAuth();
+  const esAdmin = user?.rol?.toLowerCase() === "admin";
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
@@ -70,9 +74,9 @@ export default function Register() {
   };
 
   const handleRegisterClick = () => {
-    if (vehicles.length === 0) {
+    if (vehicles.length === 0 && !esAdmin) {
       toast.error(
-        "No puedes registrar vehículos porque no tienes acceso a los vehículos."
+        "No puedes registrar vehículos porque no tienes permiso para ver los vehículos."
       );
       return;
     }
