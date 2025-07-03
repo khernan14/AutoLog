@@ -11,6 +11,7 @@ import VehiculosTable from "../../components/VehiculosForm/VehiculosTable";
 import VehiculoModal from "../../components/VehiculosForm/VehiculosModal";
 import VehiculosToolBar from "../../components/VehiculosForm/VehiculosToolBar";
 import { Box, CircularProgress, Typography, Button } from "@mui/joy";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Vehiculos() {
   const [vehiculos, setVehiculos] = useState([]);
@@ -20,6 +21,9 @@ export default function Vehiculos() {
   const [editVehiculo, setEditVehiculo] = useState(null);
   const [showInactive, setShowInactive] = useState(false);
   const [searchText, setSearchText] = useState("");
+
+  const { user } = useAuth();
+  const esAdmin = user?.rol?.toLowerCase() === "admin";
 
   const loadVehiculos = useCallback(async () => {
     setLoading(true);
@@ -46,12 +50,15 @@ export default function Vehiculos() {
   }, [loadVehiculos]);
 
   const handleAddVehiculo = () => {
-    if (vehiculos.length === 0) {
+    console.log("esAdmin:", esAdmin);
+
+    if (vehiculos.length === 0 && !esAdmin) {
       toast.error(
         "No puedes agregar registros porque no tienes acceso a los vehículos."
       );
       return;
     }
+
     setEditVehiculo(null);
     setOpenModal(true);
   };

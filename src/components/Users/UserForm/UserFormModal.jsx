@@ -26,10 +26,15 @@ export default function UserFormModal({
   supervisores = [], // <-- nueva prop para supervisores
   roles = ["Empleado", "Supervisor"],
   puestos = [
-    "Desarrollador",
-    "Tecnico Microsistemas",
+    "Gerente de Ingeniería",
+    "Gerente de Finanzas",
+    "Oficial de servicios",
+    "Supervisor de ATM",
+    "Supervisor de Microsistemas",
     "Tecnico ATM",
-    "Oficial de Servicios",
+    "Tecnico Microsistemas",
+    "Tecnico de Alta Disponibilidad",
+    "Tecnico de Soporte",
   ],
 }) {
   const [showPassword, setShowPassword] = useState(false);
