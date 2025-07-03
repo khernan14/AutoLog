@@ -49,7 +49,6 @@ export default function UploadImages({ images, setImages }) {
         tabIndex={-1}
         variant="solid"
         color="primary"
-        onClick={() => fileInputRef.current.click()}
         startDecorator={
           <SvgIcon>
             <svg
@@ -67,17 +66,16 @@ export default function UploadImages({ images, setImages }) {
           </SvgIcon>
         }>
         Upload a file
-        <VisuallyHiddenInput type="file" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          capture="environment"
+          hidden
+          onChange={handleFileChange}
+        />
       </Button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        capture="environment"
-        hidden
-        onChange={handleFileChange}
-      />
 
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
         {images.map((img, index) => (

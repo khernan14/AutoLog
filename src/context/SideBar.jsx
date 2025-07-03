@@ -15,7 +15,7 @@ import Sheet from "@mui/joy/Sheet";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
-import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import SupportRoundedIcon from "@mui/icons-material/SupportRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
@@ -23,11 +23,22 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import AppRegistrationIcon from "@mui/icons-material/AppRegistration";
-import EventNoteIcon from "@mui/icons-material/EventNote";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 
 import ColorSchemeToggle from "./ColorSchemeToggle";
 import { closeSidebar } from "../utils/ToggleSidebar";
 import Swal from "sweetalert2";
+
+function getInitials(name) {
+  if (!name) return "";
+  const names = name.trim().split(" ");
+  return names
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 function Toggler({ defaultExpanded = false, renderToggle, children }) {
   const [open, setOpen] = React.useState(defaultExpanded);
@@ -51,11 +62,32 @@ function Toggler({ defaultExpanded = false, renderToggle, children }) {
   );
 }
 
+function NavItem({ path, icon, label, currentPath, onNavigate }) {
+  return (
+    <ListItem key={path}>
+      <ListItemButton
+        selected={currentPath === path}
+        onClick={() => onNavigate(path)}>
+        {icon}
+        <ListItemContent>
+          <Typography level="title-sm">{label}</Typography>
+        </ListItemContent>
+      </ListItemButton>
+    </ListItem>
+  );
+}
+
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const storedUser = JSON.parse(localStorage.getItem("user"));
+  const storedUser = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"));
+    } catch {
+      return null;
+    }
+  }, []);
   const userName = storedUser?.nombre || "Usuario";
   const userEmail = storedUser?.email || "usuario@test.com";
 
@@ -74,6 +106,11 @@ export default function Sidebar() {
         navigate("/auth/login");
       }
     });
+  };
+
+  const handleNavigate = (path) => {
+    navigate(path);
+    if (window.matchMedia("(max-width: 768px)").matches) closeSidebar();
   };
 
   return (
@@ -101,34 +138,20 @@ export default function Sidebar() {
       <GlobalStyles
         styles={(theme) => ({
           ":root": {
-            "--Sidebar-width": "220px",
+            "--Sidebar-width": "260px",
             [theme.breakpoints.up("lg")]: {
-              "--Sidebar-width": "240px",
+              "--Sidebar-width": "280px",
             },
           },
         })}
       />
-      <Box
-        className="Sidebar-overlay"
-        sx={{
-          position: "fixed",
-          zIndex: 9998,
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          opacity: "var(--SideNavigation-slideIn)",
-          backgroundColor: "var(--joy-palette-background-backdrop)",
-          transition: "opacity 0.4s",
-          transform: {
-            xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1) + var(--SideNavigation-slideIn, 0) * var(--Sidebar-width, 0px)))",
-            lg: "translateX(-100%)",
-          },
-        }}
-        onClick={() => closeSidebar()}
-      />
+      <Box className="Sidebar-overlay" onClick={closeSidebar} />
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <IconButton variant="soft" color="primary" size="sm">
+        <IconButton
+          variant="soft"
+          color="primary"
+          size="sm"
+          aria-label="toggle theme">
           <BrightnessAutoRoundedIcon />
         </IconButton>
         <Typography level="title-lg">AutoLog</Typography>
@@ -137,7 +160,8 @@ export default function Sidebar() {
       <Input
         size="sm"
         startDecorator={<SearchRoundedIcon />}
-        placeholder="Search"
+        placeholder="Buscar"
+        sx={{ display: { xs: "none", sm: "flex" } }}
       />
       <Box
         sx={{
@@ -148,121 +172,144 @@ export default function Sidebar() {
           flexDirection: "column",
           [`& .${listItemButtonClasses.root}`]: {
             gap: 1.5,
+            borderRadius: "md",
+          },
+          [`& .${listItemButtonClasses.root}[aria-selected="true"]`]: {
+            backgroundColor: "primary.solidBg",
+            color: "primary.solidColor",
           },
         }}>
-        <List
-          size="sm"
-          sx={{
-            gap: 1,
-            "--List-nestedInsetStart": "30px",
-            "--ListItem-radius": (theme) => theme.vars.radius.sm,
-          }}>
-          <ListItem>
-            <ListItemButton
-              selected={location.pathname === "/admin/home"}
-              onClick={() => navigate("/admin/home")}>
-              <HomeRoundedIcon />
-              <ListItemContent>
-                <Typography level="title-sm">Inicio</Typography>
-              </ListItemContent>
-            </ListItemButton>
-          </ListItem>
-
-          <ListItem>
-            <ListItemButton
-              selected={location.pathname === "/admin/dashboard"}
-              onClick={() => navigate("/admin/dashboard")}>
-              <DashboardRoundedIcon />
-              <ListItemContent>
-                <Typography level="title-sm">Dashboard</Typography>
-              </ListItemContent>
-            </ListItemButton>
-          </ListItem>
-
-          <ListItem>
-            <ListItemButton
-              selected={location.pathname === "/admin/vehiculos"}
-              onClick={() => navigate("/admin/vehiculos")}>
-              <ShoppingCartRoundedIcon />
-              <ListItemContent>
-                <Typography level="title-sm">Vehiculos</Typography>
-              </ListItemContent>
-            </ListItemButton>
-          </ListItem>
-
-          <ListItem>
-            <ListItemButton
-              selected={location.pathname === "/admin/panel-vehiculos"}
-              onClick={() => navigate("/admin/panel-vehiculos")}>
-              <AppRegistrationIcon />
-              <ListItemContent>
-                <Typography level="title-sm">Registros</Typography>
-              </ListItemContent>
-            </ListItemButton>
-          </ListItem>
-
-          <ListItem>
-            <ListItemButton
-              selected={location.pathname === "/admin/reservas"}
-              onClick={() => navigate("/admin/reservas")}>
-              <EventNoteIcon />
-              <ListItemContent>
-                <Typography level="title-sm">Reservas</Typography>
-              </ListItemContent>
-            </ListItemButton>
-          </ListItem>
-
+        <Typography
+          level="body-xs"
+          sx={{ pl: 2, mt: 1, mb: 0.5, color: "text.secondary" }}>
+          Navegación
+        </Typography>
+        <List size="sm" sx={{ gap: 1, "--List-nestedInsetStart": "30px" }}>
+          {[
+            { path: "/admin/home", icon: <HomeRoundedIcon />, label: "Inicio" },
+            {
+              path: "/admin/dashboard",
+              icon: <DashboardRoundedIcon />,
+              label: "Dashboard",
+            },
+            {
+              path: "/admin/vehiculos",
+              icon: <LocalShippingIcon />,
+              label: "Vehículos",
+            },
+            {
+              path: "/admin/panel-vehiculos",
+              icon: <AppRegistrationIcon />,
+              label: "Registros",
+            },
+            {
+              path: "/admin/reports",
+              icon: <AssessmentIcon />,
+              label: "Reportes",
+            },
+          ].map(({ path, icon, label }) => (
+            <ListItem key={path}>
+              <ListItemButton
+                selected={location.pathname === path}
+                onClick={() => handleNavigate(path)}>
+                {icon}
+                <ListItemContent>
+                  <Typography level="title-sm">{label}</Typography>
+                </ListItemContent>
+              </ListItemButton>
+            </ListItem>
+          ))}
           <ListItem nested>
             <Toggler
               renderToggle={({ open, setOpen }) => (
-                <ListItemButton onClick={() => setOpen(!open)}>
+                <ListItemButton
+                  onClick={() => setOpen(!open)}
+                  aria-expanded={open}>
                   <GroupRoundedIcon />
                   <ListItemContent>
                     <Typography level="title-sm">Usuarios</Typography>
                   </ListItemContent>
                   <KeyboardArrowDownIcon
-                    sx={[
-                      open
-                        ? {
-                            transform: "rotate(180deg)",
-                          }
-                        : {
-                            transform: "none",
-                          },
-                    ]}
+                    sx={{ transform: open ? "rotate(180deg)" : "none" }}
                   />
                 </ListItemButton>
               )}>
               <List sx={{ gap: 0.5 }}>
-                <ListItem sx={{ mt: 0.5 }}>
+                <ListItem>
                   <ListItemButton
-                    onClick={() => navigate("/admin/mi-cuenta")}
-                    role="menuitem"
-                    component="a">
+                    onClick={() => handleNavigate("/admin/mi-cuenta")}>
                     Mi Perfil
                   </ListItemButton>
                 </ListItem>
                 <ListItem>
-                  <ListItemButton onClick={() => navigate("/admin/usuarios")}>
+                  <ListItemButton
+                    onClick={() => handleNavigate("/admin/usuarios")}>
                     Gestionar usuarios
                   </ListItemButton>
                 </ListItem>
                 <ListItem>
-                  <ListItemButton>Roles & permission</ListItemButton>
+                  <ListItemButton
+                    onClick={() => handleNavigate("/admin/permissions")}>
+                    Roles & permission
+                  </ListItemButton>
                 </ListItem>
               </List>
             </Toggler>
           </ListItem>
+          {/* otro menu */}
+          <ListItem nested>
+            <Toggler
+              renderToggle={({ open, setOpen }) => (
+                <ListItemButton
+                  onClick={() => setOpen(!open)}
+                  aria-expanded={open}>
+                  <AdminPanelSettingsIcon />
+                  <ListItemContent>
+                    <Typography level="title-sm">Administración</Typography>
+                  </ListItemContent>
+                  <KeyboardArrowDownIcon
+                    sx={{ transform: open ? "rotate(180deg)" : "none" }}
+                  />
+                </ListItemButton>
+              )}>
+              <List sx={{ gap: 0.5 }}>
+                <ListItem>
+                  <ListItemButton
+                    onClick={() => handleNavigate("/admin/countries")}>
+                    Paises
+                  </ListItemButton>
+                </ListItem>
+                <ListItem>
+                  <ListItemButton
+                    onClick={() => handleNavigate("/admin/cities")}>
+                    Ciudades
+                  </ListItemButton>
+                </ListItem>
+                <ListItem>
+                  <ListItemButton
+                    onClick={() => handleNavigate("/admin/parkings")}>
+                    Estacionamientos
+                  </ListItemButton>
+                </ListItem>
+                {/* <ListItem>
+                  <ListItemButton
+                    onClick={() =>
+                      handleNavigate("/admin/notificacion-grupos")
+                    }>
+                    Grupos de Notificación
+                  </ListItemButton>
+                </ListItem> */}
+              </List>
+            </Toggler>
+          </ListItem>
         </List>
-        <List
-          size="sm"
-          sx={{
-            mt: "auto",
-            flexGrow: 0,
-            "--ListItem-radius": (theme) => theme.vars.radius.sm,
-            "--List-gap": "8px",
-            mb: 2,
-          }}>
+
+        <Typography
+          level="body-xs"
+          sx={{ pl: 2, mt: 3, mb: 0.5, color: "text.secondary" }}>
+          Configuración
+        </Typography>
+        <List size="sm" sx={{ mt: "auto", flexGrow: 0, mb: 2 }}>
           <ListItem>
             <ListItemButton>
               <SupportRoundedIcon />
@@ -282,13 +329,24 @@ export default function Sidebar() {
         <Avatar
           variant="outlined"
           size="sm"
-          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=286"
-        />
+          sx={{
+            bgcolor: "primary.softBg",
+            color: "primary.softColor",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+          }}>
+          {getInitials(userName)}
+        </Avatar>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography level="title-sm">{userName}</Typography>
           <Typography level="body-xs">{userEmail}</Typography>
         </Box>
-        <IconButton size="sm" variant="plain" color="neutral" onClick={logout}>
+        <IconButton
+          size="sm"
+          variant="plain"
+          color="neutral"
+          onClick={logout}
+          aria-label="Cerrar sesión">
           <LogoutRoundedIcon />
         </IconButton>
       </Box>

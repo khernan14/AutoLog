@@ -1,54 +1,118 @@
-import { useEffect, useState } from "react";
-import { Box, Button, Stack, Typography } from "@mui/joy";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Box, Button, Stack, Typography, CircularProgress } from "@mui/joy";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
+import { toast } from "react-toastify";
+
 import SearchBar from "../../components/RegisterForm/SearchBar";
 import VehicleTable from "../../components/RegisterForm/VehicleTable";
-// Aquí importarías tu función para obtener vehículos desde tu API
+
 import { obtenerVehiculos } from "../../services/VehiculosService";
+import { getReservasPorUsuario } from "../../services/ReservaServices";
+import { STORAGE_KEYS } from "../../config/variables";
 
 export default function Register() {
   const [vehicles, setVehicles] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchVehicles = async () => {
-      try {
-        const response = await obtenerVehiculos(); // esta debe ser tu función de fetch
-        setVehicles(response); // guarda los datos en el estado
-      } catch (error) {
-        console.error("Error al obtener vehículos:", error);
+  const fetchVehicles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await obtenerVehiculos();
+      if (response) {
+        setVehicles(response);
+      } else {
+        setVehicles([]);
+        setError("No se pudo obtener la lista de vehículos.");
       }
-    };
-
-    fetchVehicles();
+    } catch (error) {
+      console.error("Error al obtener vehículos:", error);
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const verificarReservas = useCallback(async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER));
+      const idEmpleado = user?.id_empleado;
+
+      if (!idEmpleado) return;
+
+      const reservas = await getReservasPorUsuario(idEmpleado);
+
+      if (reservas && reservas.length > 0 && reservas[0].total > 0) {
+        Swal.fire({
+          title: "Reservas Pendientes",
+          text: "Tienes una o más reservas activas pendientes. Por favor realiza el registro correspondiente.",
+          icon: "warning",
+          confirmButtonText: "Entendido",
+        });
+      }
+    } catch (error) {
+      console.error("Error al verificar reservas activas:", error);
+      toast.error("No se pudo verificar tus reservas activas.");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVehicles();
+    verificarReservas();
+  }, [fetchVehicles, verificarReservas]);
 
   const handleSearchChange = (value) => {
     setSearch(value);
   };
 
-  // Redirigir al formulario de registro de uso
   const handleRegisterClick = () => {
+    if (vehicles.length === 0) {
+      toast.error(
+        "No puedes registrar vehículos porque no tienes acceso a los vehículos."
+      );
+      return;
+    }
     navigate("/admin/panel-vehiculos/register");
   };
 
-  // Filtrar vehículos basados en la búsqueda
-  const filteredVehicles = vehicles.filter(
-    (veh) =>
-      veh.placa?.toLowerCase().includes(search.toLowerCase()) || // Filtra por placa
-      veh.marca?.toLowerCase().includes(search.toLowerCase()) || // Filtra por marca
-      veh.modelo?.toLowerCase().includes(search.toLowerCase()) // Filtra por modelo
-  );
+  const filteredVehicles = useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return vehicles.filter(
+      (veh) =>
+        veh.placa?.toLowerCase().includes(searchLower) ||
+        veh.marca?.toLowerCase().includes(searchLower) ||
+        veh.modelo?.toLowerCase().includes(searchLower)
+    );
+  }, [vehicles, search]);
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography level="h4" mb={2}>
         Registro de uso de vehículos
       </Typography>
+
       <SearchBar onSearch={handleSearchChange} onAdd={handleRegisterClick} />
+
       <Box mt={3}>
-        <VehicleTable vehicles={filteredVehicles} />
+        {loading ? (
+          <Box display="flex" justifyContent="center" mt={4}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Typography color="danger" textAlign="center">
+            {error}
+          </Typography>
+        ) : filteredVehicles.length === 0 ? (
+          <Typography textAlign="center" color="neutral">
+            No se encontraron vehículos que coincidan con la búsqueda.
+          </Typography>
+        ) : (
+          <VehicleTable vehicles={filteredVehicles} />
+        )}
       </Box>
     </Box>
   );

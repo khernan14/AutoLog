@@ -1,9 +1,25 @@
-import React from "react";
-import { Box, Input, Button, Stack } from "@mui/joy";
+import React, { useState, useCallback } from "react";
+import { Box, Input, Button, Stack, IconButton } from "@mui/joy";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
+import ClearIcon from "@mui/icons-material/Clear";
 
 export default function SearchBar({ onSearch, onAdd }) {
+  const [search, setSearch] = useState("");
+
+  const handleSearch = useCallback(
+    (value) => {
+      setSearch(value);
+      onSearch?.(value);
+    },
+    [onSearch]
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearch("");
+    onSearch?.("");
+  }, [onSearch]);
+
   return (
     <Box
       sx={{
@@ -15,9 +31,23 @@ export default function SearchBar({ onSearch, onAdd }) {
         mb: 2,
       }}>
       <Input
-        placeholder="Buscar usuario..."
+        placeholder="Buscar vehículo..."
+        aria-label="Buscar vehículo"
+        value={search}
+        onChange={(e) => handleSearch(e.target.value)}
         startDecorator={<SearchRoundedIcon />}
-        onChange={(e) => onSearch(e.target.value)}
+        endDecorator={
+          search && (
+            <IconButton
+              size="sm"
+              variant="plain"
+              color="neutral"
+              onClick={clearSearch}
+              aria-label="Limpiar búsqueda">
+              <ClearIcon />
+            </IconButton>
+          )
+        }
         sx={{ width: { xs: "100%", sm: "300px" } }}
       />
 
@@ -26,7 +56,8 @@ export default function SearchBar({ onSearch, onAdd }) {
           variant="solid"
           color="primary"
           startDecorator={<NoteAddIcon />}
-          onClick={onAdd}>
+          onClick={onAdd}
+          aria-label="Registrar uso de vehículo">
           Registrar Uso
         </Button>
       </Stack>

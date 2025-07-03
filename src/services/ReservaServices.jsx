@@ -90,3 +90,14 @@ export async function finalizarReserva(id, body) {
     return null;
   }
 }
+
+export async function getReservasPorUsuario(id) {
+  try {
+    const res = await fetchConToken(`${endpoints.Reservas}/empleado/${id}`);
+    const data = await res.json();
+    return res.ok ? data : [];
+  } catch (err) {
+    console.error("Get reservas por usuario error:", err);
+    return [];
+  }
+}

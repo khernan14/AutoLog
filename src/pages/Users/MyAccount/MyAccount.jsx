@@ -1,32 +1,54 @@
-import { useState, useEffect } from "react";
-import Box from "@mui/joy/Box";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Box, Typography, CircularProgress, Snackbar } from "@mui/joy";
 import MyAccountForm from "../../../components/Users/MyAccount/MyAccountForm";
 import { getUsersById } from "../../../services/AuthServices.jsx";
-import { Typography } from "@mui/joy";
+import Swal from "sweetalert2";
 
 export default function MyAccount() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarColor, setSnackbarColor] = useState("neutral");
 
-  const storedUser = JSON.parse(localStorage.getItem("user"));
-  const id_usuario = storedUser?.id || 1;
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const data = await getUsersById(id_usuario);
-        if (data && data.length > 0) {
-          setUser(data[0]); // Accede al primer elemento del array
-        }
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-
-    loadData();
+  const storedUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"));
+    } catch {
+      return null;
+    }
   }, []);
 
-  // Mostrar un mensaje de carga mientras esperamos los datos
-  if (user === null) {
+  const id_usuario = storedUser?.id || 1;
+
+  const showSnackbar = (message, color = "neutral") => {
+    setSnackbarMessage(message);
+    setSnackbarColor(color);
+    setSnackbarOpen(true);
+  };
+
+  const loadUserData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getUsersById(id_usuario);
+      if (Array.isArray(data) && data.length > 0) {
+        setUser(data[0]);
+      } else {
+        showSnackbar("Usuario no encontrado", "warning");
+      }
+    } catch (error) {
+      console.error("Error al cargar usuario:", error);
+      showSnackbar("Error al cargar datos", "danger");
+    } finally {
+      setLoading(false);
+    }
+  }, [id_usuario]);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
+
+  if (loading) {
     return (
       <Box
         sx={{
@@ -35,7 +57,15 @@ export default function MyAccount() {
           alignItems: "center",
           minHeight: "100vh",
         }}>
-        <Typography variant="h6">Cargando...</Typography>
+        <CircularProgress size="lg" />
+      </Box>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Box sx={{ textAlign: "center", mt: 10 }}>
+        <Typography level="h4">Usuario no disponible</Typography>
       </Box>
     );
   }
@@ -58,6 +88,16 @@ export default function MyAccount() {
         }}>
         <MyAccountForm user={user} />
       </Box>
+
+      <Snackbar
+        open={snackbarOpen}
+        onClose={() => setSnackbarOpen(false)}
+        color={snackbarColor}
+        variant="outlined"
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        autoHideDuration={3000}>
+        {snackbarMessage}
+      </Snackbar>
     </Box>
   );
 }

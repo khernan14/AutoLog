@@ -40,8 +40,14 @@ export default function LoginForm({
             width: { xs: "60%", md: "40%" },
             height: "auto",
             mb: 4,
+            animation: "float 3s ease-in-out infinite",
+            "@keyframes float": {
+              "0%, 100%": { transform: "translateY(0px)" },
+              "50%": { transform: "translateY(-5px)" },
+            },
           }}
         />
+
         <Typography level="h3" textAlign="center">
           ¡Hola, bienvenido!
         </Typography>

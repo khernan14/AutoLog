@@ -30,6 +30,7 @@ export async function createUserService(newUser) {
         rol: newUser.rol,
         estatus: newUser.estatus,
         puesto: newUser.puesto,
+        id_ciudad: newUser.id_ciudad,
       }),
     });
 
@@ -48,6 +49,17 @@ export async function getUsers() {
     return res.ok ? data : [];
   } catch (err) {
     console.error("Get users error:", err);
+    return [];
+  }
+}
+
+export async function getUserSupervisors() {
+  try {
+    const res = await fetchConToken(`${endpoints.getEmpleados}/supervisor`);
+    const data = await res.json();
+    return res.ok ? data : [];
+  } catch (err) {
+    console.error("Get users suprevisors error:", err);
     return [];
   }
 }
@@ -75,7 +87,7 @@ export async function getUsersById(id) {
     return res.ok ? data : null;
   } catch (err) {
     console.error("Get users by id error:", err);
-    return null;
+    return [];
   }
 }
 
@@ -116,6 +128,36 @@ export async function getEmpleadosById(id) {
     return res.ok ? data : null;
   } catch (err) {
     console.error("Get users by id error:", err);
+    return [];
+  }
+}
+
+export async function deleteUser(id) {
+  try {
+    const res = await fetchConToken(endpoints.deleteUser + id, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+    return res.ok ? data : null;
+  } catch (err) {
+    console.error("Delete user error:", err);
+    return null;
+  }
+}
+
+export async function restoreUser(id) {
+  try {
+    const res = await fetchConToken(endpoints.restoreUser + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estatus: "Activo" }),
+    });
+
+    const data = await res.json();
+    return res.ok ? data : null;
+  } catch (err) {
+    console.error("Restore user error:", err);
     return null;
   }
 }

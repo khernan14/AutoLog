@@ -161,122 +161,101 @@ export default function SalidaForm({ vehicles, usuario }) {
         px: { xs: 2, md: 6 },
         py: { xs: 2, md: 3 },
       }}>
-      <Card component={"form"} onSubmit={handleSubmit}>
-        <>
-          <Box sx={{ mb: 1 }}>
-            <Typography level="title-md">
-              Realiza el Registro de Salida
-            </Typography>
-            <Typography level="body-sm">
-              Realiza el registro de salida de tu vehículo en el sistema de
-              registro de vehículos. Este proceso es importante para que el
-              vehículo esté registrado en el sistema y se puedan realizar las
-              operaciones correspondientes.
-            </Typography>
-          </Box>
-          <Divider />
-          <Stack spacing={2} sx={{ flexGrow: 1 }}>
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={3}
-              sx={{ my: 1 }}>
-              <Stack spacing={2} sx={{ flexGrow: 1 }}>
-                <Stack width={"60%"} spacing={1}>
-                  <FormLabel>Vehiculo</FormLabel>
-                  <FormControl
-                    sx={{
-                      display: { sm: "flex-column", md: "flex-row" },
-                      gap: 2,
-                    }}>
-                    <Select
-                      value={vehicleSelected}
-                      onChange={handleVehicleChange}
-                      placeholder="Selecciona Un Vehiculo..."
-                      indicator={<KeyboardArrowDown />}
-                      sx={{
-                        width: { xs: "157%", md: 280 },
-                        [`& .${selectClasses.indicator}`]: {
-                          transition: "0.2s",
-                          [`&.${selectClasses.expanded}`]: {
-                            transform: "rotate(-180deg)",
-                          },
-                        },
-                      }}>
-                      <Option value="">Selecciona un vehiculo</Option>
-                      {listVehicles?.map((v) => (
-                        <Option key={v.id} value={v.id}>
-                          {v.placa} - {v.marca} {v.modelo}
-                        </Option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Stack>
-                <Stack direction="row" spacing={2}>
-                  <FormControl>
-                    <FormLabel>Kilometraje Actual</FormLabel>
-                    <Input
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                      }}
-                      size="sm"
-                      type="text"
-                      placeholder="Ingrese el Kilometraje"
-                      value={kmActual}
-                      onChange={(e) => setKmActual(e.target.value)}
-                      readOnly={!kmManual}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <Stack direction="row" spacing={2}>
-                  <FormControl>
-                    <FormLabel>Porcentaje de Combustible</FormLabel>
-                    <Input
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                      }}
-                      size="sm"
-                      type="number"
-                      placeholder="Porcentaje (%)"
-                      value={fuelActual}
-                      onChange={(e) => setFuelActual(e.target.value)}
-                      readOnly={!fuelManual}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <Stack direction="row" spacing={2}>
-                  <FormControl>
-                    <FormLabel>Observaciones</FormLabel>
-                    <Textarea
-                      value={observations}
-                      onChange={(e) => setObservations(e.target.value)}
-                      maxRows={3}
-                      placeholder="Obervaciones"
-                      minRows={2}
-                      sx={{
-                        width: { xs: "100%", md: 280 },
-                        "--Textarea-focusedInset": "var(--any, )",
-                        "--Textarea-focusedThickness": "0.25rem",
-                        "--Textarea-focusedHighlight": "rgba(13,110,253,.25)",
-                        "&::before": {
-                          transition: "box-shadow .15s ease-in-out",
-                        },
-                        "&:focus-within": {
-                          borderColor: "#86b7fe",
-                        },
-                      }}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <UploadImages images={images} setImages={setImages} />
-              </Stack>
-            </Stack>
-          </Stack>
-        </>
-        <CardOverflow sx={{ borderTop: "1px solid", borderColor: "divider" }}>
-          <CardActions sx={{ alignSelf: "flex-end", pt: 2 }}>
+      <Card
+        component={"form"}
+        onSubmit={handleSubmit}
+        sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography level="title-md">
+            Realiza el Registro de Salida
+          </Typography>
+          <Typography level="body-sm">
+            Realiza el registro de salida de tu vehículo en el sistema de
+            registro de vehículos.
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 2 }} />
+
+        <Stack spacing={2}>
+          <FormControl fullWidth>
+            <FormLabel>Vehículo</FormLabel>
+            <Select
+              value={vehicleSelected}
+              onChange={handleVehicleChange}
+              placeholder="Selecciona Un Vehiculo..."
+              indicator={<KeyboardArrowDown />}
+              fullWidth
+              sx={{
+                [`& .${selectClasses.indicator}`]: {
+                  transition: "0.2s",
+                  [`&.${selectClasses.expanded}`]: {
+                    transform: "rotate(-180deg)",
+                  },
+                },
+              }}>
+              <Option value="">Selecciona un vehículo</Option>
+              {listVehicles?.map((v) => (
+                <Option key={v.id} value={v.id}>
+                  {v.placa} - {v.marca} {v.modelo}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>Kilometraje Actual</FormLabel>
+            <Input
+              fullWidth
+              size="sm"
+              type="text"
+              placeholder="Ingrese el Kilometraje"
+              value={kmActual}
+              onChange={(e) => setKmActual(e.target.value)}
+              readOnly={!kmManual}
+            />
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>Porcentaje de Combustible</FormLabel>
+            <Input
+              fullWidth
+              size="sm"
+              type="number"
+              placeholder="Porcentaje (%)"
+              value={fuelActual}
+              onChange={(e) => setFuelActual(e.target.value)}
+              readOnly={!fuelManual}
+            />
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>Observaciones</FormLabel>
+            <Textarea
+              value={observations}
+              onChange={(e) => setObservations(e.target.value)}
+              maxRows={3}
+              placeholder="Observaciones"
+              minRows={2}
+              sx={{
+                "--Textarea-focusedInset": "var(--any, )",
+                "--Textarea-focusedThickness": "0.25rem",
+                "--Textarea-focusedHighlight": "rgba(13,110,253,.25)",
+                "&::before": {
+                  transition: "box-shadow .15s ease-in-out",
+                },
+                "&:focus-within": {
+                  borderColor: "#86b7fe",
+                },
+              }}
+            />
+          </FormControl>
+
+          <UploadImages images={images} setImages={setImages} />
+        </Stack>
+
+        <CardOverflow
+          sx={{ borderTop: "1px solid", borderColor: "divider", mt: 3 }}>
+          <CardActions sx={{ justifyContent: "flex-end", pt: 2 }}>
             <Button
               size="sm"
               variant="plain"

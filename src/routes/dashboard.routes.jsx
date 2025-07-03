@@ -9,6 +9,12 @@ import Home from "@/pages/Dashboard/Home";
 import MyAccount from "../pages/Users/MyAccount/MyAccount";
 import RegisterForm from "../pages/Register/RegisterForm";
 import Reservas from "../pages/Register/Reservas";
+import Countries from "../pages/Administration/Locations/Countries";
+import Cities from "../pages/Administration/Locations/Cities";
+import Parkings from "../pages/Administration/Parkings/Parkings";
+import Permissions from "../pages/Administration/Permissions/Permissions";
+import NotificationGroupsPage from "../pages/Administration/NotificationGroups/NotificationGroupsPage";
+import Reports from "../pages/Reports/ReportsPage.jsx";
 
 export default function DashboardRoutes() {
   return (
@@ -23,6 +29,15 @@ export default function DashboardRoutes() {
         <Route path="panel-vehiculos" element={<Register />} />
         <Route path="panel-vehiculos/register" element={<RegisterForm />} />
         <Route path="reservas" element={<Reservas />} />
+        <Route path="countries" element={<Countries />} />
+        <Route path="cities" element={<Cities />} />
+        <Route path="parkings" element={<Parkings />} />
+        <Route path="permissions" element={<Permissions />} />
+        <Route
+          path="notificacion-grupos"
+          element={<NotificationGroupsPage />}
+        />
+        <Route path="reports" element={<Reports />} />
       </Route>
     </Routes>
   );

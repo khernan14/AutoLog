@@ -19,7 +19,13 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
-export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
+export default function UserTable({
+  users,
+  onEdit,
+  onDelete,
+  onBulkDelete,
+  onRestore,
+}) {
   const [selected, setSelected] = React.useState([]);
   const [sortField, setSortField] = React.useState("nombre");
   const [sortOrder, setSortOrder] = React.useState("asc");
@@ -54,6 +60,8 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
       : valB.localeCompare(valA);
   });
 
+  const isInactive = (user) => user.estatus === "Inactivo";
+
   if (isMobile) {
     // Vista móvil como tarjetas
     return (
@@ -75,10 +83,10 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
             sx={{ p: 2, borderRadius: "md" }}>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Checkbox
+                {/* <Checkbox
                   checked={selected.includes(user.id_usuario)}
                   onChange={() => toggleSelectOne(user.id_usuario)}
-                />
+                /> */}
                 <Dropdown>
                   <MenuButton
                     slots={{ root: IconButton }}
@@ -89,9 +97,15 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
                   </MenuButton>
                   <Menu>
                     <MenuItem onClick={() => onEdit(user)}>Editar</MenuItem>
-                    <MenuItem onClick={() => onDelete(user.id_usuario)}>
-                      Eliminar
-                    </MenuItem>
+                    {isInactive(user) ? (
+                      <MenuItem onClick={() => onRestore(user.id_usuario)}>
+                        Restaurar
+                      </MenuItem>
+                    ) : (
+                      <MenuItem onClick={() => onDelete(user.id_usuario)}>
+                        Eliminar
+                      </MenuItem>
+                    )}
                   </Menu>
                 </Dropdown>
               </Stack>
@@ -145,7 +159,7 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
         sx={{ minWidth: 800 }}>
         <thead>
           <tr>
-            <th>
+            {/* <th>
               <Checkbox
                 checked={selected.length === users.length}
                 indeterminate={
@@ -153,7 +167,7 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
                 }
                 onChange={(e) => toggleSelectAll(e.target.checked)}
               />
-            </th>
+            </th> */}
             {[
               { label: "Nombre", key: "nombre" },
               { label: "Email", key: "email" },
@@ -179,12 +193,12 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
         <tbody>
           {sortedUsers.map((user) => (
             <tr key={user.id_usuario}>
-              <td>
+              {/* <td>
                 <Checkbox
                   checked={selected.includes(user.id_usuario)}
                   onChange={() => toggleSelectOne(user.id_usuario)}
                 />
-              </td>
+              </td> */}
               <td>{user.nombre}</td>
               <td>{user.email}</td>
               <td>{user.username}</td>
@@ -209,9 +223,15 @@ export default function UserTable({ users, onEdit, onDelete, onBulkDelete }) {
                   </MenuButton>
                   <Menu>
                     <MenuItem onClick={() => onEdit(user)}>Editar</MenuItem>
-                    <MenuItem onClick={() => onDelete(user.id_usuario)}>
-                      Eliminar
-                    </MenuItem>
+                    {isInactive(user) ? (
+                      <MenuItem onClick={() => onRestore(user.id_usuario)}>
+                        Restaurar
+                      </MenuItem>
+                    ) : (
+                      <MenuItem onClick={() => onDelete(user.id_usuario)}>
+                        Eliminar
+                      </MenuItem>
+                    )}
                   </Menu>
                 </Dropdown>
               </td>

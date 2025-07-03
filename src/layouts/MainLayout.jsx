@@ -1,14 +1,11 @@
 import Box from "@mui/joy/Box";
-import Button from "@mui/joy/Button";
 import Breadcrumbs from "@mui/joy/Breadcrumbs";
 import Link from "@mui/joy/Link";
 import Typography from "@mui/joy/Typography";
-import { Outlet } from "react-router-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 
 import Sidebar from "../context/SideBar";
 import Header from "../components/Header/Header";
@@ -17,31 +14,28 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const pathTitles = {
-    "/admin/home": { title: "INICIO", breadcrumb: ["Dashboard", "Inicio"] },
-    "/admin/dashboard": { title: "DASHBOARD", breadcrumb: ["Dashboard"] },
-    "/admin/vehiculos": {
-      title: "Vehículos",
-      breadcrumb: ["Dashboard", "Vehículos"],
-    },
-    "/admin/usuarios": {
-      title: "Usuarios",
-      breadcrumb: ["Dashboard", "Usuarios"],
-    },
-    "/admin/registrar-uso": {
-      title: "Registrar Uso",
-      breadcrumb: ["Dashboard", "Registrar Uso"],
-    },
-    "/admin/mi-cuenta": {
-      title: "Mi Perfil",
-      breadcrumb: ["Dashboard", "Mi Perfil"],
-    },
+  const breadcrumbNameMap = {
+    home: "Home",
+    dashboard: "Dashboard",
+    vehiculos: "Vehículos",
+    "panel-vehiculos": "Registros",
+    "registrar-uso": "Registrar",
+    salida: "Salida",
+    entrada: "Entrada",
+    usuarios: "Usuarios",
+    "mi-cuenta": "Mi Perfil",
+    countries: "Países",
+    cities: "Ciudades",
+    parkings: "Estacionamientos",
   };
 
-  const current = pathTitles[location.pathname] || {
-    title: "Página",
-    breadcrumb: ["Dashboard"],
-  };
+  const pathnames = location.pathname
+    .replace(/^\/admin\/?/, "")
+    .split("/")
+    .filter((x) => x);
+
+  const buildPath = (index) =>
+    "/admin/" + pathnames.slice(0, index + 1).join("/");
 
   return (
     <Box sx={{ display: "flex", minHeight: "100dvh" }}>
@@ -63,7 +57,7 @@ export default function MainLayout() {
           flexDirection: "column",
           minWidth: 0,
           height: "100dvh",
-          overflowY: "auto", // <--- esto es importante
+          overflowY: "auto",
           gap: 1,
         }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -79,18 +73,28 @@ export default function MainLayout() {
               sx={{ cursor: "pointer" }}>
               <HomeRoundedIcon />
             </Link>
-            {current.breadcrumb.slice(0, -1).map((crumb, index) => (
-              <Link
-                key={index}
-                underline="hover"
-                color="neutral"
-                sx={{ fontSize: 12, fontWeight: 500 }}>
-                {crumb}
-              </Link>
-            ))}
-            <Typography color="primary" sx={{ fontWeight: 500, fontSize: 12 }}>
-              {current.breadcrumb[current.breadcrumb.length - 1]}
-            </Typography>
+            {pathnames.map((value, index) => {
+              const isLast = index === pathnames.length - 1;
+              const to = buildPath(index);
+              const label = breadcrumbNameMap[value] || value;
+              return isLast ? (
+                <Typography
+                  key={to}
+                  color="primary"
+                  sx={{ fontWeight: 500, fontSize: 12 }}>
+                  {label}
+                </Typography>
+              ) : (
+                <Link
+                  key={to}
+                  underline="hover"
+                  color="neutral"
+                  onClick={() => navigate(to)}
+                  sx={{ cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+                  {label}
+                </Link>
+              );
+            })}
           </Breadcrumbs>
         </Box>
         <Box
@@ -104,15 +108,8 @@ export default function MainLayout() {
             justifyContent: "space-between",
           }}>
           <Typography level="h2" component="h1">
-            {current.title}
+            {breadcrumbNameMap[pathnames[pathnames.length - 1]] || "Inicio"}
           </Typography>
-
-          <Button
-            color="primary"
-            startDecorator={<DownloadRoundedIcon />}
-            size="sm">
-            Download PDF
-          </Button>
         </Box>
         <Outlet />
       </Box>

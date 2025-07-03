@@ -7,7 +7,14 @@ import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
-export default function UserToolbar({ onSearch, onAdd }) {
+export default function UserToolbar({
+  onSearch,
+  onAdd,
+  showInactive,
+  setShowInactive,
+  onDelete,
+  selectedUsers,
+}) {
   return (
     <Box
       sx={{
@@ -21,12 +28,25 @@ export default function UserToolbar({ onSearch, onAdd }) {
       <Input
         placeholder="Buscar usuario..."
         startDecorator={<SearchRoundedIcon />}
-        onChange={(e) => onSearch(e.target.value)}
+        onChange={(e) => onSearch?.(e.target.value)}
         sx={{ width: { xs: "100%", sm: "300px" } }}
       />
 
       <Stack direction="row" spacing={1} flexWrap="wrap">
         <Button
+          variant="outlined"
+          color={showInactive ? "success" : "neutral"}
+          onClick={() => setShowInactive(!showInactive)}>
+          {showInactive ? "Ocultar inactivos" : "Mostrar inactivos"}
+        </Button>
+
+        {selectedUsers?.length > 0 && (
+          <Button variant="soft" color="danger" onClick={onDelete}>
+            Eliminar seleccionados ({selectedUsers.length})
+          </Button>
+        )}
+
+        {/* <Button
           variant="outlined"
           color="neutral"
           startDecorator={<PrintRoundedIcon />}>
@@ -43,7 +63,7 @@ export default function UserToolbar({ onSearch, onAdd }) {
           color="neutral"
           startDecorator={<FileDownloadRoundedIcon />}>
           Excel
-        </Button>
+        </Button> */}
         <Button
           variant="solid"
           color="primary"

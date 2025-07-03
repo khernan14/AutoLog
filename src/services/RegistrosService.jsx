@@ -114,6 +114,6 @@ export async function getCiudades() {
     return await res.json();
   } catch (err) {
     console.error("Error al obtener las ciudades:", err);
-    return null;
+    return [];
   }
 }

@@ -12,4 +12,10 @@ export default defineConfig({
       // agrega más si lo necesitas
     },
   },
+  server: {
+    proxy: {
+      "/api": "http://localhost:3000", // ya lo tenías
+      "/uploads": "http://localhost:3000", // 👈 agrega esto
+    },
+  },
 });
