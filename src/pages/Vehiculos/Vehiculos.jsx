@@ -23,7 +23,7 @@ export default function Vehiculos() {
   const [searchText, setSearchText] = useState("");
 
   const { user } = useAuth();
-  const isAdmin = user?.rol?.toLowerCase() === "admin";
+  const esAdmin = user?.rol?.toLowerCase() === "admin";
 
   const loadVehiculos = useCallback(async () => {
     setLoading(true);
@@ -50,7 +50,7 @@ export default function Vehiculos() {
   }, [loadVehiculos]);
 
   const handleAddVehiculo = () => {
-    const esAdmin = user?.rol?.toLowerCase() === "admin";
+    console.log("esAdmin:", esAdmin);
 
     if (vehiculos.length === 0 && !esAdmin) {
       toast.error(

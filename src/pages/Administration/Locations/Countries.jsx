@@ -13,6 +13,8 @@ import CountriesToolBar from "../../../components/Administration/Locations/Count
 import CountriesTable from "../../../components/Administration/Locations/Countries/CountriesTable";
 import CountriesModal from "../../../components/Administration/Locations/Countries/CountriesModal";
 
+import { useAuth } from "../../../context/AuthContext";
+
 export default function Countries() {
   const [countries, setCountries] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,6 +22,9 @@ export default function Countries() {
   const [openModal, setOpenModal] = useState(false);
   const [editCountry, setEditCountry] = useState(null);
   const [searchText, setSearchText] = useState("");
+
+  const { user } = useAuth();
+  const isAdmin = user?.rol?.toLowerCase() === "admin";
 
   const loadCountries = useCallback(async () => {
     setLoading(true);
@@ -46,7 +51,7 @@ export default function Countries() {
   }, [loadCountries]);
 
   const handleAddCountry = () => {
-    if (countries.length === 0) {
+    if (countries.length === 0 && !isAdmin) {
       toast.error(
         "No puedes agregar países porque no tienes permiso para ver los países."
       );
