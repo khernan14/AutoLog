@@ -1,13 +1,19 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { STORAGE_KEYS } from "../config/variables"; // Asegúrate de importar esto
+import { STORAGE_KEYS } from "../config/variables"; // Asegúrate de que tenga TOKEN y USER definidos
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const userData = localStorage.getItem(STORAGE_KEYS.USER);
-    return userData ? JSON.parse(userData) : null;
+    const userDataString = localStorage.getItem(STORAGE_KEYS.USER);
+    // console.log("AuthContext: UserData string from localStorage:", userDataString); // Debugging
+    try {
+      return userDataString ? JSON.parse(userDataString) : null;
+    } catch (e) {
+      console.error("Error parsing user data from localStorage:", e);
+      return null;
+    }
   });
 
   const [isSessionExpired, setIsSessionExpired] = useState(false);
@@ -18,9 +24,14 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
     if (!token || isExpired(token)) {
       setIsSessionExpired(true);
+      // Opcional: Si la sesión expiró, limpia el usuario para forzar re-login
+      if (user) {
+        setUser(null);
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
     }
     setCheckingSession(false);
-  }, []);
+  }, [user]); // Añadir 'user' como dependencia para re-evaluar si el usuario cambia
 
   const logout = () => {
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
@@ -30,14 +41,21 @@ export const AuthProvider = ({ children }) => {
     navigate("/auth/login");
   };
 
+  const hasPermiso = (permisoNombre) => {
+    // console.log(`Checking permission for ${permisoNombre}. User permissions:`, user?.permisos); // Debugging
+    return user?.permisos?.includes(permisoNombre);
+  };
+
   return (
     <AuthContext.Provider
       value={{
-        user,
+        userData: user, // <-- CAMBIO CLAVE: Renombrado a userData para coincidir con Sidebar
+        setUser,
         isSessionExpired,
         setIsSessionExpired,
         logout,
         checkingSession,
+        hasPermiso,
       }}>
       {children}
     </AuthContext.Provider>

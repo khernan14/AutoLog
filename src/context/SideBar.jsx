@@ -17,7 +17,6 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
-import SupportRoundedIcon from "@mui/icons-material/SupportRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
@@ -25,23 +24,33 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import AppRegistrationIcon from "@mui/icons-material/AppRegistration";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount"; // Para "Gestionar Usuarios"
+import VpnKeyIcon from "@mui/icons-material/VpnKey"; // Para "Roles & Permisos"
+import AccountCircleIcon from "@mui/icons-material/AccountCircle"; // Para "Mi Perfil"
+import PublicIcon from "@mui/icons-material/Public"; // Para Paises
+import LocationCityIcon from "@mui/icons-material/LocationCity"; // Para Ciudades
+import LocalParkingIcon from "@mui/icons-material/LocalParking"; // Para Estacionamientos
+import HelpCenterIcon from "@mui/icons-material/HelpCenter"; // Para Soporte
 
-import ColorSchemeToggle from "./ColorSchemeToggle";
-import { closeSidebar } from "../utils/ToggleSidebar";
+import { useAuth } from "./AuthContext"; // Asegúrate de que la ruta sea correcta
+
+import ColorSchemeToggle from "./ColorSchemeToggle"; // Asume que este componente está en la misma carpeta
+import { closeSidebar } from "../utils/ToggleSidebar"; // Asume que esta utilidad existe
+
 import Swal from "sweetalert2";
 
+// Helper para obtener las iniciales del nombre de usuario
 function getInitials(name) {
   if (!name) return "";
   const names = name.trim().split(" ");
-  return names
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  if (names.length === 1) return names[0].slice(0, 2).toUpperCase();
+  return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 }
 
+// Componente Toggler para menús anidados
 function Toggler({ defaultExpanded = false, renderToggle, children }) {
   const [open, setOpen] = React.useState(defaultExpanded);
+
   return (
     <>
       {renderToggle({ open, setOpen })}
@@ -56,23 +65,59 @@ function Toggler({ defaultExpanded = false, renderToggle, children }) {
           },
           open ? { gridTemplateRows: "1fr" } : { gridTemplateRows: "0fr" },
         ]}>
-        {children}
+        <List
+          sx={{ gap: 0.5, [`& .${listItemButtonClasses.root}`]: { py: 0.8 } }}>
+          {children}
+        </List>
       </Box>
     </>
   );
 }
 
-function NavItem({ path, icon, label, currentPath, onNavigate }) {
+// Componente individual para cada item de navegación
+function NavItem({
+  path,
+  icon,
+  label,
+  currentPath,
+  onNavigate,
+  canView,
+  externalLink,
+}) {
+  // canView ya es un booleano que incorpora la lógica del rol Admin
+  if (!canView) {
+    return null; // No renderiza el item si no tiene permiso
+  }
+
+  const Tag = externalLink ? "a" : ListItemButton;
+
   return (
-    <ListItem key={path}>
-      <ListItemButton
-        selected={currentPath === path}
-        onClick={() => onNavigate(path)}>
+    <ListItem>
+      <Tag
+        selected={currentPath === path && !externalLink}
+        onClick={() => onNavigate(path)}
+        {...(externalLink && {
+          href: path,
+          target: "_blank",
+          rel: "noopener noreferrer",
+        })}
+        sx={{
+          backgroundColor: currentPath === path ? "primary.solidBg" : "inherit",
+          color: currentPath === path ? "primary.solidColor" : "text.primary",
+          "&:hover": {
+            backgroundColor:
+              currentPath === path ? "primary.solidBg" : "neutral.softBg",
+            color:
+              currentPath === path
+                ? "primary.solidColor"
+                : "neutral.plainColor",
+          },
+        }}>
         {icon}
         <ListItemContent>
           <Typography level="title-sm">{label}</Typography>
         </ListItemContent>
-      </ListItemButton>
+      </Tag>
     </ListItem>
   );
 }
@@ -80,16 +125,15 @@ function NavItem({ path, icon, label, currentPath, onNavigate }) {
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermiso, userData } = useAuth();
 
-  const storedUser = React.useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("user"));
-    } catch {
-      return null;
-    }
-  }, []);
-  const userName = storedUser?.nombre || "Usuario";
-  const userEmail = storedUser?.email || "usuario@test.com";
+  // --- DEBUGGING: Revisa el contenido de userData aquí ---
+  console.log("UserData en Sidebar:", userData);
+  // Si userData es null/undefined o no tiene 'nombre'/'email', el problema está en AuthContext.
+
+  const userName = userData?.nombre || "Usuario";
+  const userEmail = userData?.email || "usuario@test.com";
+  const userRole = userData?.rol; // Obtener el rol del usuario
 
   const logout = () => {
     Swal.fire({
@@ -100,18 +144,116 @@ export default function Sidebar() {
       confirmButtonColor: "#03624C",
       cancelButtonColor: "#d33",
       confirmButtonText: "Sí, cerrar sesión",
+      cancelButtonText: "Cancelar",
     }).then((result) => {
       if (result.isConfirmed) {
         localStorage.clear();
-        navigate("/auth/login");
+        setTimeout(() => navigate("/auth/login"), 100);
       }
     });
   };
 
   const handleNavigate = (path) => {
     navigate(path);
-    if (window.matchMedia("(max-width: 768px)").matches) closeSidebar();
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      closeSidebar();
+    }
   };
+
+  // Función auxiliar para aplicar la lógica de permiso de Admin
+  const checkPermission = (permiso) => {
+    return userRole === "Admin" || hasPermiso(permiso);
+  };
+
+  const navItems = [
+    {
+      path: "/admin/home",
+      icon: <HomeRoundedIcon />,
+      label: "Inicio",
+      canView: true,
+    }, // Siempre visible
+    {
+      path: "/admin/dashboard",
+      icon: <DashboardRoundedIcon />,
+      label: "Dashboard",
+      canView: checkPermission("ver_dashboard"),
+    },
+    {
+      path: "/admin/vehiculos",
+      icon: <LocalShippingIcon />,
+      label: "Vehículos",
+      canView: checkPermission("gestionar_vehiculos"),
+    },
+    {
+      path: "/admin/panel-vehiculos",
+      icon: <AppRegistrationIcon />,
+      label: "Registros",
+      canView: checkPermission("registrar_uso"),
+    },
+    {
+      path: "/admin/reports",
+      icon: <AssessmentIcon />,
+      label: "Reportes",
+      canView: checkPermission("ver_reportes"),
+    },
+  ];
+
+  const userManagementItems = [
+    {
+      path: "/admin/mi-cuenta",
+      icon: <AccountCircleIcon />,
+      label: "Mi Perfil",
+      canView: true, // Siempre visible
+    }, // Siempre visible
+    {
+      path: "/admin/usuarios",
+      icon: <SupervisorAccountIcon />,
+      label: "Gestionar Usuarios",
+      canView: checkPermission("gestionar_usuarios"),
+    },
+    {
+      path: "/admin/permissions",
+      icon: <VpnKeyIcon />,
+      label: "Roles y Permisos",
+      canView: checkPermission("asignar_permisos"),
+    },
+  ];
+
+  const administrationItems = [
+    {
+      path: "/admin/countries",
+      icon: <PublicIcon />,
+      label: "Países",
+      canView: checkPermission("gestionar_paises"),
+    },
+    {
+      path: "/admin/cities",
+      icon: <LocationCityIcon />,
+      label: "Ciudades",
+      canView: checkPermission("gestionar_ciudades"),
+    },
+    {
+      path: "/admin/parkings",
+      icon: <LocalParkingIcon />,
+      label: "Estacionamientos",
+      canView: checkPermission("gestionar_estacionamientos"),
+    },
+  ];
+
+  const supportItems = [
+    {
+      path: "/admin/soporte",
+      icon: <HelpCenterIcon />,
+      label: "Centro de Ayuda",
+      canView: true,
+    }, // Asume que siempre está disponible
+    {
+      path: "/admin/configuraciones",
+      icon: <SettingsRoundedIcon />,
+      label: "Configuraciones",
+      canView: checkPermission("ver_configuraciones"),
+    },
+  ];
 
   return (
     <Sheet
@@ -134,6 +276,7 @@ export default function Sidebar() {
         gap: 2,
         borderRight: "1px solid",
         borderColor: "divider",
+        boxShadow: { xs: "md", md: "none" },
       }}>
       <GlobalStyles
         styles={(theme) => ({
@@ -146,27 +289,38 @@ export default function Sidebar() {
         })}
       />
       <Box className="Sidebar-overlay" onClick={closeSidebar} />
+
+      {/* Encabezado del Sidebar: Logo y Toggle de Tema */}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <IconButton
           variant="soft"
           color="primary"
           size="sm"
-          aria-label="toggle theme">
+          aria-label="icono de la aplicación">
           <BrightnessAutoRoundedIcon />
         </IconButton>
-        <Typography level="title-lg">AutoLog</Typography>
+        <Typography
+          level="title-lg"
+          sx={{ fontWeight: "xl", color: "primary.plainColor" }}>
+          AutoLog
+        </Typography>
         <ColorSchemeToggle sx={{ ml: "auto" }} />
       </Box>
+
+      {/* Barra de Búsqueda */}
       <Input
         size="sm"
         startDecorator={<SearchRoundedIcon />}
-        placeholder="Buscar"
+        placeholder="Buscar..."
         sx={{ display: { xs: "none", sm: "flex" } }}
       />
+
+      {/* Contenido principal del Sidebar: Navegación */}
       <Box
         sx={{
           minHeight: 0,
-          overflow: "hidden auto",
+          overflowY: "auto",
+          overflowX: "hidden",
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
@@ -177,176 +331,184 @@ export default function Sidebar() {
           [`& .${listItemButtonClasses.root}[aria-selected="true"]`]: {
             backgroundColor: "primary.solidBg",
             color: "primary.solidColor",
+            "&:hover": {
+              backgroundColor: "primary.solidBg",
+            },
           },
         }}>
         <Typography
           level="body-xs"
-          sx={{ pl: 2, mt: 1, mb: 0.5, color: "text.secondary" }}>
-          Navegación
+          sx={{
+            pl: 2,
+            mt: 1,
+            mb: 0.5,
+            color: "text.tertiary",
+            textTransform: "uppercase",
+          }}>
+          General
         </Typography>
         <List size="sm" sx={{ gap: 1, "--List-nestedInsetStart": "30px" }}>
-          {[
-            { path: "/admin/home", icon: <HomeRoundedIcon />, label: "Inicio" },
-            {
-              path: "/admin/dashboard",
-              icon: <DashboardRoundedIcon />,
-              label: "Dashboard",
-            },
-            {
-              path: "/admin/vehiculos",
-              icon: <LocalShippingIcon />,
-              label: "Vehículos",
-            },
-            {
-              path: "/admin/panel-vehiculos",
-              icon: <AppRegistrationIcon />,
-              label: "Registros",
-            },
-            {
-              path: "/admin/reports",
-              icon: <AssessmentIcon />,
-              label: "Reportes",
-            },
-          ].map(({ path, icon, label }) => (
-            <ListItem key={path}>
-              <ListItemButton
-                selected={location.pathname === path}
-                onClick={() => handleNavigate(path)}>
-                {icon}
-                <ListItemContent>
-                  <Typography level="title-sm">{label}</Typography>
-                </ListItemContent>
-              </ListItemButton>
-            </ListItem>
+          {navItems.map((item) => (
+            <NavItem
+              key={item.path}
+              path={item.path}
+              icon={item.icon}
+              label={item.label}
+              currentPath={location.pathname}
+              onNavigate={handleNavigate}
+              canView={item.canView}
+            />
           ))}
-          <ListItem nested>
-            <Toggler
-              renderToggle={({ open, setOpen }) => (
-                <ListItemButton
-                  onClick={() => setOpen(!open)}
-                  aria-expanded={open}>
-                  <GroupRoundedIcon />
-                  <ListItemContent>
-                    <Typography level="title-sm">Usuarios</Typography>
-                  </ListItemContent>
-                  <KeyboardArrowDownIcon
-                    sx={{ transform: open ? "rotate(180deg)" : "none" }}
+
+          {/* Menú Anidado para Usuarios */}
+          {/* Solo se muestra el toggler si el usuario puede ver al menos un elemento dentro */}
+          {(checkPermission("cambiar_password") ||
+            checkPermission("asignar_permisos")) && (
+            <ListItem nested>
+              <Toggler
+                renderToggle={({ open, setOpen }) => (
+                  <ListItemButton
+                    onClick={() => setOpen(!open)}
+                    aria-expanded={open}
+                    sx={{
+                      fontWeight: "md",
+                      "&:hover": {
+                        backgroundColor: "neutral.softBg",
+                      },
+                    }}>
+                    <GroupRoundedIcon />
+                    <ListItemContent>
+                      <Typography level="title-sm">Usuarios</Typography>
+                    </ListItemContent>
+                    <KeyboardArrowDownIcon
+                      sx={{
+                        transform: open ? "rotate(180deg)" : "none",
+                        transition: "0.2s",
+                      }}
+                    />
+                  </ListItemButton>
+                )}>
+                {userManagementItems.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    path={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    currentPath={location.pathname}
+                    onNavigate={handleNavigate}
+                    canView={item.canView}
                   />
-                </ListItemButton>
-              )}>
-              <List sx={{ gap: 0.5 }}>
-                <ListItem>
+                ))}
+              </Toggler>
+            </ListItem>
+          )}
+
+          {/* Menú Anidado para Administración */}
+          {/* Solo se muestra el toggler si el usuario puede ver al menos un elemento dentro */}
+          {(checkPermission("gestionar_paises") ||
+            checkPermission("gestionar_ciudades") ||
+            checkPermission("gestionar_estacionamientos")) && (
+            <ListItem nested>
+              <Toggler
+                renderToggle={({ open, setOpen }) => (
                   <ListItemButton
-                    onClick={() => handleNavigate("/admin/mi-cuenta")}>
-                    Mi Perfil
+                    onClick={() => setOpen(!open)}
+                    aria-expanded={open}
+                    sx={{
+                      fontWeight: "md",
+                      "&:hover": {
+                        backgroundColor: "neutral.softBg",
+                      },
+                    }}>
+                    <AdminPanelSettingsIcon />
+                    <ListItemContent>
+                      <Typography level="title-sm">Administración</Typography>
+                    </ListItemContent>
+                    <KeyboardArrowDownIcon
+                      sx={{
+                        transform: open ? "rotate(180deg)" : "none",
+                        transition: "0.2s",
+                      }}
+                    />
                   </ListItemButton>
-                </ListItem>
-                <ListItem>
-                  <ListItemButton
-                    onClick={() => handleNavigate("/admin/usuarios")}>
-                    Gestionar usuarios
-                  </ListItemButton>
-                </ListItem>
-                <ListItem>
-                  <ListItemButton
-                    onClick={() => handleNavigate("/admin/permissions")}>
-                    Roles & permission
-                  </ListItemButton>
-                </ListItem>
-              </List>
-            </Toggler>
-          </ListItem>
-          {/* otro menu */}
-          <ListItem nested>
-            <Toggler
-              renderToggle={({ open, setOpen }) => (
-                <ListItemButton
-                  onClick={() => setOpen(!open)}
-                  aria-expanded={open}>
-                  <AdminPanelSettingsIcon />
-                  <ListItemContent>
-                    <Typography level="title-sm">Administración</Typography>
-                  </ListItemContent>
-                  <KeyboardArrowDownIcon
-                    sx={{ transform: open ? "rotate(180deg)" : "none" }}
+                )}>
+                {administrationItems.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    path={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    currentPath={location.pathname}
+                    onNavigate={handleNavigate}
+                    canView={item.canView}
                   />
-                </ListItemButton>
-              )}>
-              <List sx={{ gap: 0.5 }}>
-                <ListItem>
-                  <ListItemButton
-                    onClick={() => handleNavigate("/admin/countries")}>
-                    Paises
-                  </ListItemButton>
-                </ListItem>
-                <ListItem>
-                  <ListItemButton
-                    onClick={() => handleNavigate("/admin/cities")}>
-                    Ciudades
-                  </ListItemButton>
-                </ListItem>
-                <ListItem>
-                  <ListItemButton
-                    onClick={() => handleNavigate("/admin/parkings")}>
-                    Estacionamientos
-                  </ListItemButton>
-                </ListItem>
-                {/* <ListItem>
-                  <ListItemButton
-                    onClick={() =>
-                      handleNavigate("/admin/notificacion-grupos")
-                    }>
-                    Grupos de Notificación
-                  </ListItemButton>
-                </ListItem> */}
-              </List>
-            </Toggler>
-          </ListItem>
+                ))}
+              </Toggler>
+            </ListItem>
+          )}
         </List>
 
         <Typography
           level="body-xs"
-          sx={{ pl: 2, mt: 3, mb: 0.5, color: "text.secondary" }}>
-          Configuración
+          sx={{
+            pl: 2,
+            mt: 3,
+            mb: 0.5,
+            color: "text.tertiary",
+            textTransform: "uppercase",
+          }}>
+          Soporte
         </Typography>
-        <List size="sm" sx={{ mt: "auto", flexGrow: 0, mb: 2 }}>
-          <ListItem>
-            <ListItemButton>
-              <SupportRoundedIcon />
-              Soporte
-            </ListItemButton>
-          </ListItem>
-          <ListItem>
-            <ListItemButton>
-              <SettingsRoundedIcon />
-              Configuraciones
-            </ListItemButton>
-          </ListItem>
+        <List size="sm" sx={{ gap: 1, mt: "auto", flexGrow: 0, mb: 2 }}>
+          {supportItems.map((item) => (
+            <NavItem
+              key={item.path}
+              path={item.path}
+              icon={item.icon}
+              label={item.label}
+              currentPath={location.pathname}
+              onNavigate={handleNavigate}
+              canView={item.canView}
+            />
+          ))}
         </List>
       </Box>
+
+      {/* Sección del Perfil de Usuario en el pie del Sidebar */}
       <Divider />
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", p: 1 }}>
         <Avatar
-          variant="outlined"
-          size="sm"
+          variant="soft"
+          size="md"
           sx={{
             bgcolor: "primary.softBg",
             color: "primary.softColor",
             fontWeight: "bold",
             textTransform: "uppercase",
+            border: "2px solid",
+            borderColor: "primary.softColor",
           }}>
           {getInitials(userName)}
         </Avatar>
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography level="title-sm">{userName}</Typography>
-          <Typography level="body-xs">{userEmail}</Typography>
+          <Typography level="title-md" sx={{ fontWeight: "lg" }}>
+            {userName}
+          </Typography>
+          <Typography level="body-xs" sx={{ color: "text.secondary" }}>
+            {userEmail}
+          </Typography>
         </Box>
         <IconButton
           size="sm"
           variant="plain"
           color="neutral"
           onClick={logout}
-          aria-label="Cerrar sesión">
+          aria-label="Cerrar sesión"
+          sx={{
+            "&:hover": {
+              color: "danger.plainColor",
+            },
+          }}>
           <LogoutRoundedIcon />
         </IconButton>
       </Box>
