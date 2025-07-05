@@ -33,6 +33,8 @@ export default function RegisterRegresoForm({ registro, usuario }) {
   const [fuel, setFuel] = useState("");
   const [observations, setObservations] = useState("");
   const [images, setImages] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false); // nuevo estado
+  const [errorMessage, setErrorMessage] = useState("");
 
   const navigate = useNavigate();
 
@@ -67,6 +69,7 @@ export default function RegisterRegresoForm({ registro, usuario }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true); // nuevo cambio
 
     if (
       !km_regreso ||
@@ -75,20 +78,16 @@ export default function RegisterRegresoForm({ registro, usuario }) {
       !images.length ||
       !id_ubicacion_regreso
     ) {
-      Swal.fire(
-        "Error",
-        "Por favor, rellena todos los campos obligatorios",
-        "warning"
-      );
+      setErrorMessage("Por favor, rellena todos los campos obligatorios.");
+      setIsSubmitting(false);
       return;
     }
 
     if (parseInt(km_regreso) < parseInt(kmAnterior)) {
-      Swal.fire(
-        "Error",
-        "El kilometraje de regreso no puede ser menor al de salida",
-        "warning"
+      setErrorMessage(
+        "El kilometraje de regreso no puede ser menor al de salida."
       );
+      setIsSubmitting(false);
       return;
     }
 
@@ -125,6 +124,8 @@ export default function RegisterRegresoForm({ registro, usuario }) {
     } catch (error) {
       console.error(error);
       Swal.fire("Error", "Ocurrió un error durante el registro", "error");
+    } finally {
+      setIsSubmitting(false); // ✅ apagar loading
     }
   };
 
@@ -142,6 +143,15 @@ export default function RegisterRegresoForm({ registro, usuario }) {
         px: { xs: 2, md: 6 },
         py: { xs: 2, md: 3 },
       }}>
+      {errorMessage && (
+        <Alert
+          color="danger"
+          variant="soft"
+          onClose={() => setErrorMessage("")}>
+          {errorMessage}
+        </Alert>
+      )}
+
       <Card component={"form"} onSubmit={handleSubmit}>
         <>
           <Box sx={{ mb: 1 }}>
@@ -291,8 +301,14 @@ export default function RegisterRegresoForm({ registro, usuario }) {
               onClick={handleCancel}>
               Cancelar
             </Button>
-            <Button size="sm" variant="solid" type="submit">
-              Guardar
+            <Button
+              size="sm"
+              variant="solid"
+              type="submit"
+              loading={isSubmitting} // MUI Joy soporta esto
+              disabled={isSubmitting} // para evitar doble clic
+            >
+              {isSubmitting ? "Guardando..." : "Guardar"}
             </Button>
           </CardActions>
         </CardOverflow>

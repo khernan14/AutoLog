@@ -56,6 +56,17 @@ export const endpoints = {
 
   // REPORTES
   getRegisterReport: `${API_BASE_URL}/reports/registros/`,
+  getEmpleadosMasSalidas: `${API_BASE_URL}/reports/reportes/empleados-mas-salidas`,
+  getKilometrajePorEmpleado: `${API_BASE_URL}/reports/reportes/kilometraje-por-empleado`,
+  getVehiculosMasUtilizados: `${API_BASE_URL}/reports/reportes/vehiculos-mas-utilizados`,
+  getRegistrosPorUbicacion: `${API_BASE_URL}/reports/reportes/registros-por-ubicacion`,
+  getConsumoCombustibleVehiculo: `${API_BASE_URL}/reports/reportes/consumo-combustible-vehiculo`,
+
+  // Home
+  getTotalEmpleados: `${API_BASE_URL}/reports/reportes/total-empleados`,
+  getTotalVehiculos: `${API_BASE_URL}/reports/reportes/total-vehiculos`,
+  getVehiculosEnUso: `${API_BASE_URL}/reports/reportes/vehiculos-en-uso`,
+  getVehiculosEnMantenimiento: `${API_BASE_URL}/reports/reportes/vehiculos-en-mantenimiento`,
 };
 
 // src/js/config/variables.js

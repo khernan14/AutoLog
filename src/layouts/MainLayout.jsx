@@ -27,6 +27,8 @@ export default function MainLayout() {
     countries: "Países",
     cities: "Ciudades",
     parkings: "Estacionamientos",
+    reports: "Reportes",
+    permissions: "Roles & Permission",
   };
 
   const pathnames = location.pathname

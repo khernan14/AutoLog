@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
-import dayjs from "dayjs";
-import {
-  getUbicaciones,
-  ListarVehiculosEmpleado,
-} from "../../services/VehiculosService";
+import { ListarVehiculosEmpleado } from "../../services/VehiculosService";
 import {
   obtenerCombustibleActual,
   obtenerKmActual,
@@ -25,8 +21,11 @@ import {
   Option,
   CardOverflow,
   CardActions,
+  Select,
+  Alert,
+  CircularProgress,
 } from "@mui/joy";
-import Select, { selectClasses } from "@mui/joy/Select";
+import { selectClasses } from "@mui/joy/Select";
 import { KeyboardArrowDown } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -40,11 +39,13 @@ export default function SalidaForm({ vehicles, usuario }) {
   const [fuelManual, setFuelManual] = useState(false);
   const [observations, setObservations] = useState("");
   const [images, setImages] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!usuario || !usuario.id_empleado) return;
+    if (!usuario?.id_empleado) return;
 
     const loadListVehicles = async () => {
       const data = await ListarVehiculosEmpleado(usuario.id_empleado);
@@ -55,10 +56,12 @@ export default function SalidaForm({ vehicles, usuario }) {
 
   const handleVehicleChange = async (_, value) => {
     setVehicleSelected(value);
+    setErrorMessage("");
 
     try {
       const kilometraje = await obtenerKmActual(value);
       const combustible = await obtenerCombustibleActual(value);
+
       const km = kilometraje?.km_regreso || 0;
       const combustibleActual = combustible?.combustible_regreso || 0;
 
@@ -74,7 +77,7 @@ export default function SalidaForm({ vehicles, usuario }) {
         setFuelManual(true);
       }
     } catch (error) {
-      console.error("Error obteniendo km actual:", error);
+      console.error("Error obteniendo datos:", error);
       setKmActual("");
       setKmManual(true);
       setFuelActual("");
@@ -84,6 +87,9 @@ export default function SalidaForm({ vehicles, usuario }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
+    setIsSubmitting(true);
+
     if (
       !kmActual ||
       !vehicleSelected ||
@@ -91,13 +97,8 @@ export default function SalidaForm({ vehicles, usuario }) {
       !observations ||
       !images.length
     ) {
-      Swal.fire({
-        title: "Error",
-        text: "Por favor, rellena todos los campos obligatorios",
-        icon: "warning",
-        confirmButtonColor: "#FFFA8D",
-        confirmButtonText: "Aceptar",
-      });
+      setErrorMessage("Por favor, rellena todos los campos obligatorios.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -144,6 +145,8 @@ export default function SalidaForm({ vehicles, usuario }) {
         text: "Ocurrió un error al registrar la salida. Intenta de nuevo.",
         icon: "error",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -161,8 +164,17 @@ export default function SalidaForm({ vehicles, usuario }) {
         px: { xs: 2, md: 6 },
         py: { xs: 2, md: 3 },
       }}>
+      {errorMessage && (
+        <Alert
+          color="danger"
+          variant="soft"
+          onClose={() => setErrorMessage("")}>
+          {errorMessage}
+        </Alert>
+      )}
+
       <Card
-        component={"form"}
+        component="form"
         onSubmit={handleSubmit}
         sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
         <Box sx={{ mb: 2 }}>
@@ -240,12 +252,6 @@ export default function SalidaForm({ vehicles, usuario }) {
                 "--Textarea-focusedInset": "var(--any, )",
                 "--Textarea-focusedThickness": "0.25rem",
                 "--Textarea-focusedHighlight": "rgba(13,110,253,.25)",
-                "&::before": {
-                  transition: "box-shadow .15s ease-in-out",
-                },
-                "&:focus-within": {
-                  borderColor: "#86b7fe",
-                },
               }}
             />
           </FormControl>
@@ -260,11 +266,18 @@ export default function SalidaForm({ vehicles, usuario }) {
               size="sm"
               variant="plain"
               color="neutral"
-              onClick={handleCancel}>
+              onClick={handleCancel}
+              disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button size="sm" variant="solid" type="submit">
-              Guardar
+            <Button
+              size="sm"
+              variant="solid"
+              type="submit"
+              loading={isSubmitting}
+              disabled={isSubmitting}
+              startDecorator={isSubmitting && <CircularProgress size="sm" />}>
+              {isSubmitting ? "Guardando..." : "Guardar"}
             </Button>
           </CardActions>
         </CardOverflow>
