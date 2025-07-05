@@ -1,6 +1,6 @@
 import * as React from "react";
 import RegisterReport from "../../../Reports/RegisterReport";
-import EmpleadosMasSalidas from "../../../Reports/EmpleadosmasSalidas";
+import EmpleadosMasSalidas from "../../../Reports/EmpleadosMasSalidas.jsx";
 import KilometrajePorEmpleado from "../../../Reports/KilometrajePorEmpleado.jsx";
 import VehiculosMasUtilizados from "../../../Reports/VehiculosMasUtilizados.jsx";
 import RegistrosPorUbicacion from "../../../Reports/RegistrosPorUbicacion.jsx";
