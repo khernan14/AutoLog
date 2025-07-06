@@ -6,6 +6,7 @@ import {
   registrarSalida,
   SubirImagenesRegistro,
 } from "../../services/RegistrosService";
+import { sendNotificacionSalida } from "../../services/MailServices";
 import UploadImages from "./UploadImages";
 import {
   Box,
@@ -30,7 +31,7 @@ import { KeyboardArrowDown } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
-export default function SalidaForm({ vehicles, usuario }) {
+export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
   const [vehicleSelected, setVehicleSelected] = useState("");
   const [listVehicles, setListVehicles] = useState([]);
   const [kmActual, setKmActual] = useState("");
@@ -134,6 +135,17 @@ export default function SalidaForm({ vehicles, usuario }) {
           }).then(() => {
             navigate("/admin/panel-vehiculos", {
               state: { mensaje: "Salida registrada con éxito 🚗✅" },
+            });
+            const destinatarios = [usuario.email];
+            if (emailSupervisor?.supervisor_email) {
+              destinatarios.push(emailSupervisor.supervisor_email);
+            }
+
+            sendNotificacionSalida({
+              to: [usuario.email, emailSupervisor.supervisor_email],
+              employeeName: usuario.nombre,
+              vehicleName: foundVehicle.placa,
+              supervisorName: emailSupervisor.supervisor_nombre,
             });
           });
         }

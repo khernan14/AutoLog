@@ -6,9 +6,11 @@ import Swal from "sweetalert2";
 import SalidaForm from "../../components/RegisterForm/RegisterSalidaForm";
 import { obtenerVehiculos } from "../../services/VehiculosService";
 import RegresoForm from "../../components/RegisterForm/RegisterRegresoForm";
+import { getEmailSupervisor } from "../../services/AuthServices";
 
 export default function RegisterForm() {
   const [usuario, setUsuario] = useState(null);
+  const [emailSupervisor, setEmailSupervisor] = useState(null);
   const [registroActivo, setRegistroActivo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState([]);
@@ -56,6 +58,21 @@ export default function RegisterForm() {
     fetchVehicles();
   }, []);
 
+  useEffect(() => {
+    const loadEmailSupervisor = async () => {
+      if (!usuario?.id_empleado) return;
+
+      try {
+        const data = await getEmailSupervisor(usuario.id_empleado);
+        setEmailSupervisor(data);
+      } catch (error) {
+        console.error("Error al obtener el email del supervisor:", error);
+      }
+    };
+
+    loadEmailSupervisor();
+  }, [usuario]);
+
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
@@ -73,9 +90,17 @@ export default function RegisterForm() {
       </Typography>
 
       {registroActivo ? (
-        <RegresoForm registro={registroActivo} usuario={usuario} />
+        <RegresoForm
+          registro={registroActivo}
+          usuario={usuario}
+          emailSupervisor={emailSupervisor}
+        />
       ) : (
-        <SalidaForm vehicles={vehicles} usuario={usuario} />
+        <SalidaForm
+          vehicles={vehicles}
+          usuario={usuario}
+          emailSupervisor={emailSupervisor}
+        />
       )}
     </Box>
   );

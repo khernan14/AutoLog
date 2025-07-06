@@ -53,6 +53,19 @@ export async function getUsers() {
   }
 }
 
+export async function getEmailSupervisor(idEmpleado) {
+  try {
+    const res = await fetchConToken(
+      `${endpoints.getEmailSupervisor}?id_empleado=${idEmpleado}`
+    );
+    const data = await res.json();
+    return res.ok ? data : null;
+  } catch (err) {
+    console.error("Get email supervisor error:", err);
+    return null;
+  }
+}
+
 export async function getUserSupervisors() {
   try {
     const res = await fetchConToken(`${endpoints.getEmpleados}/supervisor`);

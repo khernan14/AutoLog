@@ -75,7 +75,7 @@ export default function ResetPassword() {
       // Redirigir al login después de un breve retraso si fue exitoso
       setTimeout(() => {
         navigate("/auth/login");
-      }, 3000); // Redirige después de 3 segundos para que el usuario lea el mensaje
+      }, 2000); // Redirige después de 3 segundos para que el usuario lea el mensaje
     } catch (err) {
       console.error("Error al restablecer contraseña:", err);
       setError(

@@ -25,8 +25,14 @@ import {
   registrarEntrada,
   SubirImagenesRegistro,
 } from "../../services/RegistrosService";
+import { getParkings } from "../../services/ParkingServices";
+import { sendNotificacionRegreso } from "../../services/MailServices";
 
-export default function RegisterRegresoForm({ registro, usuario }) {
+export default function RegisterRegresoForm({
+  registro,
+  usuario,
+  emailSupervisor,
+}) {
   const [kmAnterior, setKmAnterior] = useState("");
   const [km_regreso, setkm_regreso] = useState("");
   const [id_ubicacion_regreso, setIdUbicacionRegreso] = useState("");
@@ -35,18 +41,26 @@ export default function RegisterRegresoForm({ registro, usuario }) {
   const [images, setImages] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false); // nuevo estado
   const [errorMessage, setErrorMessage] = useState("");
+  const [estacionamientos, setEstacionamientos] = useState([]);
 
   const navigate = useNavigate();
 
-  const estacionamientos = [
-    { id: 1, nombre: "Estacionamiento E1" },
-    { id: 2, nombre: "Estacionamiento E2" },
-    { id: 3, nombre: "Estacionamiento E3" },
-    { id: 4, nombre: "Estacionamiento S1" },
-    { id: 5, nombre: "Estacionamiento S2" },
-    { id: 6, nombre: "Estacionamiento S3" },
-    { id: 7, nombre: "Estacionamiento S4" },
-  ];
+  const estacionamientoNombre =
+    estacionamientos.find((e) => e.id === id_ubicacion_regreso)
+      ?.nombre_ubicacion || "Desconocido";
+
+  useEffect(() => {
+    const fetchParkings = async () => {
+      try {
+        const data = await getParkings();
+        setEstacionamientos(data);
+      } catch (error) {
+        console.error("Error al obtener estacionamientos:", error);
+      }
+    };
+
+    fetchParkings();
+  }, []);
 
   useEffect(() => {
     if (!usuario?.id_empleado || !registro?.id_vehiculo) return;
@@ -105,10 +119,29 @@ export default function RegisterRegresoForm({ registro, usuario }) {
       const onlyFiles = images.map((f) => f.file);
 
       if (registerReturn) {
+        // 🔔 Enviar correo de regreso
+        const emailData = {
+          to: [usuario.email, emailSupervisor?.supervisor_email].filter(
+            Boolean
+          ),
+          employeeName: usuario.nombre,
+          vehicleName: registro.placa,
+          supervisorName: emailSupervisor?.supervisor_nombre,
+          estacionamiento: estacionamientoNombre,
+        };
+
+        try {
+          await sendNotificacionRegreso(emailData);
+        } catch (err) {
+          console.warn("No se pudo enviar el correo de regreso:", err);
+        }
+
+        // 📷 Subir imágenes
         const imageData = await SubirImagenesRegistro(
           registro.id_registro,
           onlyFiles
         );
+
         if (imageData) {
           Swal.fire(
             "Proceso completo",
@@ -125,7 +158,7 @@ export default function RegisterRegresoForm({ registro, usuario }) {
       console.error(error);
       Swal.fire("Error", "Ocurrió un error durante el registro", "error");
     } finally {
-      setIsSubmitting(false); // ✅ apagar loading
+      setIsSubmitting(false);
     }
   };
 
@@ -217,7 +250,7 @@ export default function RegisterRegresoForm({ registro, usuario }) {
                       <Option value="">Selecciona un estacionamiento</Option>
                       {estacionamientos.map((e) => (
                         <Option key={e.id} value={e.id}>
-                          {e.nombre}
+                          {e.nombre_ubicacion}
                         </Option>
                       ))}
                     </Select>

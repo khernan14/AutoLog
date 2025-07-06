@@ -34,6 +34,9 @@ export default function ForgotPasswordRequest() {
         response.message ||
           "Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña."
       );
+      setTimeout(() => {
+        navigate("/auth/login");
+      }, 2000);
     } catch (err) {
       console.error("Error al solicitar restablecimiento:", err);
       setError(

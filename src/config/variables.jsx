@@ -16,6 +16,7 @@ export const endpoints = {
   dashboard: `${API_BASE_URL}/dashboard`,
   registerUsers: `${API_BASE_URL}/auth/register`,
   getUsers: `${API_BASE_URL}/auth/usuarios`,
+  getEmailSupervisor: `${API_BASE_URL}/auth/email-supervisor`,
   updateUser: `${API_BASE_URL}/auth/usuarios/`,
   getUsersById: `${API_BASE_URL}/auth/usuarios/`,
   deleteUser: `${API_BASE_URL}/auth/usuarios/`,
@@ -41,7 +42,12 @@ export const endpoints = {
   getUserPermissions: `${API_BASE_URL}/permisos/`,
   updateUserPermissions: `${API_BASE_URL}/permisos/asignar`,
   getUserPermissionsList: `${API_BASE_URL}/permisos/usuarios`,
+
+  // NOTIFICACIONES
   sendMail: `${API_BASE_URL}/mail/`,
+  sendNotificacionSalida: `${API_BASE_URL}/mail/notification-salida`,
+  sendNotificacionEntrada: `${API_BASE_URL}/mail/notification-regreso`,
+
   // GRUPOS DE NOTIFICACIÓN
   getGroups: `${API_BASE_URL}/grupos/`,
   getGroup: `${API_BASE_URL}/grupos/`,
