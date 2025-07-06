@@ -21,6 +21,8 @@ export const endpoints = {
   deleteUser: `${API_BASE_URL}/auth/usuarios/`,
   restoreUser: `${API_BASE_URL}/auth/usuarios/`,
   updateMyAccount: `${API_BASE_URL}/auth/perfil`,
+  resetPassword: `${API_BASE_URL}/auth/reset-password`,
+  forgotPassword: `${API_BASE_URL}/mail/forgot-password`,
   getUbicaciones: `${API_BASE_URL}/vehiculos/ubicaciones`,
   getEmpleados: `${API_BASE_URL}/empleados/`,
   Reservas: `${API_BASE_URL}/reservas`,

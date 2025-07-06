@@ -46,16 +46,28 @@ export const AuthProvider = ({ children }) => {
     return user?.permisos?.includes(permisoNombre);
   };
 
+  const restoreSessionFromStorage = () => {
+    const userDataString = localStorage.getItem(STORAGE_KEYS.USER);
+    try {
+      const parsedUser = userDataString ? JSON.parse(userDataString) : null;
+      setUser(parsedUser);
+    } catch (e) {
+      console.error("Error restoring user from localStorage:", e);
+      setUser(null);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
-        userData: user, // <-- CAMBIO CLAVE: Renombrado a userData para coincidir con Sidebar
+        userData: user,
         setUser,
         isSessionExpired,
         setIsSessionExpired,
         logout,
         checkingSession,
         hasPermiso,
+        restoreSessionFromStorage, // 👈 agregado aquí
       }}>
       {children}
     </AuthContext.Provider>

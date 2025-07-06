@@ -161,3 +161,26 @@ export async function restoreUser(id) {
     return null;
   }
 }
+
+export async function restablecerContrasenia(token, newPassword) {
+  try {
+    const res = await fetch(endpoints.resetPassword, {
+      method: "POST", // CAMBIO: De PUT a POST
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword }), // 'dataSend' debe contener { token: "...", newPassword: "..." }
+    });
+
+    console.log("Enviando:", { token, newPassword });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(
+        errorData.message || "No se pudo restablecer la contraseña."
+      );
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("restablecerContraseña error:", err);
+    throw err;
+  }
+}

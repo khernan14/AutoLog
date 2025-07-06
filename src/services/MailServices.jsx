@@ -18,3 +18,24 @@ export async function sendMail(data) {
     return null;
   }
 }
+
+export async function sendRecoveryPassword(email) {
+  console.log("sendRecoveryPassword:", email);
+
+  try {
+    const res = await fetch(endpoints.forgotPassword, {
+      method: "POST",
+      body: JSON.stringify({ email }), // 👈 ¡Este es el fix!
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) throw new Error("No se pudo enviar el mail");
+
+    return await res.json();
+  } catch (err) {
+    console.error("sendRecoveryPassword error:", err);
+    throw err;
+  }
+}
