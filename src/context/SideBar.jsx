@@ -30,7 +30,12 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle"; // Para "Mi P
 import PublicIcon from "@mui/icons-material/Public"; // Para Paises
 import LocationCityIcon from "@mui/icons-material/LocationCity"; // Para Ciudades
 import LocalParkingIcon from "@mui/icons-material/LocalParking"; // Para Estacionamientos
-import HelpCenterIcon from "@mui/icons-material/HelpCenter"; // Para Soporte
+import HelpCenterIcon from "@mui/icons-material/HelpCenter"; // Para Soporte (Frontend)
+import SupportAgentIcon from "@mui/icons-material/SupportAgent"; // Nuevo icono para Soporte Admin
+import QuestionAnswerRoundedIcon from "@mui/icons-material/QuestionAnswerRounded"; // Icono para FAQs
+import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded"; // Icono para Tutoriales
+import AnnouncementRoundedIcon from "@mui/icons-material/AnnouncementRounded"; // Icono para Novedades
+import DnsRoundedIcon from "@mui/icons-material/DnsRounded"; // Icono para Estado del Sistema
 
 import { useAuth } from "./AuthContext"; // Asegúrate de que la ruta sea correcta
 
@@ -127,10 +132,6 @@ export default function Sidebar() {
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
 
-  // --- DEBUGGING: Revisa el contenido de userData aquí ---
-  console.log("UserData en Sidebar:", userData);
-  // Si userData es null/undefined o no tiene 'nombre'/'email', el problema está en AuthContext.
-
   const userName = userData?.nombre || "Usuario";
   const userEmail = userData?.email || "usuario@test.com";
   const userRole = userData?.rol; // Obtener el rol del usuario
@@ -204,7 +205,7 @@ export default function Sidebar() {
       icon: <AccountCircleIcon />,
       label: "Mi Perfil",
       canView: true, // Siempre visible
-    }, // Siempre visible
+    },
     {
       path: "/admin/usuarios",
       icon: <SupervisorAccountIcon />,
@@ -240,13 +241,41 @@ export default function Sidebar() {
     },
   ];
 
+  // NUEVOS ITEMS PARA EL MENÚ DE SOPORTE (ADMIN)
+  const supportAdminItems = [
+    {
+      path: "/admin/faqs",
+      icon: <QuestionAnswerRoundedIcon />,
+      label: "Gestionar FAQs",
+      canView: checkPermission("gestionar_faqs"), // Nuevo permiso
+    },
+    {
+      path: "/admin/help/tutorials",
+      icon: <VideoLibraryRoundedIcon />,
+      label: "Gestionar Tutoriales",
+      canView: checkPermission("gestionar_tutoriales"), // Nuevo permiso
+    },
+    {
+      path: "/admin/help/changelogs",
+      icon: <AnnouncementRoundedIcon />,
+      label: "Gestionar Novedades",
+      canView: checkPermission("gestionar_novedades"), // Nuevo permiso
+    },
+    {
+      path: "/admin/help/services",
+      icon: <DnsRoundedIcon />,
+      label: "Estado de Servicios",
+      canView: checkPermission("gestionar_servicios_sistema"), // Nuevo permiso
+    },
+  ];
+
   const supportItems = [
     {
       path: "/admin/soporte",
       icon: <HelpCenterIcon />,
       label: "Centro de Ayuda",
       canView: true,
-    }, // Asume que siempre está disponible
+    }, // Siempre visible para todos los usuarios
     {
       path: "/admin/configuraciones",
       icon: <SettingsRoundedIcon />,
@@ -363,7 +392,8 @@ export default function Sidebar() {
           {/* Menú Anidado para Usuarios */}
           {/* Solo se muestra el toggler si el usuario puede ver al menos un elemento dentro */}
           {(checkPermission("cambiar_password") ||
-            checkPermission("asignar_permisos")) && (
+            checkPermission("asignar_permisos") ||
+            checkPermission("gestionar_usuarios")) && ( // Agregado gestionar_usuarios aquí
             <ListItem nested>
               <Toggler
                 renderToggle={({ open, setOpen }) => (
@@ -404,7 +434,6 @@ export default function Sidebar() {
           )}
 
           {/* Menú Anidado para Administración */}
-          {/* Solo se muestra el toggler si el usuario puede ver al menos un elemento dentro */}
           {(checkPermission("gestionar_paises") ||
             checkPermission("gestionar_ciudades") ||
             checkPermission("gestionar_estacionamientos")) && (
@@ -433,6 +462,50 @@ export default function Sidebar() {
                   </ListItemButton>
                 )}>
                 {administrationItems.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    path={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    currentPath={location.pathname}
+                    onNavigate={handleNavigate}
+                    canView={item.canView}
+                  />
+                ))}
+              </Toggler>
+            </ListItem>
+          )}
+
+          {/* NUEVO: Menú Anidado para Soporte (Admin) */}
+          {(checkPermission("gestionar_faqs") ||
+            checkPermission("gestionar_tutoriales") ||
+            checkPermission("gestionar_novedades") ||
+            checkPermission("gestionar_servicios_sistema")) && (
+            <ListItem nested>
+              <Toggler
+                renderToggle={({ open, setOpen }) => (
+                  <ListItemButton
+                    onClick={() => setOpen(!open)}
+                    aria-expanded={open}
+                    sx={{
+                      fontWeight: "md",
+                      "&:hover": {
+                        backgroundColor: "neutral.softBg",
+                      },
+                    }}>
+                    <SupportAgentIcon /> {/* Icono para Soporte Admin */}
+                    <ListItemContent>
+                      <Typography level="title-sm">Soporte (Admin)</Typography>
+                    </ListItemContent>
+                    <KeyboardArrowDownIcon
+                      sx={{
+                        transform: open ? "rotate(180deg)" : "none",
+                        transition: "0.2s",
+                      }}
+                    />
+                  </ListItemButton>
+                )}>
+                {supportAdminItems.map((item) => (
                   <NavItem
                     key={item.path}
                     path={item.path}

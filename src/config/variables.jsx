@@ -75,6 +75,34 @@ export const endpoints = {
   getTotalVehiculos: `${API_BASE_URL}/reports/reportes/total-vehiculos`,
   getVehiculosEnUso: `${API_BASE_URL}/reports/reportes/vehiculos-en-uso`,
   getVehiculosEnMantenimiento: `${API_BASE_URL}/reports/reportes/vehiculos-en-mantenimiento`,
+
+  // FAQs
+  getFAQs: `${API_BASE_URL}/help/faqs`,
+  addFAQ: `${API_BASE_URL}/help/faqs`,
+  updateFAQ: `${API_BASE_URL}/help/faqs`, // Se usará con ID en la URL
+  deleteFAQ: `${API_BASE_URL}/help/faqs`, // Se usará con ID en la URL
+
+  // Tutoriales
+  getTutorials: `${API_BASE_URL}/help/tutorials`,
+  addTutorial: `${API_BASE_URL}/help/tutorials`,
+  updateTutorial: `${API_BASE_URL}/help/tutorials`, // Se usará con ID en la URL
+  deleteTutorial: `${API_BASE_URL}/help/tutorials`, // Se usará con ID en la URL
+
+  // Changelogs (Novedades y Anuncios)
+  getChangelogs: `${API_BASE_URL}/help/changelogs`,
+  addChangelog: `${API_BASE_URL}/help/changelogs`,
+  updateChangelog: `${API_BASE_URL}/help/changelogs`, // Se usará con ID en la URL
+  deleteChangelog: `${API_BASE_URL}/help/changelogs`, // Se usará con ID en la URL
+
+  // System Services (Estado de Servicios)
+  getSystemServices: `${API_BASE_URL}/help/services`,
+  addSystemService: `${API_BASE_URL}/help/services`,
+  updateSystemServiceStatus: `${API_BASE_URL}/help/services`, // Se usará con ID en la URL
+  deleteSystemService: `${API_BASE_URL}/help/services`, // Se usará con ID en la URL
+
+  // System Overall Status Log (Historial de Estado General)
+  getOverallStatusHistory: `${API_BASE_URL}/help/status/history`,
+  addOverallStatusLog: `${API_BASE_URL}/help/status/log`,
 };
 
 // src/js/config/variables.js

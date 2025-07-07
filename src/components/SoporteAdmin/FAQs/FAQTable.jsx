@@ -18,7 +18,7 @@ import {
 import { useTheme } from "@mui/joy/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded"; // Used for inactivation
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded"; // Usado para inactivar
 import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded"; // New icon for restore
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded"; // Icon for dropdown menu
 import Swal from "sweetalert2"; // For confirmations
@@ -51,7 +51,7 @@ export default function FAQTable({
 
     const resultSwal = await Swal.fire({
       title: `¿Estás seguro de inactivar esta FAQ?`,
-      text: `La FAQ "${faq.question}" será marcada como inactiva.`,
+      text: `La FAQ "${faq.question}" será marcada como inactiva. Podrás restaurarla más tarde.`, // Mensaje más informativo
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -75,7 +75,7 @@ export default function FAQTable({
 
     const resultSwal = await Swal.fire({
       title: `¿Estás seguro de activar esta FAQ?`,
-      text: `La FAQ "${faq.question}" será marcada como activa.`,
+      text: `La FAQ "${faq.question}" será marcada como activa nuevamente.`, // Mensaje más informativo
       icon: "info",
       showCancelButton: true,
       confirmButtonColor: "#03624C", // Green for success
@@ -96,8 +96,6 @@ export default function FAQTable({
         <Typography level="body-md" color="text.secondary">
           No hay preguntas frecuentes para mostrar.
         </Typography>
-        {/* You could add a button to add the first FAQ here if desired */}
-        {/* <Button sx={{ mt: 2 }} onClick={onAdd}>Add first FAQ</Button> */}
       </Box>
     );
   }
@@ -169,11 +167,11 @@ export default function FAQTable({
                   <MoreHorizRoundedIcon />
                 </MenuButton>
                 <Menu>
-                  {/* Edit MenuItem */}
+                  {/* MenuItem para Editar */}
                   <MenuItem onClick={() => onEdit(faq)} disabled={!canEdit}>
                     <EditRoundedIcon /> Editar
                   </MenuItem>
-                  {/* Conditional Delete or Restore MenuItem */}
+                  {/* MenuItem condicional para Inactivar o Activar */}
                   {faq.isActive ? (
                     <MenuItem
                       onClick={() => handleDeleteConfirm(faq)}
@@ -208,7 +206,7 @@ export default function FAQTable({
       }}>
       <Table
         hoverRow
-        aria-label="FAQ table"
+        aria-label="Tabla de FAQs"
         size="md"
         stickyHeader
         sx={{
@@ -266,11 +264,11 @@ export default function FAQTable({
                     <MoreHorizRoundedIcon />
                   </MenuButton>
                   <Menu>
-                    {/* Edit MenuItem */}
+                    {/* MenuItem para Editar */}
                     <MenuItem onClick={() => onEdit(faq)} disabled={!canEdit}>
                       <EditRoundedIcon /> Editar
                     </MenuItem>
-                    {/* Conditional Delete or Restore MenuItem */}
+                    {/* MenuItem condicional para Inactivar o Activar */}
                     {faq.isActive ? (
                       <MenuItem
                         onClick={() => handleDeleteConfirm(faq)}

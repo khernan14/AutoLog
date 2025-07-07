@@ -15,6 +15,8 @@ import Parkings from "../pages/Administration/Parkings/Parkings";
 import Permissions from "../pages/Administration/Permissions/Permissions";
 import NotificationGroupsPage from "../pages/Administration/NotificationGroups/NotificationGroupsPage";
 import Reports from "../pages/Reports/ReportsPage.jsx";
+import HelpPage from "../pages/HelpPage/HelpPage.jsx";
+import FAQsAdminPage from "../pages/SoporteAdmin/FAQsAdminPage.jsx";
 
 export default function DashboardRoutes() {
   return (
@@ -38,6 +40,8 @@ export default function DashboardRoutes() {
           element={<NotificationGroupsPage />}
         />
         <Route path="reports" element={<Reports />} />
+        <Route path="soporte" element={<HelpPage />} />
+        <Route path="faqs" element={<FAQsAdminPage />} />
       </Route>
     </Routes>
   );
