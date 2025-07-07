@@ -19,7 +19,7 @@ import {
   addFAQ,
   updateFAQ,
   deleteFAQ, // Este servicio se usará para inactivar (isActive = false)
-} from "../../services/helpServices"; // Ajusta la ruta
+} from "../../services/HelpServices"; // Ajusta la ruta
 
 // Importa los componentes que creamos
 import FAQFormModal from "../../components/SoporteAdmin/FAQs/FAQFormModal";
