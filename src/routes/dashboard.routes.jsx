@@ -17,6 +17,7 @@ import NotificationGroupsPage from "../pages/Administration/NotificationGroups/N
 import Reports from "../pages/Reports/ReportsPage.jsx";
 import HelpPage from "../pages/HelpPage/HelpPage.jsx";
 import FAQsAdminPage from "../pages/SoporteAdmin/FAQsAdminPage.jsx";
+import ConfigPage from "../pages/Configuraciones/ConfigPage.jsx";
 
 export default function DashboardRoutes() {
   return (
@@ -42,6 +43,7 @@ export default function DashboardRoutes() {
         <Route path="reports" element={<Reports />} />
         <Route path="soporte" element={<HelpPage />} />
         <Route path="faqs" element={<FAQsAdminPage />} />
+        <Route path="configuraciones" element={<ConfigPage />} />
       </Route>
     </Routes>
   );

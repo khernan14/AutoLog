@@ -333,7 +333,7 @@ export default function Sidebar() {
           sx={{ fontWeight: "xl", color: "primary.plainColor" }}>
           AutoLog
         </Typography>
-        <ColorSchemeToggle sx={{ ml: "auto" }} />
+        {/* <ColorSchemeToggle sx={{ ml: "auto" }} /> */}
       </Box>
 
       {/* Barra de Búsqueda */}
