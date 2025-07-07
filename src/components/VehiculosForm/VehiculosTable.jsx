@@ -1,194 +1,130 @@
-// src/components/SoporteAdmin/FAQTable.jsx
-
-import React from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   Box,
   Table,
   IconButton,
   Typography,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
   Sheet,
-  Chip,
-  Stack,
   Button,
-  Dropdown, // Importar Dropdown
-  Menu, // Importar Menu
-  MenuButton, // Importar MenuButton
-  MenuItem, // Importar MenuItem
+  Stack,
 } from "@mui/joy";
 import { useTheme } from "@mui/joy/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded"; // Used for inactivation
-import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded"; // New icon for restore
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded"; // Icon for dropdown menu
-import Swal from "sweetalert2"; // For confirmations
-import { toast } from "react-toastify"; // Ensure toast is available for info messages
 
-export default function FAQTable({
-  faqs,
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+
+export default function VehiculosTable({
+  vehiculos,
   onEdit,
-  onDelete, // This function is now used for inactivating a FAQ
-  onRestore, // New function for activating a FAQ
-  canEdit, // Permission to edit
-  canDelete, // Permission to inactivate (logical delete)
-  canRestore, // Permission to activate (restore)
+  onDelete,
+  onBulkDelete,
+  onRestore,
 }) {
+  const [selected, setSelected] = useState([]);
+  const [sortField, setSortField] = useState("placa");
+  const [sortOrder, setSortOrder] = useState("asc");
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // Determines the Chip color based on active/inactive status
-  const getStatusColor = (isActive) => {
-    return isActive ? "success" : "danger";
-  };
+  const toggleSelectAll = useCallback(
+    (checked) => {
+      setSelected(checked ? vehiculos.map((v) => v.id) : []);
+    },
+    [vehiculos]
+  );
 
-  // Handler for delete (inactivate) confirmation
-  const handleDeleteConfirm = async (faq) => {
-    // If the FAQ is already inactive, prevent further action
-    if (!faq.isActive) {
-      toast.info(`La FAQ "${faq.question}" ya está inactiva.`);
-      return;
-    }
-
-    const resultSwal = await Swal.fire({
-      title: `¿Estás seguro de inactivar esta FAQ?`,
-      text: `La FAQ "${faq.question}" será marcada como inactiva.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, inactivar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (resultSwal.isConfirmed) {
-      onDelete(faq.id); // Call the onDelete function (which is handleDeleteFaq in the parent)
-    }
-  };
-
-  // Handler for restore (activate) confirmation
-  const handleRestoreConfirm = async (faq) => {
-    // If the FAQ is already active, prevent further action
-    if (faq.isActive) {
-      toast.info(`La FAQ "${faq.question}" ya está activa.`);
-      return;
-    }
-
-    const resultSwal = await Swal.fire({
-      title: `¿Estás seguro de activar esta FAQ?`,
-      text: `La FAQ "${faq.question}" será marcada como activa.`,
-      icon: "info",
-      showCancelButton: true,
-      confirmButtonColor: "#03624C", // Green for success
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, activar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (resultSwal.isConfirmed) {
-      onRestore(faq.id); // Call the onRestore function in the parent
-    }
-  };
-
-  // Message if no FAQs are available
-  if (!faqs || faqs.length === 0) {
-    return (
-      <Box textAlign="center" py={4}>
-        <Typography level="body-md" color="text.secondary">
-          No hay preguntas frecuentes para mostrar.
-        </Typography>
-        {/* You could add a button to add the first FAQ here if desired */}
-        {/* <Button sx={{ mt: 2 }} onClick={onAdd}>Add first FAQ</Button> */}
-      </Box>
+  const toggleSelectOne = useCallback((id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
-  }
+  }, []);
 
-  // --- Mobile View (Cards) ---
+  const handleSort = useCallback(
+    (field) => {
+      if (field === sortField) {
+        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    },
+    [sortField]
+  );
+
+  const sortedVehiculos = useMemo(() => {
+    return [...vehiculos].sort((a, b) => {
+      const valA = a[sortField]?.toString().toLowerCase() ?? "";
+      const valB = b[sortField]?.toString().toLowerCase() ?? "";
+      return sortOrder === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+  }, [vehiculos, sortField, sortOrder]);
+
+  const isInactive = (vehiculo) => vehiculo.estado === "Inactivo";
+
   if (isMobile) {
     return (
-      <Stack spacing={2} sx={{ mb: 2 }}>
-        {faqs.map((faq) => (
-          <Sheet
-            key={faq.id}
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: "lg",
-              boxShadow: "sm",
-              display: "flex",
-              flexDirection: "column",
-              gap: 1.5,
-              // Style for inactive FAQs
-              ...(faq.isActive === false && {
-                opacity: 0.7,
-                fontStyle: "italic",
-                bgcolor: "neutral.softBg",
-              }),
-            }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-              }}>
-              <Typography level="title-md" sx={{ flexGrow: 1, pr: 1 }}>
-                {faq.question}
-              </Typography>
-              <Chip
-                size="sm"
-                variant="soft"
-                color={getStatusColor(faq.isActive)}
-                sx={{
-                  "--Chip-radius": "md",
-                  minWidth: "70px",
-                  justifyContent: "center",
-                }}>
-                {faq.isActive ? "Activa" : "Inactiva"}
-              </Chip>
-            </Box>
-            <Typography level="body-sm">
-              <strong>Categoría:</strong> {faq.category}
-            </Typography>
-            <Typography level="body-sm">
-              <strong>Orden:</strong> {faq.order ?? "N/A"}
-            </Typography>
-            <Typography level="body-sm">
-              <strong>Respuesta:</strong> {faq.answer.substring(0, 100)}...
-            </Typography>
+      <Stack spacing={2}>
+        {selected.length > 0 && (
+          <Button
+            color="danger"
+            variant="soft"
+            startDecorator={<DeleteRoundedIcon />}
+            onClick={() => onBulkDelete(selected)}>
+            Eliminar seleccionados ({selected.length})
+          </Button>
+        )}
 
-            {/* Actions at the bottom of the card using Dropdown */}
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ mt: 1, justifyContent: "flex-end" }}>
-              <Dropdown>
-                <MenuButton
-                  slots={{ root: IconButton }}
-                  slotProps={{
-                    root: { variant: "plain", color: "neutral", size: "sm" },
-                  }}>
-                  <MoreHorizRoundedIcon />
-                </MenuButton>
-                <Menu>
-                  {/* Edit MenuItem */}
-                  <MenuItem onClick={() => onEdit(faq)} disabled={!canEdit}>
-                    <EditRoundedIcon /> Editar
-                  </MenuItem>
-                  {/* Conditional Delete or Restore MenuItem */}
-                  {faq.isActive ? (
-                    <MenuItem
-                      onClick={() => handleDeleteConfirm(faq)}
-                      disabled={!canDelete}>
-                      <DeleteRoundedIcon /> Inactivar
-                    </MenuItem>
-                  ) : (
-                    <MenuItem
-                      onClick={() => handleRestoreConfirm(faq)}
-                      disabled={!canRestore}>
-                      <RestoreRoundedIcon /> Activar
-                    </MenuItem>
-                  )}
-                </Menu>
-              </Dropdown>
+        {sortedVehiculos.map((vehiculo) => (
+          <Sheet
+            key={vehiculo.id}
+            variant="outlined"
+            sx={{ p: 2, borderRadius: "md" }}>
+            <Stack spacing={1}>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography level="title-md">{vehiculo.placa}</Typography>
+                <Dropdown>
+                  <MenuButton
+                    slots={{ root: IconButton }}
+                    slotProps={{
+                      root: { variant: "plain", color: "neutral" },
+                    }}>
+                    <MoreHorizRoundedIcon />
+                  </MenuButton>
+                  <Menu>
+                    <MenuItem onClick={() => onEdit(vehiculo)}>Editar</MenuItem>
+                    {isInactive(vehiculo) ? (
+                      <MenuItem onClick={() => onRestore(vehiculo.id)}>
+                        Restaurar
+                      </MenuItem>
+                    ) : (
+                      <MenuItem onClick={() => onDelete(vehiculo.id)}>
+                        Eliminar
+                      </MenuItem>
+                    )}
+                  </Menu>
+                </Dropdown>
+              </Stack>
+              <Typography level="body-sm">
+                <strong>Marca:</strong> {vehiculo.marca}
+              </Typography>
+              <Typography level="body-sm">
+                <strong>Modelo:</strong> {vehiculo.modelo}
+              </Typography>
+              <Typography level="body-sm">
+                <strong>Estado:</strong> {vehiculo.estado}
+              </Typography>
+              <Typography level="body-sm">
+                <strong>Ubicación:</strong> {vehiculo.nombre_ubicacion}
+              </Typography>
             </Stack>
           </Sheet>
         ))}
@@ -196,92 +132,81 @@ export default function FAQTable({
     );
   }
 
-  // --- Desktop View (Table) ---
   return (
-    <Sheet
-      variant="outlined"
-      sx={{
-        borderRadius: "lg",
-        boxShadow: "md",
-        overflow: "auto",
-        width: "100%",
-      }}>
+    <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
+      {selected.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Button
+            color="danger"
+            variant="soft"
+            startDecorator={<DeleteRoundedIcon />}
+            onClick={() => onBulkDelete(selected)}>
+            Eliminar seleccionados ({selected.length})
+          </Button>
+        </Box>
+      )}
       <Table
         hoverRow
-        aria-label="FAQ table"
-        size="md"
+        aria-label="Tabla de vehículos"
+        size="sm"
         stickyHeader
-        sx={{
-          "--Table-headerUnderline": "1px solid",
-          "--Table-borderColor": "divider",
-          minWidth: 600, // Minimum width for the table
-        }}>
+        sx={{ minWidth: 800 }}>
         <thead>
           <tr>
-            <th style={{ width: "40%" }}>Pregunta</th>
-            <th style={{ width: "20%" }}>Categoría</th>
-            <th style={{ width: "10%", textAlign: "center" }}>Orden</th>
-            <th style={{ width: "10%", textAlign: "center" }}>Estado</th>
-            <th style={{ width: "20%", textAlign: "center" }}>Acciones</th>
+            {[
+              { label: "Vehículo", key: "placa" },
+              { label: "Marca", key: "marca" },
+              { label: "Modelo", key: "modelo" },
+              { label: "Estado", key: "estado" },
+              { label: "Ubicación", key: "nombre_ubicacion" },
+            ].map((col) => (
+              <th key={col.key}>
+                <Button
+                  variant="plain"
+                  size="sm"
+                  onClick={() => handleSort(col.key)}
+                  endDecorator={<ArrowDropDownIcon />}>
+                  {col.label}
+                </Button>
+              </th>
+            ))}
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {faqs.map((faq) => (
-            <tr
-              key={faq.id}
-              sx={{
-                // Style for inactive FAQs
-                ...(faq.isActive === false && {
-                  opacity: 0.7,
-                  fontStyle: "italic",
-                  bgcolor: "neutral.softBg",
-                }),
-              }}>
+          {sortedVehiculos.map((vehiculo) => (
+            <tr key={vehiculo.id}>
+              <td>{vehiculo.placa}</td>
+              <td>{vehiculo.marca}</td>
+              <td>{vehiculo.modelo}</td>
               <td>
-                <Typography level="body-md" sx={{ fontWeight: "md" }}>
-                  {faq.question}
-                </Typography>
-                <Typography level="body-sm" color="text.secondary">
-                  {faq.answer.substring(0, 150)}...
+                <Typography
+                  level="body-sm"
+                  color={
+                    vehiculo.estado === "Disponible" ? "success" : "warning"
+                  }>
+                  {vehiculo.estado}
                 </Typography>
               </td>
-              <td>{faq.category}</td>
-              <td style={{ textAlign: "center" }}>{faq.order ?? "N/A"}</td>
-              <td style={{ textAlign: "center" }}>
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={getStatusColor(faq.isActive)}
-                  sx={{ "--Chip-radius": "sm" }}>
-                  {faq.isActive ? "Activa" : "Inactiva"}
-                </Chip>
-              </td>
-              <td style={{ textAlign: "center" }}>
+              <td>{vehiculo.nombre_ubicacion}</td>
+              <td>
                 <Dropdown>
                   <MenuButton
                     slots={{ root: IconButton }}
                     slotProps={{
-                      root: { variant: "plain", color: "neutral", size: "sm" },
+                      root: { variant: "plain", color: "neutral" },
                     }}>
                     <MoreHorizRoundedIcon />
                   </MenuButton>
                   <Menu>
-                    {/* Edit MenuItem */}
-                    <MenuItem onClick={() => onEdit(faq)} disabled={!canEdit}>
-                      <EditRoundedIcon /> Editar
-                    </MenuItem>
-                    {/* Conditional Delete or Restore MenuItem */}
-                    {faq.isActive ? (
-                      <MenuItem
-                        onClick={() => handleDeleteConfirm(faq)}
-                        disabled={!canDelete}>
-                        <DeleteRoundedIcon /> Inactivar
+                    <MenuItem onClick={() => onEdit(vehiculo)}>Editar</MenuItem>
+                    {isInactive(vehiculo) ? (
+                      <MenuItem onClick={() => onRestore(vehiculo.id)}>
+                        Restaurar
                       </MenuItem>
                     ) : (
-                      <MenuItem
-                        onClick={() => handleRestoreConfirm(faq)}
-                        disabled={!canRestore}>
-                        <RestoreRoundedIcon /> Activar
+                      <MenuItem onClick={() => onDelete(vehiculo.id)}>
+                        Eliminar
                       </MenuItem>
                     )}
                   </Menu>
