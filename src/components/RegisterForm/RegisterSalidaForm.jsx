@@ -86,6 +86,93 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
     }
   };
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setErrorMessage("");
+  //   setIsSubmitting(true);
+
+  //   if (
+  //     !kmActual ||
+  //     !vehicleSelected ||
+  //     !fuelActual ||
+  //     !observations ||
+  //     !images.length
+  //   ) {
+  //     setErrorMessage("Por favor, rellena todos los campos obligatorios.");
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+
+  //   const foundVehicle = vehicles.find(
+  //     (v) => v.id === parseInt(vehicleSelected)
+  //   );
+
+  //   const payload = {
+  //     ...foundVehicle,
+  //     id_empleado: usuario.id_empleado,
+  //     id_vehiculo: foundVehicle?.id,
+  //     id_ubicacion_salida: foundVehicle?.LocationID ?? null,
+  //     km_salida: parseInt(kmActual),
+  //     combustible_salida: parseInt(fuelActual),
+  //     comentario_salida: observations,
+  //   };
+
+  //   try {
+  //     const register = await registrarSalida(payload);
+  //     const onlyFiles = images.map((f) => f.file);
+
+  //     if (register) {
+  //       try {
+  //         const imagesData = await SubirImagenesRegistro(
+  //           register.id_registro,
+  //           onlyFiles
+  //         );
+
+  //         Swal.fire({
+  //           title: "¡Salida registrada con éxito!",
+  //           text: "Salida registrada con éxito 🚗",
+  //           icon: "success",
+  //           confirmButtonColor: "#03624C",
+  //         }).then(() => {
+  //           navigate("/admin/panel-vehiculos", {
+  //             state: { mensaje: "Salida registrada con éxito 🚗✅" },
+  //           });
+
+  //           if (emailSupervisor?.supervisor_email) {
+  //             sendNotificacionSalida({
+  //               to: [usuario.email, emailSupervisor.supervisor_email],
+  //               employeeName: usuario.nombre,
+  //               vehicleName: foundVehicle.placa,
+  //               supervisorName: emailSupervisor.supervisor_nombre,
+  //             });
+  //           }
+  //         });
+  //       } catch (imageError) {
+  //         console.error("❌ Error al subir imágenes:", imageError);
+
+  //         Swal.fire({
+  //           title: "Error al subir imágenes",
+  //           text: imageError.message || "Error desconocido al subir imágenes.",
+  //           icon: "error",
+  //           confirmButtonColor: "#B00020",
+  //         });
+
+  //         // Opcional: acá decides si cancelar todo o no
+  //         return;
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error("Error al registrar la salida:", error);
+  //     Swal.fire({
+  //       title: "Error",
+  //       text: "Ocurrió un error al registrar la salida. Intenta de nuevo.",
+  //       icon: "error",
+  //     });
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
@@ -107,54 +194,57 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
       (v) => v.id === parseInt(vehicleSelected)
     );
 
-    const payload = {
-      ...foundVehicle,
-      id_empleado: usuario.id_empleado,
-      id_vehiculo: foundVehicle?.id,
-      id_ubicacion_salida: foundVehicle?.LocationID ?? null,
-      km_salida: parseInt(kmActual),
-      combustible_salida: parseInt(fuelActual),
-      comentario_salida: observations,
-    };
+    const formData = new FormData();
+    formData.append("id_empleado", usuario.id_empleado);
+    formData.append("id_vehiculo", foundVehicle?.id);
+    formData.append("id_ubicacion_salida", foundVehicle?.LocationID ?? null);
+    formData.append("km_salida", parseInt(kmActual));
+    formData.append("combustible_salida", parseInt(fuelActual));
+    formData.append("comentario_salida", observations);
+
+    images.forEach((img) => {
+      formData.append("files", img.file); // nombre debe coincidir con el usado en multer
+    });
+
+    for (let pair of formData.entries()) {
+      console.log(pair[0] + ": " + pair[1]);
+    }
 
     try {
-      const register = await registrarSalida(payload);
-      const onlyFiles = images.map((f) => f.file);
+      const register = await registrarSalida(formData);
 
       if (register) {
-        const imagesData = await SubirImagenesRegistro(
-          register.id_registro,
-          onlyFiles
-        );
-        if (imagesData) {
-          Swal.fire({
-            title: "¡Salida registrada con éxito!",
-            text: "Salida registrada con éxito 🚗",
-            icon: "success",
-            confirmButtonColor: "#03624C",
-          }).then(() => {
-            navigate("/admin/panel-vehiculos", {
-              state: { mensaje: "Salida registrada con éxito 🚗✅" },
-            });
-            const destinatarios = [usuario.email];
-            if (emailSupervisor?.supervisor_email) {
-              destinatarios.push(emailSupervisor.supervisor_email);
-            }
+        Swal.fire({
+          title: "¡Salida registrada con éxito!",
+          text: "Salida registrada con éxito 🚗",
+          icon: "success",
+          confirmButtonColor: "#03624C",
+        }).then(() => {
+          navigate("/admin/panel-vehiculos", {
+            state: { mensaje: "Salida registrada con éxito 🚗✅" },
+          });
 
+          if (emailSupervisor?.supervisor_email) {
             sendNotificacionSalida({
               to: [usuario.email, emailSupervisor.supervisor_email],
               employeeName: usuario.nombre,
               vehicleName: foundVehicle.placa,
               supervisorName: emailSupervisor.supervisor_nombre,
             });
-          });
-        }
+          }
+        });
       }
     } catch (error) {
       console.error("Error al registrar la salida:", error);
+
+      const errorMessage =
+        error?.response?.data?.error || // si usas axios
+        error?.message || // mensaje de JS
+        "Ocurrió un error al registrar la salida. Intenta de nuevo.";
+
       Swal.fire({
         title: "Error",
-        text: "Ocurrió un error al registrar la salida. Intenta de nuevo.",
+        text: errorMessage,
         icon: "error",
       });
     } finally {

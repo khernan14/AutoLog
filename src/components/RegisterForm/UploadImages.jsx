@@ -71,7 +71,6 @@ export default function UploadImages({ images, setImages }) {
           type="file"
           accept="image/*"
           multiple
-          capture="environment"
           hidden
           onChange={handleFileChange}
         />

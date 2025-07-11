@@ -49,18 +49,38 @@ export async function obtenerCombustibleActual(id_vehiculo) {
   }
 }
 
-export async function registrarSalida(datosSalida) {
+// export async function registrarSalida(datosSalida) {
+//   try {
+//     const res = await fetchConToken(endpoints.registrarSalida, {
+//       method: "POST",
+//       body: JSON.stringify(datosSalida),
+//     });
+
+//     if (!res.ok) throw new Error("No se pudo registrar la salida");
+//     return await res.json();
+//   } catch (err) {
+//     console.error("Error al registrar la salida:", err);
+//     return null;
+//   }
+// }
+
+export async function registrarSalida(formData) {
   try {
     const res = await fetchConToken(endpoints.registrarSalida, {
       method: "POST",
-      body: JSON.stringify(datosSalida),
+      body: formData,
     });
 
-    if (!res.ok) throw new Error("No se pudo registrar la salida");
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({}));
+      const message = errorBody?.error || "No se pudo registrar la salida";
+      throw new Error(message);
+    }
+
     return await res.json();
   } catch (err) {
     console.error("Error al registrar la salida:", err);
-    return null;
+    throw err; // 👈 importante: relanzar el error para que el componente lo capture
   }
 }
 
@@ -81,27 +101,27 @@ export async function registrarEntrada(datosEntrada) {
 
 // Subir y asociar imagenes al registro
 export async function SubirImagenesRegistro(id_registro, imagenes) {
-  try {
-    const formData = new FormData();
-    for (let i = 0; i < imagenes.length; i++) {
-      formData.append("imagenes", imagenes[i]);
-      console.log("FormData:", formData);
-    }
-
-    const res = await fetchConToken(
-      endpoints.resgistrarImagenes + `${id_registro}/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!res.ok) throw new Error("No se pudieron subir las imagenes");
-    return await res.json();
-  } catch (error) {
-    console.error("Error al subir las imagenes:", error);
-    return null;
+  const formData = new FormData();
+  for (let i = 0; i < imagenes.length; i++) {
+    formData.append("imagenes", imagenes[i]);
   }
+
+  const res = await fetchConToken(
+    endpoints.resgistrarImagenes + `${id_registro}/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  if (!res.ok) {
+    // Intentamos leer el error específico que envía el backend
+    const errorData = await res.json();
+    const mensaje = errorData.error || "No se pudieron subir las imágenes";
+    throw new Error(mensaje);
+  }
+
+  return await res.json();
 }
 
 export async function getCiudades() {
