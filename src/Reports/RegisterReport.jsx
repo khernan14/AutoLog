@@ -33,7 +33,7 @@ export default function RegisterReport() {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 9;
 
   useEffect(() => {
     const fetchRegistros = async () => {
