@@ -85,8 +85,6 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
       setFuelManual(true);
     }
   };
-
-  // const handleSubmit = async (e) => {
   //   e.preventDefault();
   //   setErrorMessage("");
   //   setIsSubmitting(true);
@@ -186,6 +184,24 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
       !images.length
     ) {
       setErrorMessage("Por favor, rellena todos los campos obligatorios.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validaciones adicionales
+    const kmParsed = parseInt(kmActual);
+    const fuelParsed = parseInt(fuelActual);
+
+    if (
+      isNaN(kmParsed) ||
+      isNaN(fuelParsed) ||
+      kmParsed < 0 ||
+      fuelParsed < 0 ||
+      fuelParsed > 100
+    ) {
+      setErrorMessage(
+        "Verifica que el kilometraje sea válido y el combustible esté entre 0 y 100."
+      );
       setIsSubmitting(false);
       return;
     }
@@ -373,8 +389,7 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
               variant="solid"
               type="submit"
               loading={isSubmitting}
-              disabled={isSubmitting}
-              startDecorator={isSubmitting && <CircularProgress size="sm" />}>
+              disabled={isSubmitting}>
               {isSubmitting ? "Guardando..." : "Guardar"}
             </Button>
           </CardActions>
