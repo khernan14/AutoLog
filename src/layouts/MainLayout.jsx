@@ -29,6 +29,9 @@ export default function MainLayout() {
     parkings: "Estacionamientos",
     reports: "Reportes",
     permissions: "Roles & Permission",
+    configuraciones: "Ajustes de la Aplicación",
+    faqs: "FAQs",
+    soporte: "Centro de Ayuda",
   };
 
   const pathnames = location.pathname
