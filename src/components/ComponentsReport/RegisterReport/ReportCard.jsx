@@ -31,7 +31,6 @@ export default function ReportCard({ registro, onClick }) {
     <Card
       sx={{
         p: 3,
-        borderRadius: "2xl",
         boxShadow: "lg",
         bgcolor: "background.body",
         cursor: "pointer",
