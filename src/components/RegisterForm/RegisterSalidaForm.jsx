@@ -206,10 +206,6 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
       formData.append("files", img.file); // nombre debe coincidir con el usado en multer
     });
 
-    for (let pair of formData.entries()) {
-      console.log(pair[0] + ": " + pair[1]);
-    }
-
     try {
       const register = await registrarSalida(formData);
 

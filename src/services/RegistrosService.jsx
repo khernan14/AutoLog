@@ -84,22 +84,43 @@ export async function registrarSalida(formData) {
   }
 }
 
-export async function registrarEntrada(datosEntrada) {
+// export async function registrarEntrada(datosEntrada) {
+//   try {
+//     const res = await fetchConToken(endpoints.registrarRegreso, {
+//       method: "POST",
+//       body: JSON.stringify(datosEntrada),
+//     });
+
+//     if (!res.ok) throw new Error("No se pudo registrar la entrada");
+//     return await res.json();
+//   } catch (err) {
+//     console.error("Error al registrar la entrada:", err);
+//     return null;
+//   }
+// }
+
+// Subir y asociar imagenes al registro
+
+export async function registrarRegreso(formData) {
   try {
     const res = await fetchConToken(endpoints.registrarRegreso, {
       method: "POST",
-      body: JSON.stringify(datosEntrada),
+      body: formData,
     });
 
-    if (!res.ok) throw new Error("No se pudo registrar la entrada");
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({}));
+      const message = errorBody?.error || "No se pudo registrar la entrada";
+      throw new Error(message);
+    }
+
     return await res.json();
   } catch (err) {
     console.error("Error al registrar la entrada:", err);
-    return null;
+    throw err; // 👈 importante: relanzar el error para que el componente lo capture
   }
 }
 
-// Subir y asociar imagenes al registro
 export async function SubirImagenesRegistro(id_registro, imagenes) {
   const formData = new FormData();
   for (let i = 0; i < imagenes.length; i++) {

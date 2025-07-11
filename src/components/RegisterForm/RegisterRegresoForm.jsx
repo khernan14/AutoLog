@@ -22,8 +22,7 @@ import Swal from "sweetalert2";
 import UploadImages from "./UploadImages";
 import {
   obtenerKmActual,
-  registrarEntrada,
-  SubirImagenesRegistro,
+  registrarRegreso,
 } from "../../services/RegistrosService";
 import { getParkings } from "../../services/ParkingServices";
 import { sendNotificacionRegreso } from "../../services/MailServices";
@@ -81,9 +80,91 @@ export default function RegisterRegresoForm({
     loadKmActual();
   }, [usuario, registro]);
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setIsSubmitting(true); // nuevo cambio
+
+  //   if (
+  //     !km_regreso ||
+  //     !fuel ||
+  //     !observations ||
+  //     !images.length ||
+  //     !id_ubicacion_regreso
+  //   ) {
+  //     setErrorMessage("Por favor, rellena todos los campos obligatorios.");
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+
+  //   if (parseInt(km_regreso) < parseInt(kmAnterior)) {
+  //     setErrorMessage(
+  //       "El kilometraje de regreso no puede ser menor al de salida."
+  //     );
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+
+  //   const datosEntrada = {
+  //     id_registro: registro.id_registro,
+  //     id_empleado: usuario.id_empleado,
+  //     id_ubicacion_regreso,
+  //     km_regreso: parseInt(km_regreso),
+  //     combustible_regreso: parseInt(fuel),
+  //     comentario_regreso: observations,
+  //   };
+
+  //   try {
+  //     const registerReturn = await registrarEntrada(datosEntrada);
+  //     const onlyFiles = images.map((f) => f.file);
+
+  //     if (registerReturn) {
+  //       // 🔔 Enviar correo de regreso
+  //       const emailData = {
+  //         to: [usuario.email, emailSupervisor?.supervisor_email].filter(
+  //           Boolean
+  //         ),
+  //         employeeName: usuario.nombre,
+  //         vehicleName: registro.placa,
+  //         supervisorName: emailSupervisor?.supervisor_nombre,
+  //         estacionamiento: estacionamientoNombre,
+  //       };
+
+  //       try {
+  //         await sendNotificacionRegreso(emailData);
+  //       } catch (err) {
+  //         console.warn("No se pudo enviar el correo de regreso:", err);
+  //       }
+
+  //       // 📷 Subir imágenes
+  //       const imageData = await SubirImagenesRegistro(
+  //         registro.id_registro,
+  //         onlyFiles
+  //       );
+
+  //       if (imageData) {
+  //         Swal.fire(
+  //           "Proceso completo",
+  //           "Regreso registrado y fotos subidas exitosamente",
+  //           "success"
+  //         ).then(() => {
+  //           navigate("/admin/panel-vehiculos", {
+  //             state: { mensaje: "Regreso registrado con éxito 🚗✅" },
+  //           });
+  //         });
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     Swal.fire("Error", "Ocurrió un error durante el registro", "error");
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true); // nuevo cambio
+    setErrorMessage("");
+    setIsSubmitting(true);
 
     if (
       !km_regreso ||
@@ -105,58 +186,57 @@ export default function RegisterRegresoForm({
       return;
     }
 
-    const datosEntrada = {
-      id_registro: registro.id_registro,
-      id_empleado: usuario.id_empleado,
-      id_ubicacion_regreso,
-      km_regreso: parseInt(km_regreso),
-      combustible_regreso: parseInt(fuel),
-      comentario_regreso: observations,
-    };
+    const formData = new FormData();
+    formData.append("id_registro", registro.id_registro);
+    formData.append("id_empleado", usuario.id_empleado);
+    formData.append("id_ubicacion_regreso", id_ubicacion_regreso);
+    formData.append("km_regreso", parseInt(km_regreso));
+    formData.append("combustible_regreso", parseInt(fuel));
+    formData.append("comentario_regreso", observations);
+
+    images.forEach((img) => {
+      formData.append("files", img.file); // nombre debe coincidir con el usado en multer
+    });
 
     try {
-      const registerReturn = await registrarEntrada(datosEntrada);
-      const onlyFiles = images.map((f) => f.file);
+      const register = await registrarRegreso(formData);
 
-      if (registerReturn) {
-        // 🔔 Enviar correo de regreso
-        const emailData = {
-          to: [usuario.email, emailSupervisor?.supervisor_email].filter(
-            Boolean
-          ),
-          employeeName: usuario.nombre,
-          vehicleName: registro.placa,
-          supervisorName: emailSupervisor?.supervisor_nombre,
-          estacionamiento: estacionamientoNombre,
-        };
+      if (register) {
+        Swal.fire({
+          title: "¡Regreso registrado con éxito!",
+          text: "Regreso registrado con éxito 🚗",
+          icon: "success",
+          confirmButtonColor: "#03624C",
+        }).then(() => {
+          navigate("/admin/panel-vehiculos", {
+            state: { mensaje: "Regreso registrado con éxito 🚗✅" },
+          });
+        });
 
-        try {
-          await sendNotificacionRegreso(emailData);
-        } catch (err) {
-          console.warn("No se pudo enviar el correo de regreso:", err);
-        }
-
-        // 📷 Subir imágenes
-        const imageData = await SubirImagenesRegistro(
-          registro.id_registro,
-          onlyFiles
-        );
-
-        if (imageData) {
-          Swal.fire(
-            "Proceso completo",
-            "Regreso registrado y fotos subidas exitosamente",
-            "success"
-          ).then(() => {
-            navigate("/admin/panel-vehiculos", {
-              state: { mensaje: "Regreso registrado con éxito 🚗✅" },
-            });
+        if (emailSupervisor?.supervisor_email) {
+          sendNotificacionRegreso({
+            to: [usuario.email, emailSupervisor?.supervisor_email].filter(
+              Boolean
+            ),
+            employeeName: usuario.nombre,
+            vehicleName: registro.placa,
+            supervisorName: emailSupervisor?.supervisor_nombre,
+            estacionamiento: estacionamientoNombre,
           });
         }
       }
     } catch (error) {
-      console.error(error);
-      Swal.fire("Error", "Ocurrió un error durante el registro", "error");
+      console.error("Error al registrar el regreso:", error);
+      const errorMessage =
+        error?.response?.data?.error || // si usas axios
+        error?.message || // mensaje de JS
+        "Ocurrió un error al registrar el regreso. Intenta de nuevo.";
+
+      Swal.fire({
+        title: "Error",
+        text: errorMessage,
+        icon: "error",
+      });
     } finally {
       setIsSubmitting(false);
     }
