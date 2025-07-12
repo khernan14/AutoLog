@@ -137,6 +137,7 @@ export default function Sidebar() {
   const userRole = userData?.rol; // Obtener el rol del usuario
 
   const logout = () => {
+    closeSidebar();
     Swal.fire({
       title: "¿Deseas cerrar sesión?",
       text: "Se cerrará tu sesión actual",
