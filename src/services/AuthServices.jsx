@@ -31,6 +31,7 @@ export async function createUserService(newUser) {
         estatus: newUser.estatus,
         puesto: newUser.puesto,
         id_ciudad: newUser.id_ciudad,
+        supervisor_id: newUser.supervisor_id,
       }),
     });
 

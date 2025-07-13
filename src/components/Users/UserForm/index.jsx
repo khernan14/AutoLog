@@ -121,7 +121,7 @@ export default function UsersForm({ users: initialUsers }) {
       supervisor_id:
         user.supervisor_id !== undefined && user.supervisor_id !== null
           ? String(user.supervisor_id)
-          : "",
+          : null,
     });
     setModalOpen(true);
   };
