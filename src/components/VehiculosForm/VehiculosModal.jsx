@@ -179,7 +179,7 @@ export default function VehiculoModal({
                     : "Selecciona ubicación"
                 }>
                 {ubicaciones.map((u) => (
-                  <Option key={u.id} value={String(u.id)}>
+                  <Option key={u.id} value={u.id}>
                     {u.nombre_ubicacion}
                   </Option>
                 ))}

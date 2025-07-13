@@ -87,11 +87,16 @@ export default function Vehiculos() {
 
   const handleEdit = (vehiculo) => {
     if (!canPerformAction("editar_vehiculo")) {
-      // Permiso para editar
       toast.error("No tienes permisos para editar vehículos.");
       return;
     }
-    setEditVehiculo(vehiculo);
+
+    const vehiculoTransformado = {
+      ...vehiculo,
+      id_ubicacion_actual: vehiculo.LocationID,
+    };
+
+    setEditVehiculo(vehiculoTransformado);
     setOpenModal(true);
   };
 
