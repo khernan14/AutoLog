@@ -87,7 +87,7 @@ export default function ReportDetailModal({ open, onClose, registro }) {
             </Typography>
             <Typography level="body-sm">Salida: {km_salida} km</Typography>
             <Typography level="body-sm">
-              Regreso: {km_regreso ?? "-"}
+              Regreso: {km_regreso ?? "-"} km{" "}
             </Typography>
 
             <Typography level="title-sm" color="primary" mt={1}>
