@@ -106,10 +106,10 @@ export default function LoginForm({
           ¿Necesitas ayuda? Contacta a soporte:
           <br />
           <Link
-            href="mailto:support@company.com"
+            href="mailto:micros.teh@tecnasadesk.com"
             level="body-sm"
             sx={{ fontWeight: "md" }}>
-            support@company.com
+            micros.teh@tecnasa.com
           </Link>
         </Typography>
       </Box>
@@ -207,13 +207,7 @@ export default function LoginForm({
             textAlign="center"
             sx={{ color: "text.secondary" }}>
             ¿No tienes cuenta?{" "}
-            <Link
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onForgotPassword();
-              }}
-              sx={{ fontWeight: "md" }}>
+            <Link href="mailto:support@herndevs.com" sx={{ fontWeight: "md" }}>
               Contacta al administrador.
             </Link>
           </Typography>
