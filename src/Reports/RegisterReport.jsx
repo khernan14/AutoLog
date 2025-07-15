@@ -273,6 +273,37 @@ export default function RegisterReport() {
     doc.save("reporte_Registros_de_Uso_Vehiculos.pdf");
   };
 
+  function getPaginationPages(current, total) {
+    const delta = 1;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= total; i++) {
+      if (
+        i === 1 ||
+        i === total ||
+        (i >= current - delta && i <= current + delta)
+      ) {
+        range.push(i);
+      }
+    }
+
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push("...");
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+
+    return rangeWithDots;
+  }
+
   return (
     <Sheet
       variant="soft"
@@ -355,6 +386,7 @@ export default function RegisterReport() {
       )}
 
       {/* Paginación */}
+      {/* Paginación */}
       {!loading && totalPages > 1 && (
         <Box
           sx={{
@@ -372,16 +404,22 @@ export default function RegisterReport() {
             <ChevronLeft />
           </IconButton>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Button
-              key={page}
-              size="sm"
-              variant={page === currentPage ? "solid" : "outlined"}
-              color="primary"
-              onClick={() => handlePageChange(page)}>
-              {page}
-            </Button>
-          ))}
+          {getPaginationPages(currentPage, totalPages).map((page, index) =>
+            page === "..." ? (
+              <Button key={`ellipsis-${index}`} disabled size="sm">
+                ...
+              </Button>
+            ) : (
+              <Button
+                key={page}
+                size="sm"
+                variant={page === currentPage ? "solid" : "outlined"}
+                color="primary"
+                onClick={() => handlePageChange(page)}>
+                {page}
+              </Button>
+            )
+          )}
 
           <IconButton
             variant="outlined"
