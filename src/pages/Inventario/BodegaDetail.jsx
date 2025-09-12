@@ -45,7 +45,7 @@ import StatusCard from "../../components/common/StatusCard";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import useIsMobile from "../../hooks/useIsMobile";
-import logoTecnasa from "../assets/newLogoTecnasaBlack.png";
+import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
 export default function BodegaDetail() {
   const { id } = useParams();
