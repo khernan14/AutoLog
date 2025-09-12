@@ -45,6 +45,7 @@ import StatusCard from "../../components/common/StatusCard";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import useIsMobile from "../../hooks/useIsMobile";
+import logoTecnasa from "@/assets/newLogoTecnasaBlack.png";
 
 export default function BodegaDetail() {
   const { id } = useParams();
@@ -622,7 +623,7 @@ export default function BodegaDetail() {
                     text={`${
                       window.location.origin
                     }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
-                    logoUrl="/src/assets/newLogoTecnasaBlack.png"
+                    logoUrl={logoTecnasa}
                     size={220}
                   />
                 </Stack>
@@ -631,7 +632,7 @@ export default function BodegaDetail() {
                 <Button variant="plain" onClick={() => setOpenQR(false)}>
                   Cerrar
                 </Button>
-                <Button onClick={descargarQR}>Descargar PNsssG</Button>
+                <Button onClick={descargarQR}>Descargar PNG</Button>
               </Stack>
             </ModalDialog>
           </Modal>
