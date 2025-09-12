@@ -1,18 +1,22 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/auth/login",
+      "permanent": true
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/((?!api|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
-      "source": "/",
+      "source": "/((?!.*\\.).*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
-      ]
-    },
-    {
-      "source": "/index.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
       ]
     }
   ]
