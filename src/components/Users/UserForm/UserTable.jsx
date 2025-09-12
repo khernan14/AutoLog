@@ -1,173 +1,194 @@
-import * as React from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
-  Box,
+  Sheet,
   Table,
-  Checkbox,
+  Stack,
   IconButton,
+  Checkbox,
+  Chip,
   Typography,
   Dropdown,
   Menu,
   MenuButton,
   MenuItem,
-  Sheet,
-  Button,
+  Tooltip,
 } from "@mui/joy";
-import { useTheme } from "@mui/joy/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import Stack from "@mui/joy/Stack";
+import useIsMobile from "../../../hooks/useIsMobile";
+
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import RestoreFromTrashRoundedIcon from "@mui/icons-material/RestoreFromTrashRounded";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 export default function UserTable({
   users,
+  selected, // array ids seleccionados
+  setSelected, // setter
   onEdit,
   onDelete,
-  onBulkDelete,
   onRestore,
+  canEdit,
+  canDelete,
+  canRestore,
 }) {
-  const [selected, setSelected] = React.useState([]);
-  const [sortField, setSortField] = React.useState("nombre");
-  const [sortOrder, setSortOrder] = React.useState("asc");
+  const isMobile = useIsMobile(768);
 
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [sortField, setSortField] = useState("nombre");
+  const [sortOrder, setSortOrder] = useState("asc");
 
-  const toggleSelectAll = (checked) => {
-    setSelected(checked ? users.map((u) => u.id_usuario) : []);
-  };
+  const toggleSelectAll = useCallback(
+    (checked) => {
+      setSelected(checked ? users.map((u) => u.id_usuario) : []);
+    },
+    [users, setSelected]
+  );
 
-  const toggleSelectOne = (id) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
+  const toggleSelectOne = useCallback(
+    (id) => {
+      setSelected((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    },
+    [setSelected]
+  );
 
-  const handleSort = (field) => {
-    if (field === sortField) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-  };
+  const handleSort = useCallback(
+    (field) => {
+      if (field === sortField)
+        setSortOrder((p) => (p === "asc" ? "desc" : "asc"));
+      else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    },
+    [sortField]
+  );
 
-  const sortedUsers = [...users].sort((a, b) => {
-    const valA = a[sortField]?.toString().toLowerCase() ?? "";
-    const valB = b[sortField]?.toString().toLowerCase() ?? "";
-    return sortOrder === "asc"
-      ? valA.localeCompare(valB)
-      : valB.localeCompare(valA);
-  });
+  const sorted = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const valA = (a[sortField] ?? "").toString().toLowerCase();
+      const valB = (b[sortField] ?? "").toString().toLowerCase();
+      return sortOrder === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+  }, [users, sortField, sortOrder]);
 
-  const isInactive = (user) => user.estatus === "Inactivo";
+  const isInactive = (u) => (u.estatus || "Activo") !== "Activo";
 
+  // ====== Mobile: tarjetas ======
   if (isMobile) {
-    // Vista móvil como tarjetas
     return (
-      <Stack spacing={2}>
-        {selected.length > 0 && (
-          <Button
-            color="danger"
-            variant="soft"
-            startDecorator={<DeleteRoundedIcon />}
-            onClick={() => onBulkDelete(selected)}>
-            Eliminar seleccionados ({selected.length})
-          </Button>
-        )}
+      <Stack spacing={2} p={1}>
+        {sorted.map((u) => {
+          const id = u.id_usuario;
+          const checked = selected.includes(id);
+          return (
+            <Sheet
+              key={id}
+              variant="outlined"
+              sx={{ p: 2, borderRadius: "md" }}>
+              <Stack spacing={0.5}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Checkbox
+                      size="sm"
+                      checked={checked}
+                      onChange={(e) => toggleSelectOne(id)}
+                    />
+                    <Typography level="title-md">{u.nombre}</Typography>
+                  </Stack>
+                  <Dropdown>
+                    <MenuButton
+                      slots={{ root: IconButton }}
+                      slotProps={{
+                        root: { variant: "plain", color: "neutral" },
+                      }}>
+                      <MoreHorizRoundedIcon />
+                    </MenuButton>
+                    <Menu>
+                      <MenuItem disabled={!canEdit} onClick={() => onEdit?.(u)}>
+                        Editar
+                      </MenuItem>
+                      {isInactive(u) ? (
+                        <MenuItem
+                          disabled={!canRestore}
+                          onClick={() => onRestore?.(id)}>
+                          Restaurar
+                        </MenuItem>
+                      ) : (
+                        <MenuItem
+                          disabled={!canDelete}
+                          onClick={() => onDelete?.(id)}>
+                          Inactivar
+                        </MenuItem>
+                      )}
+                    </Menu>
+                  </Dropdown>
+                </Stack>
 
-        {sortedUsers.map((user) => (
-          <Sheet
-            key={user.id_usuario}
-            variant="outlined"
-            sx={{ p: 2, borderRadius: "md" }}>
-            <Stack spacing={1}>
-              <Stack direction="row" justifyContent="space-between">
-                {/* <Checkbox
-                  checked={selected.includes(user.id_usuario)}
-                  onChange={() => toggleSelectOne(user.id_usuario)}
-                /> */}
-                <Dropdown>
-                  <MenuButton
-                    slots={{ root: IconButton }}
-                    slotProps={{
-                      root: { variant: "plain", color: "neutral" },
-                    }}>
-                    <MoreHorizRoundedIcon />
-                  </MenuButton>
-                  <Menu>
-                    <MenuItem onClick={() => onEdit(user)}>Editar</MenuItem>
-                    {isInactive(user) ? (
-                      <MenuItem onClick={() => onRestore(user.id_usuario)}>
-                        Restaurar
-                      </MenuItem>
-                    ) : (
-                      <MenuItem onClick={() => onDelete(user.id_usuario)}>
-                        Eliminar
-                      </MenuItem>
-                    )}
-                  </Menu>
-                </Dropdown>
+                <Typography level="body-sm" sx={{ opacity: 0.9 }}>
+                  {u.email}
+                </Typography>
+                <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+                  Usuario: {u.username}
+                </Typography>
+
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                  {u.rol && (
+                    <Chip size="sm" variant="soft" color="primary">
+                      {u.rol}
+                    </Chip>
+                  )}
+                  {u.puesto && (
+                    <Chip size="sm" variant="outlined">
+                      {u.puesto}
+                    </Chip>
+                  )}
+                  {u.ciudad && (
+                    <Chip size="sm" variant="soft" color="neutral">
+                      {u.ciudad}
+                    </Chip>
+                  )}
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={isInactive(u) ? "neutral" : "success"}
+                    sx={{ ml: "auto" }}>
+                    {u.estatus || "Activo"}
+                  </Chip>
+                </Stack>
               </Stack>
-              <Typography level="title-md">{user.nombre}</Typography>
-              <Typography level="body-sm">
-                <strong>Email:</strong> {user.email}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Usuario:</strong> {user.username}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Rol:</strong> {user.rol}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Puesto:</strong> {user.puesto}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Ciudad:</strong> {user.ciudad}
-              </Typography>
-              <Typography
-                level="body-sm"
-                color={user.estatus === "Activo" ? "success" : "danger"}>
-                <strong>Estatus:</strong> {user.estatus}
-              </Typography>
-            </Stack>
-          </Sheet>
-        ))}
+            </Sheet>
+          );
+        })}
       </Stack>
     );
   }
 
-  // Tabla para escritorio
+  // ====== Desktop: tabla ======
+  const allChecked = selected.length > 0 && selected.length === users.length;
+
   return (
     <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
-      {selected.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Button
-            color="danger"
-            variant="soft"
-            startDecorator={<DeleteRoundedIcon />}
-            onClick={() => onBulkDelete(selected)}>
-            Eliminar seleccionados ({selected.length})
-          </Button>
-        </Box>
-      )}
-      <Table
-        hoverRow
-        aria-label="User table"
-        size="sm"
-        stickyHeader
-        sx={{ minWidth: 800 }}>
+      <Table hoverRow size="sm" stickyHeader sx={{ minWidth: 1100 }}>
         <thead>
           <tr>
-            {/* <th>
+            <th style={{ width: 40 }}>
               <Checkbox
-                checked={selected.length === users.length}
-                indeterminate={
-                  selected.length > 0 && selected.length < users.length
-                }
+                checked={allChecked}
+                indeterminate={selected.length > 0 && !allChecked}
                 onChange={(e) => toggleSelectAll(e.target.checked)}
               />
-            </th> */}
+            </th>
             {[
               { label: "Nombre", key: "nombre" },
               { label: "Email", key: "email" },
@@ -178,65 +199,95 @@ export default function UserTable({
               { label: "Estatus", key: "estatus" },
             ].map((col) => (
               <th key={col.key}>
-                <Button
-                  variant="plain"
+                <IconButton
                   size="sm"
+                  variant="plain"
                   onClick={() => handleSort(col.key)}
-                  endDecorator={<ArrowDropDownIcon />}>
+                  aria-label={`Ordenar por ${col.label}`}>
                   {col.label}
-                </Button>
+                  <ArrowDropDownIcon fontSize="small" />
+                </IconButton>
               </th>
             ))}
-            <th>Acciones</th>
+            <th style={{ width: 160 }}>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {sortedUsers.map((user) => (
-            <tr key={user.id_usuario}>
-              {/* <td>
-                <Checkbox
-                  checked={selected.includes(user.id_usuario)}
-                  onChange={() => toggleSelectOne(user.id_usuario)}
-                />
-              </td> */}
-              <td>{user.nombre}</td>
-              <td>{user.email}</td>
-              <td>{user.username}</td>
-              <td>{user.rol}</td>
-              <td>{user.puesto}</td>
-              <td>{user.ciudad}</td>
-              <td>
-                <Typography
-                  level="body-sm"
-                  color={user.estatus === "Activo" ? "success" : "danger"}>
-                  {user.estatus}
-                </Typography>
-              </td>
-              <td>
-                <Dropdown>
-                  <MenuButton
-                    slots={{ root: IconButton }}
-                    slotProps={{
-                      root: { variant: "plain", color: "neutral" },
-                    }}>
-                    <MoreHorizRoundedIcon />
-                  </MenuButton>
-                  <Menu>
-                    <MenuItem onClick={() => onEdit(user)}>Editar</MenuItem>
-                    {isInactive(user) ? (
-                      <MenuItem onClick={() => onRestore(user.id_usuario)}>
-                        Restaurar
-                      </MenuItem>
+          {sorted.map((u) => {
+            const id = u.id_usuario;
+            const checked = selected.includes(id);
+            return (
+              <tr key={id}>
+                <td>
+                  <Checkbox
+                    checked={checked}
+                    onChange={() => toggleSelectOne(id)}
+                  />
+                </td>
+                <td>{u.nombre}</td>
+                <td>{u.email}</td>
+                <td>{u.username}</td>
+                <td>{u.rol || "—"}</td>
+                <td>{u.puesto || "—"}</td>
+                <td>{u.ciudad || "—"}</td>
+                <td>
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={isInactive(u) ? "neutral" : "success"}>
+                    {u.estatus || "Activo"}
+                  </Chip>
+                </td>
+                <td>
+                  <Stack direction="row" spacing={1}>
+                    <Tooltip
+                      title={canEdit ? "Editar" : "Sin permiso"}
+                      variant="soft">
+                      <span>
+                        <IconButton
+                          onClick={() => onEdit?.(u)}
+                          disabled={!canEdit}
+                          variant={canEdit ? "soft" : "plain"}
+                          color={canEdit ? "primary" : "neutral"}>
+                          <EditRoundedIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+
+                    {isInactive(u) ? (
+                      <Tooltip
+                        title={canRestore ? "Restaurar" : "Sin permiso"}
+                        variant="soft">
+                        <span>
+                          <IconButton
+                            onClick={() => onRestore?.(id)}
+                            disabled={!canRestore}
+                            variant={canRestore ? "soft" : "plain"}
+                            color={canRestore ? "success" : "neutral"}>
+                            <RestoreFromTrashRoundedIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     ) : (
-                      <MenuItem onClick={() => onDelete(user.id_usuario)}>
-                        Eliminar
-                      </MenuItem>
+                      <Tooltip
+                        title={canDelete ? "Inactivar" : "Sin permiso"}
+                        variant="soft">
+                        <span>
+                          <IconButton
+                            onClick={() => onDelete?.(id)}
+                            disabled={!canDelete}
+                            variant={canDelete ? "soft" : "plain"}
+                            color={canDelete ? "danger" : "neutral"}>
+                            <DeleteRoundedIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     )}
-                  </Menu>
-                </Dropdown>
-              </td>
-            </tr>
-          ))}
+                  </Stack>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </Table>
     </Sheet>

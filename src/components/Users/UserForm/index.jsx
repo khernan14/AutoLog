@@ -1,423 +1,485 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { toast } from "react-toastify";
-import UserToolbar from "./UserToolbar";
-import UserTable from "./UserTable";
-import UserFormModal from "./UserFormModal";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
+  Box,
+  Card,
+  Typography,
+  Stack,
+  Button,
+  Sheet,
+  CircularProgress,
+} from "@mui/joy";
+
+import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
+import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
+
+import Swal from "sweetalert2";
+
+import { useAuth } from "../../../context/AuthContext";
+import { useToast } from "../../../context/ToastContext";
+
+// 🔧 Ajusta si tu servicio tiene otros nombres
+import {
+  getUsers as getUsersService,
   createUserService,
   updateUser as updateUserService,
   deleteUser as deleteUserService,
   restoreUser as restoreUserService,
   getUserSupervisors,
 } from "../../../services/AuthServices";
-import { sendMail } from "../../../services/MailServices";
 import { getCiudades } from "../../../services/RegistrosService";
-import { Box, CircularProgress, Typography, Button, Alert } from "@mui/joy";
-import { useAuth } from "../../../context/AuthContext";
-import Swal from "sweetalert2";
+import { sendMail } from "../../../services/MailServices";
 
-// Recibe 'users' como prop desde el componente padre Users.jsx
-export default function UsersForm({ users: initialUsers }) {
-  const [users, setUsers] = useState(initialUsers); // Usa initialUsers para el estado local
-  const [selectedUsers, setSelectedUsers] = useState([]);
-  const [isModalOpen, setModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+import StatusCard from "../../../components/common/StatusCard";
+import UserToolbar from "./UserToolbar";
+import UserTable from "./UserTable";
+import UserFormModal from "./UserFormModal";
+
+export default function Users() {
+  // ---- data ----
+  const [users, setUsers] = useState([]);
   const [ciudades, setCiudades] = useState([]);
   const [supervisores, setSupervisores] = useState([]);
-  // El loading y error principal ahora reflejarán la carga de ciudades/supervisores y el estado general
-  const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const [errorInitialData, setErrorInitialData] = useState(null);
+
+  // ---- ui state ----
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(true);
+  const [error, setError] = useState(null);
+
+  // toolbar state
+  const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
-  const [searchText, setSearchText] = useState("");
 
+  // selection / modal
+  const [selected, setSelected] = useState([]);
+  const [openModal, setOpenModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // ---- auth/perm ----
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const esAdmin = userData?.rol?.toLowerCase() === "admin";
-
-  // Función auxiliar para verificar permisos (Admin o permiso específico)
-  const canPerformAction = useCallback(
-    (permissionName) => {
-      return esAdmin || hasPermiso(permissionName);
-    },
-    [esAdmin, hasPermiso]
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
+  const can = useCallback(
+    (perm) => isAdmin || hasPermiso(perm),
+    [isAdmin, hasPermiso]
   );
 
-  // Sincronizar el estado local 'users' con la prop 'initialUsers'
-  useEffect(() => {
-    setUsers(initialUsers);
-  }, [initialUsers]);
+  const canView = can("ver_usuarios");
+  const canCreate = can("crear_usuario");
+  const canEdit = can("editar_usuario");
+  const canDelete = can("eliminar_usuario");
+  const canRestore = can("restaurar_usuario");
 
-  // --- Funciones de Carga de Datos (ciudades, supervisores) ---
-  // Estas se cargan independientemente de si el usuario puede ver la tabla de usuarios,
-  // ya que son necesarias para el modal de creación/edición.
+  const { showToast } = useToast();
 
-  const fetchCiudades = useCallback(async () => {
-    try {
-      const data = await getCiudades();
-      setCiudades(data);
-    } catch (error) {
-      console.error("Error cargando ciudades:", error);
-      // No establecer un error general aquí, ya que el modal puede manejar la falta de ciudades
-      // O podrías establecer un error específico para el modal.
-    }
-  }, []);
-
-  const fetchSupervisores = useCallback(async () => {
-    try {
-      const data = await getUserSupervisors();
-      setSupervisores(data);
-    } catch (error) {
-      console.error("Error cargando supervisores:", error);
-      // No establecer un error general aquí
-    }
-  }, []);
-
-  // Cargar ciudades y supervisores al montar el componente
-  useEffect(() => {
-    const loadRequiredData = async () => {
-      setLoadingInitialData(true);
-      setErrorInitialData(null);
-      try {
-        await Promise.all([fetchCiudades(), fetchSupervisores()]);
-      } catch (err) {
-        // Este error solo se mostrará si fetchCiudades o fetchSupervisores lanzan un error
-        // que no fue capturado internamente.
-        setErrorInitialData(
-          "Error al cargar datos adicionales (ciudades/supervisores)."
-        );
-      } finally {
-        setLoadingInitialData(false);
-      }
-    };
-    loadRequiredData();
-  }, [fetchCiudades, fetchSupervisores]);
-
-  // --- Handlers de Acciones con Lógica de Permisos ---
-
-  const handleAddUser = () => {
-    if (!canPerformAction("crear_usuario")) {
-      toast.error("No tienes permisos para agregar usuarios.");
+  // ---- load ----
+  const load = useCallback(async () => {
+    setChecking(checkingSession);
+    if (checkingSession) {
+      setLoading(true);
       return;
     }
-    // Si no hay ciudades, el modal debería mostrar un mensaje o deshabilitar la selección
-    if (ciudades.length === 0 && !errorInitialData) {
-      // Solo si no hay un error general ya
-      toast.warn("No hay ciudades disponibles para asignar a los usuarios.");
+
+    if (!canView) {
+      setError(null); // deja a la tarjeta “sin permisos”
+      setLoading(false);
+      return;
     }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const [usersRes, ciudadesRes, supervisoresRes] = await Promise.all([
+        getUsersService(), // 🔧 ajusta si se llama distinto
+        getCiudades(),
+        getUserSupervisors(),
+      ]);
+      setUsers(Array.isArray(usersRes) ? usersRes : []);
+      setCiudades(Array.isArray(ciudadesRes) ? ciudadesRes : []);
+      setSupervisores(Array.isArray(supervisoresRes) ? supervisoresRes : []);
+    } catch (err) {
+      const msg = err?.message || "Error desconocido.";
+      setError(
+        /failed to fetch|network/i.test(msg)
+          ? "No hay conexión con el servidor."
+          : "No se pudo cargar la lista de usuarios."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [checkingSession, canView]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // ---- helpers ----
+  const getCiudadNombre = useCallback(
+    (idCiudad) =>
+      ciudades.find((c) => String(c.id) === String(idCiudad))?.nombre || "",
+    [ciudades]
+  );
+
+  // ---- actions ----
+  const onNew = () => {
+    if (!canCreate)
+      return showToast("No tienes permiso para crear usuarios.", "warning");
     setEditingUser(null);
-    setModalOpen(true);
+    setOpenModal(true);
   };
 
-  const handleEditUser = (user) => {
-    if (!canPerformAction("editar_usuario")) {
-      toast.error("No tienes permisos para editar usuarios.");
-      return;
-    }
-    if (ciudades.length === 0 && !errorInitialData) {
-      toast.warn("No hay ciudades disponibles para editar usuarios.");
-    }
+  const onEdit = (user) => {
+    if (!canEdit)
+      return showToast("No tienes permiso para editar usuarios.", "warning");
     setEditingUser({
       ...user,
       ciudad: String(user.id_ciudad ?? user.ciudad),
       supervisor_id:
-        user.supervisor_id !== undefined && user.supervisor_id !== null
-          ? String(user.supervisor_id)
-          : null,
+        user.supervisor_id != null ? String(user.supervisor_id) : "",
     });
-    setModalOpen(true);
+    setOpenModal(true);
   };
 
-  const getCiudadNombre = useCallback(
-    (idCiudad) => {
-      return (
-        ciudades.find((c) => String(c.id) === String(idCiudad))?.nombre || ""
-      );
-    },
-    [ciudades]
-  );
+  const onDelete = async (id) => {
+    if (!canDelete)
+      return showToast("No tienes permiso para eliminar usuarios.", "warning");
 
-  const handleSaveUser = async (newUser) => {
-    if (!newUser.id_usuario && !canPerformAction("crear_usuario")) {
-      toast.error("No tienes permisos para crear usuarios.");
-      return { error: true };
-    }
-    if (newUser.id_usuario && !canPerformAction("editar_usuario")) {
-      toast.error("No tienes permisos para editar usuarios.");
-      return { error: true };
-    }
+    const res = await Swal.fire({
+      title: "¿Inactivar usuario?",
+      text: "El usuario será marcado como Inactivo.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonText: "Cancelar",
+      confirmButtonText: "Sí, inactivar",
+    });
+    if (!res.isConfirmed) return;
 
     try {
-      let result = null;
-      if (newUser.id_usuario) {
-        result = await updateUserService(newUser);
-        if (!result || result.error) throw new Error(result?.error);
+      const r = await deleteUserService(id);
+      if (r && !r.error) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.id_usuario === newUser.id_usuario
+            u.id_usuario === id ? { ...u, estatus: "Inactivo" } : u
+          )
+        );
+        setSelected((prev) => prev.filter((x) => x !== id));
+        showToast("Usuario inactivado correctamente", "success");
+      } else {
+        showToast("Error al inactivar el usuario.", "danger");
+      }
+    } catch {
+      showToast(
+        "Error de conexión al intentar inactivar el usuario.",
+        "danger"
+      );
+    }
+  };
+
+  const onRestore = async (id) => {
+    if (!canRestore)
+      return showToast("No tienes permiso para restaurar usuarios.", "warning");
+
+    const res = await Swal.fire({
+      title: "¿Restaurar usuario?",
+      text: "El usuario será marcado como Activo.",
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonColor: "#03624C",
+      cancelButtonText: "Cancelar",
+      confirmButtonText: "Sí, restaurar",
+    });
+    if (!res.isConfirmed) return;
+
+    try {
+      const r = await restoreUserService(id);
+      if (r && !r.error) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id_usuario === id ? { ...u, estatus: "Activo" } : u
+          )
+        );
+        showToast("Usuario restaurado correctamente", "success");
+      } else {
+        showToast("Error al restaurar el usuario.", "danger");
+      }
+    } catch {
+      showToast(
+        "Error de conexión al intentar restaurar el usuario.",
+        "danger"
+      );
+    }
+  };
+
+  const onBulkDelete = async () => {
+    if (!canDelete)
+      return showToast("No tienes permiso para inactivar usuarios.", "warning");
+    if (selected.length === 0) return;
+
+    const res = await Swal.fire({
+      title: "¿Inactivar seleccionados?",
+      text: "Los usuarios seleccionados serán marcados como Inactivo.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonText: "Cancelar",
+      confirmButtonText: "Sí, inactivar",
+    });
+    if (!res.isConfirmed) return;
+
+    try {
+      await Promise.all(selected.map((id) => deleteUserService(id)));
+      setUsers((prev) =>
+        prev.map((u) =>
+          selected.includes(u.id_usuario) ? { ...u, estatus: "Inactivo" } : u
+        )
+      );
+      setSelected([]);
+      showToast("Usuarios inactivados correctamente", "success");
+    } catch {
+      showToast(
+        "Error de conexión al inactivar usuarios seleccionados.",
+        "danger"
+      );
+    }
+  };
+
+  const onSubmitUser = async (payload) => {
+    // payload: { id_usuario?, nombre, email, username, password?, rol, puesto, id_ciudad/ciudad, supervisor_id }
+    if (payload?.id_usuario) {
+      if (!canEdit)
+        return showToast("No tienes permiso para editar usuarios.", "warning");
+    } else {
+      if (!canCreate)
+        return showToast("No tienes permiso para crear usuarios.", "warning");
+    }
+
+    setSaving(true);
+    try {
+      if (payload?.id_usuario) {
+        // === actualizar ===
+        const r = await updateUserService(payload);
+        if (!r || r.error) throw new Error(r?.error || "Error al actualizar");
+
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id_usuario === payload.id_usuario
               ? {
                   ...u,
-                  ...newUser,
-                  ciudad: getCiudadNombre(newUser.id_ciudad ?? newUser.ciudad),
-                  supervisor_id: newUser.supervisor_id ?? null,
+                  ...payload,
+                  ciudad: getCiudadNombre(payload.id_ciudad ?? payload.ciudad),
                 }
               : u
           )
         );
-        toast.success("Usuario actualizado correctamente");
+
+        showToast("Usuario actualizado correctamente", "success");
       } else {
-        result = await createUserService(newUser);
-        if (!result || result.error) throw new Error(result?.error);
+        // === crear ===
+        const r = await createUserService(payload);
+        if (!r || r.error) throw new Error(r?.error || "Error al crear");
 
         const ciudadNombre = getCiudadNombre(
-          newUser.id_ciudad ?? newUser.ciudad
+          payload.id_ciudad ?? payload.ciudad
         );
-        const nuevoUsuario = {
-          ...result,
-          ...newUser,
-          ciudad: ciudadNombre,
-        };
-        setUsers((prev) => [...prev, nuevoUsuario]);
-        toast.success("Usuario creado correctamente");
+        const nuevoUsuario = { ...r, ...payload, ciudad: ciudadNombre };
 
+        // Enviar correo ANTES del toast de éxito (si falla, no rompemos el flujo)
         try {
           await sendMail({
             to: nuevoUsuario.email,
             nombre: nuevoUsuario.nombre,
             usuario: nuevoUsuario.username,
-            password: result.password || newUser.password,
+            password: r.password || payload.password,
           });
-          toast.success("Correo de bienvenida enviado");
-        } catch (error) {
-          toast.warn("Usuario creado, pero el correo no se pudo enviar");
-          console.error("Error enviando correo:", error);
+        } catch (e) {
+          showToast(
+            "Usuario creado, pero el correo no se pudo enviar.",
+            "warning"
+          );
         }
+
+        setUsers((prev) => [...prev, nuevoUsuario]);
+        showToast("Usuario creado correctamente", "success");
       }
-      setModalOpen(false);
+
+      setOpenModal(false);
       setEditingUser(null);
-      return result;
-    } catch (error) {
-      toast.error(error.message || "Error al guardar el usuario.");
-      return { error: true };
+    } catch (err) {
+      showToast(err?.message || "Error al guardar el usuario.", "danger");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteUser = async (id) => {
-    if (!canPerformAction("eliminar_usuario")) {
-      toast.error("No tienes permisos para eliminar usuarios.");
-      return;
-    }
-
-    const resultSwal = await Swal.fire({
-      title: "¿Estás seguro?",
-      text: "El usuario será marcado como inactivo.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, inactivar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (resultSwal.isConfirmed) {
-      try {
-        const result = await deleteUserService(id);
-        if (result && !result.error) {
-          setUsers((prev) =>
-            prev.map((u) =>
-              u.id_usuario === id ? { ...u, estatus: "Inactivo" } : u
-            )
-          );
-          setSelectedUsers((prev) => prev.filter((userId) => userId !== id));
-          toast.success("Usuario inactivado correctamente");
-        } else {
-          toast.error("Error al inactivar el usuario.");
-        }
-      } catch (err) {
-        console.error("Error al eliminar usuario:", err);
-        toast.error("Error de conexión al intentar inactivar el usuario.");
-      }
-    }
-  };
-
-  const handleRestoreUser = async (id) => {
-    if (!canPerformAction("gestionar_usuarios")) {
-      // O 'restaurar_usuario' si es más específico
-      toast.error("No tienes permisos para restaurar usuarios.");
-      return;
-    }
-
-    const resultSwal = await Swal.fire({
-      title: "¿Restaurar usuario?",
-      text: "El usuario será marcado como activo nuevamente.",
-      icon: "info",
-      showCancelButton: true,
-      confirmButtonColor: "#03624C",
-      cancelButtonColor: "#d33",
-      confirmButtonText: "Sí, restaurar",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (resultSwal.isConfirmed) {
-      try {
-        const result = await restoreUserService(id);
-        if (result && !result.error) {
-          setUsers((prev) =>
-            prev.map((user) =>
-              user.id_usuario === id ? { ...user, estatus: "Activo" } : user
-            )
-          );
-          toast.success("Usuario restaurado correctamente");
-        } else {
-          toast.error("Error al restaurar el usuario");
-        }
-      } catch (err) {
-        console.error("Error al restaurar usuario:", err);
-        toast.error("Error de conexión al intentar restaurar el usuario.");
-      }
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!canPerformAction("eliminar_usuario")) {
-      toast.error("No tienes permisos para eliminar usuarios seleccionados.");
-      return;
-    }
-
-    const resultSwal = await Swal.fire({
-      title: "¿Estás seguro?",
-      text: "Los usuarios seleccionados serán marcados como inactivos.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, inactivar seleccionados",
-      cancelButtonText: "Cancelar",
-    });
-
-    if (resultSwal.isConfirmed) {
-      try {
-        await Promise.all(selectedUsers.map((id) => deleteUserService(id)));
-
-        setUsers((prev) =>
-          prev.map((u) =>
-            selectedUsers.includes(u.id_usuario)
-              ? { ...u, estatus: "Inactivo" }
-              : u
-          )
-        );
-        setSelectedUsers([]);
-        toast.success("Usuarios inactivados correctamente");
-      } catch (err) {
-        console.error("Error al inactivar usuarios seleccionados:", err);
-        toast.error("Error de conexión al inactivar usuarios seleccionados.");
-      }
-    }
-  };
-
-  const filteredUsers = useMemo(() => {
-    const search = searchText.toLowerCase();
+  // ---- filtered ----
+  const filtered = useMemo(() => {
+    const s = (search || "").toLowerCase();
     return (users || []).filter((u) => {
-      const matchesStatus = showInactive ? true : u.estatus === "Activo";
-      const matchesSearch =
-        `${u.nombre} ${u.email} ${u.username} ${u.rol} ${u.puesto} ${u.ciudad}`
-          .toLowerCase()
-          .includes(search);
+      const matchesStatus = showInactive
+        ? true
+        : (u.estatus || "Activo") === "Activo";
+      const text = `${u.nombre || ""} ${u.email || ""} ${u.username || ""} ${
+        u.rol || ""
+      } ${u.puesto || ""} ${u.ciudad || ""}`.toLowerCase();
+      const matchesSearch = text.includes(s);
       return matchesStatus && matchesSearch;
     });
-  }, [users, showInactive, searchText]);
+  }, [users, showInactive, search]);
 
-  // --- Renderizado del Componente ---
-  // Manejo de carga y errores iniciales (incluyendo el checkingSession del AuthContext)
-  if (checkingSession || loadingInitialData) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="80vh">
-        <CircularProgress size="lg" />
-        <Typography level="body-lg" sx={{ ml: 2 }}>
-          {checkingSession ? "Verificando sesión..." : "Cargando datos..."}
-        </Typography>
-      </Box>
-    );
-  }
+  // ---- view state ----
+  const viewState = checking
+    ? "checking"
+    : !canView
+    ? "no-permission"
+    : error
+    ? "error"
+    : loading
+    ? "loading"
+    : filtered.length === 0
+    ? "empty"
+    : "data";
 
-  // Si no tiene permiso para ver usuarios (y ya no está cargando ni verificando sesión)
-  if (!canPerformAction("ver_usuarios")) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-md">
-            Acceso denegado. No tienes permisos para ver la lista de usuarios.
-          </Typography>
-        </Alert>
-      </Box>
-    );
-  }
+  const renderStatus = () => {
+    if (viewState === "checking") {
+      return (
+        <StatusCard
+          icon={<HourglassEmptyRoundedIcon />}
+          title="Verificando sesión…"
+          description={
+            <Stack alignItems="center" spacing={1}>
+              <CircularProgress size="sm" />
+              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+                Por favor, espera un momento.
+              </Typography>
+            </Stack>
+          }
+        />
+      );
+    }
+    if (viewState === "no-permission") {
+      return (
+        <StatusCard
+          color="danger"
+          icon={<LockPersonRoundedIcon />}
+          title="Sin permisos para ver usuarios"
+          description="Consulta con un administrador para obtener acceso."
+        />
+      );
+    }
+    if (viewState === "error") {
+      const isNetwork = /conexión|failed to fetch/i.test(error || "");
+      return (
+        <StatusCard
+          color={isNetwork ? "warning" : "danger"}
+          icon={
+            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
+          }
+          title={
+            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
+          }
+          description={error}
+          actions={
+            <Button
+              startDecorator={<RestartAltRoundedIcon />}
+              onClick={load}
+              variant="soft">
+              Reintentar
+            </Button>
+          }
+        />
+      );
+    }
+    if (viewState === "empty") {
+      const noData = (users || []).length === 0;
+      return (
+        <StatusCard
+          color="neutral"
+          icon={<InfoOutlinedIcon />}
+          title={noData ? "Sin usuarios" : "No hay coincidencias"}
+          description={
+            noData
+              ? "Aún no hay usuarios registrados."
+              : "Ajusta la búsqueda o alterna 'ver inactivos' para ver resultados."
+          }
+        />
+      );
+    }
+    return null;
+  };
 
-  // Si hay un error general después de la carga inicial (ej. ciudades no cargadas)
-  if (errorInitialData) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="warning" variant="soft">
-          <Typography level="body-md" mb={2}>
-            {errorInitialData}
-          </Typography>
-          <Button
-            onClick={() => {
-              setErrorInitialData(null); // Limpiar error para reintentar
-              setLoadingInitialData(true); // Activar carga para reintentar
-              fetchCiudades(); // Reintentar solo ciudades/supervisores
-              fetchSupervisores();
-            }}
-            variant="outlined"
-            color="warning">
-            Reintentar Carga de Datos
-          </Button>
-        </Alert>
-      </Box>
-    );
-  }
-
+  // ---- UI ----
   return (
-    <Box p={2}>
-      <UserToolbar
-        onAdd={handleAddUser}
-        onDelete={handleDeleteSelected}
-        selectedUsers={selectedUsers}
-        showInactive={showInactive}
-        setShowInactive={setShowInactive}
-        onSearch={(text) => setSearchText(text)}
-        // Pasando permisos a la barra de herramientas
-        canAdd={canPerformAction("crear_usuario")}
-        canDeleteSelected={canPerformAction("eliminar_usuario")}
-      />
-      <UserTable
-        users={filteredUsers}
-        onEdit={handleEditUser}
-        onDelete={handleDeleteUser}
-        onBulkDelete={handleDeleteSelected}
-        selectedUsers={selectedUsers}
-        setSelectedUsers={setSelectedUsers}
-        onRestore={handleRestoreUser}
-        // Pasando permisos a la tabla
-        canEdit={canPerformAction("editar_usuario")}
-        canDelete={canPerformAction("eliminar_usuario")}
-        canRestore={canPerformAction("gestionar_usuarios")} // O un permiso más específico si existe
-      />
-      <UserFormModal
-        open={isModalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingUser(null);
-        }}
-        onSave={handleSaveUser}
-        user={editingUser}
-        ciudades={ciudades}
-        supervisores={supervisores}
-        // Puedes pasar un prop para indicar si no hay ciudades, si el modal lo necesita
-        // hasCiudades={ciudades.length > 0}
-      />
-    </Box>
+    <Sheet
+      variant="plain"
+      sx={{
+        flex: 1,
+        width: "100%",
+        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
+        pb: { xs: 2, sm: 2, md: 4 },
+        px: { xs: 2, md: 4 },
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "auto",
+        minHeight: "100dvh",
+        bgcolor: "background.body",
+      }}>
+      <Box sx={{ width: "100%" }}>
+        {/* Toolbar */}
+        <UserToolbar
+          search={search}
+          onSearch={setSearch}
+          showInactive={showInactive}
+          onToggleInactive={setShowInactive}
+          onNew={onNew}
+          canCreate={canCreate}
+          selectedCount={selected.length}
+          onBulkDelete={onBulkDelete}
+          canBulkDelete={canDelete}
+        />
+
+        {/* Contenedor principal */}
+        <Card
+          variant="plain"
+          sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+          {viewState !== "data" ? (
+            <Box p={2}>{renderStatus()}</Box>
+          ) : (
+            <UserTable
+              users={filtered}
+              selected={selected}
+              setSelected={setSelected}
+              onEdit={canEdit ? onEdit : undefined}
+              onDelete={canDelete ? onDelete : undefined}
+              onRestore={canRestore ? onRestore : undefined}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canRestore={canRestore}
+            />
+          )}
+        </Card>
+
+        {/* Modal crear/editar */}
+        {openModal && (
+          <UserFormModal
+            open={openModal}
+            onClose={() => {
+              setOpenModal(false);
+              setEditingUser(null);
+            }}
+            onSubmit={onSubmitUser}
+            initialValues={editingUser || undefined}
+            ciudades={ciudades}
+            supervisores={supervisores}
+            saving={saving}
+          />
+        )}
+      </Box>
+    </Sheet>
   );
 }

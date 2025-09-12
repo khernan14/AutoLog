@@ -10,6 +10,7 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { GlobalStyles } from "./constants/GlobalStyle";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { ToastProvider } from "./context/ToastContext";
 
 // 🎨 Crea un theme extendido con la fuente Poppins
 const theme = extendTheme({
@@ -26,7 +27,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <CssBaseline />
         <GlobalStyles />
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
         <ToastContainer
           position="top-center"
           autoClose={3000}

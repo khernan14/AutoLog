@@ -4,7 +4,7 @@ import { STORAGE_KEYS } from "../config/variables";
 export async function fetchConToken(url, options = {}) {
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
-    console.log("Token:", token);
+    // console.log("Token:", token);
 
     // Si el body es FormData, NO incluir Content-Type manualmente
     const isFormData = options.body instanceof FormData;
@@ -22,7 +22,6 @@ export async function fetchConToken(url, options = {}) {
         });
         return res;
     } catch (err) {
-        console.error("❌ Error en fetchConToken:", err);
         throw err;
     }
 }

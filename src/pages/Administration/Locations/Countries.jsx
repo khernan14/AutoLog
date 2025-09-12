@@ -1,259 +1,317 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { toast } from "react-toastify";
-import { Box, CircularProgress, Typography, Button, Alert } from "@mui/joy"; // Añadido Alert
-import Swal from "sweetalert2"; // Para las confirmaciones
+import {
+  Box, Card, Typography, Stack, Button, Sheet, CircularProgress,
+} from "@mui/joy";
+import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
+import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import Swal from "sweetalert2";
+
+import { useAuth } from "../../../context/AuthContext";
+import { useToast } from "../../../context/ToastContext";
 
 import {
   getCountries,
   addCountry,
   updateCountry,
-  deleteCountry, // Asumo que tienes una función deleteCountry
-} from "../../../services/LocationServices"; // Asegúrate de que la ruta sea correcta
+  deleteCountry,
+} from "../../../services/LocationServices";
 
-import CountriesToolBar from "../../../components/Administration/Locations/Countries/CountriesToolBar"; // Asegúrate de que la ruta sea correcta
-import CountriesTable from "../../../components/Administration/Locations/Countries/CountriesTable"; // Asegúrate de que la ruta sea correcta
-import CountriesModal from "../../../components/Administration/Locations/Countries/CountriesModal"; // Asegúrate de que la ruta sea correcta
+// Ajusta la ruta si tu StatusCard vive en otro lugar
+import StatusCard from "../../../components/common/StatusCard";
 
-import { useAuth } from "../../../context/AuthContext"; // Asegúrate de que la ruta sea correcta
+import CountriesTable from "../../../components/Administration/Locations/Countries/CountriesTable";
+import CountriesModal from "../../../components/Administration/Locations/Countries/CountriesModal";
+import CountriesToolBar from "../../../components/Administration/Locations/Countries/CountriesToolBar";
 
 export default function Countries() {
+  // ---- state ----
   const [countries, setCountries] = useState([]);
-  const [loading, setLoading] = useState(true); // Inicializar en true para la carga inicial
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   const [openModal, setOpenModal] = useState(false);
   const [editCountry, setEditCountry] = useState(null);
-  const [searchText, setSearchText] = useState("");
 
-  const { userData, checkingSession, hasPermiso } = useAuth(); // Obtener userData, checkingSession y hasPermiso
-  const esAdmin = userData?.rol?.toLowerCase() === "admin";
+  const [search, setSearch] = useState("");
 
-  // Función auxiliar para verificar permisos (Admin o permiso específico)
-  const canPerformAction = useCallback(
-    (permissionName) => {
-      return esAdmin || hasPermiso(permissionName);
-    },
-    [esAdmin, hasPermiso]
-  );
+  // ---- auth/perm ----
+  const { userData, checkingSession, hasPermiso } = useAuth();
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
+  const can = useCallback((perm) => isAdmin || hasPermiso(perm), [isAdmin, hasPermiso]);
 
-  // Carga de países con manejo de permisos y estado de sesión
+  // Fallbacks por ausencia de eliminar_paises en tu DB
+  const canView = can("ver_paises");
+  const canCreate = can("crear_paises");
+  const canEdit = can("editar_paises");
+  const canDelete = can("eliminar_paises") || canEdit;
+
+  // ---- toast ----
+  const { showToast } = useToast();
+
+  // ---- load ----
   const loadCountries = useCallback(async () => {
-    // Si aún estamos verificando la sesión, no hacemos nada.
-    if (checkingSession) {
-      setLoading(true); // Mantener el spinner mientras se verifica
-      return;
-    }
+    if (checkingSession) { setLoading(true); return; }
 
-    // Verificar permiso para VER países
-    if (!canPerformAction("ver_paises")) {
-      setError("No tienes permisos para ver la lista de países.");
+    if (!canView) {
+      setError(null);  // dejemos a la tarjeta de "sin permisos" encargarse del mensaje
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    setError(null); // Limpiar errores previos
-
+    setError(null);
     try {
       const data = await getCountries();
-      if (data) {
+      if (Array.isArray(data)) {
         setCountries(data);
       } else {
-        setError("No se pudieron cargar los países. Intenta más tarde.");
+        setError("No se pudieron cargar los países.");
       }
     } catch (err) {
-      console.error("Error al cargar países:", err);
-      setError("No se pudo conectar con el servidor. Intenta más tarde.");
+      const msg = err?.message || "Error desconocido.";
+      setError(/failed to fetch|network/i.test(msg) ? "No hay conexión con el servidor." : msg);
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canPerformAction]); // Dependencias: checkingSession, canPerformAction
+  }, [checkingSession, canView]);
 
-  useEffect(() => {
-    loadCountries();
-  }, [loadCountries]);
+  useEffect(() => { loadCountries(); }, [loadCountries]);
 
-  // --- Handlers de acciones con lógica de permisos ---
-
-  const handleAddCountry = () => {
-    if (!canPerformAction("crear_paises")) {
-      // Permiso específico para crear
-      toast.error("No tienes permisos para agregar países.");
+  // ---- actions ----
+  const onNew = () => {
+    if (!canCreate) {
+      showToast("No tienes permiso para crear países. Solicítalo al administrador.", "warning");
       return;
     }
     setEditCountry(null);
     setOpenModal(true);
   };
 
-  const handleEdit = (country) => {
-    if (!canPerformAction("editar_paises")) {
-      // Permiso específico para editar
-      toast.error("No tienes permisos para editar países.");
+  const onEdit = (country) => {
+    if (!canEdit) {
+      showToast("No tienes permiso para editar países.", "warning");
       return;
     }
     setEditCountry(country);
     setOpenModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!canPerformAction("eliminar_paises")) {
-      // Permiso específico para eliminar
-      toast.error("No tienes permisos para eliminar países.");
+  const onDelete = async (id) => {
+    if (!canDelete) {
+      showToast("No tienes permiso para eliminar países.", "warning");
       return;
     }
-
-    const resultSwal = await Swal.fire({
-      title: "¿Estás seguro?",
-      text: "Esta acción eliminará el país permanentemente.",
+    const res = await Swal.fire({
+      title: "¿Eliminar país?",
+      text: "Esta acción no se puede deshacer.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33", // Rojo para eliminar
+      confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Sí, eliminar",
       cancelButtonText: "Cancelar",
     });
-
-    if (resultSwal.isConfirmed) {
-      try {
-        const deleteResult = await deleteCountry(id); // Asumo que deleteCountry existe
-        if (deleteResult && !deleteResult.error) {
-          setCountries((prev) => prev.filter((c) => c.id !== id));
-          toast.success("País eliminado correctamente");
-        } else {
-          toast.error("Error al eliminar el país.");
-        }
-      } catch (err) {
-        console.error("Error al eliminar país:", err);
-        toast.error("Error de conexión al intentar eliminar el país.");
-      }
-    }
-  };
-
-  const handleSubmitCountry = async (country) => {
-    // Permiso para crear o editar
-    if (!country.id && !canPerformAction("crear_paises")) {
-      toast.error("No tienes permisos para crear países.");
-      return;
-    }
-    if (country.id && !canPerformAction("editar_paises")) {
-      toast.error("No tienes permisos para editar países.");
-      return;
-    }
+    if (!res.isConfirmed) return;
 
     try {
-      const payload = {
-        nombre: country.nombre?.trim() || "",
-        id: country.id || null,
-      };
-
-      if (!payload.nombre) {
-        toast.error("El nombre del país es obligatorio");
-        return;
-      }
-
-      if (payload.id && Number(payload.id) > 0) {
-        const result = await updateCountry(payload.id, payload);
-        if (result && !result.error) {
-          toast.success("País actualizado correctamente");
-        } else {
-          toast.error("Error al actualizar el país.");
-        }
+      const r = await deleteCountry(id);
+      if (r && !r.error) {
+        setCountries((prev) => prev.filter((c) => c.id !== id));
+        showToast("País eliminado correctamente", "success");
       } else {
-        const result = await addCountry(payload);
-        if (result && !result.error) {
-          toast.success("País agregado correctamente");
-        } else {
-          toast.error("Error al agregar el país.");
-        }
+        showToast("Error al eliminar el país.", "danger");
       }
-
-      setOpenModal(false);
-      setEditCountry(null);
-      loadCountries(); // Recargar la lista después de guardar
-    } catch (error) {
-      toast.error(error.message || "Error al guardar el país.");
-      console.error("handleSubmitCountry error:", error);
+    } catch {
+      showToast("Error de conexión al intentar eliminar el país.", "danger");
     }
   };
 
-  const filteredCountries = useMemo(() => {
-    const search = searchText.toLowerCase();
-    return (countries || []).filter((u) =>
-      (u.nombre || "").toLowerCase().includes(search)
-    );
-  }, [countries, searchText]);
+  const onSubmitCountry = async (payload) => {
+    const nombre = payload?.nombre?.trim();
+    if (!nombre) return showToast("El nombre del país es obligatorio", "warning");
 
-  // Renderizado principal del componente
-  if (checkingSession || loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="80vh">
-        <CircularProgress size="lg" />
-        <Typography level="body-lg" sx={{ ml: 2 }}>
-          {checkingSession ? "Verificando sesión..." : "Cargando países..."}
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-md" mb={2}>
-            {error}
-          </Typography>
-          {/* Solo mostrar botón de reintentar si el error no es de permisos */}
-          {!error.includes("No tienes permisos") && (
-            <Button onClick={loadCountries} variant="outlined" color="danger">
-              Reintentar
-            </Button>
-          )}
-        </Alert>
-      </Box>
-    );
-  }
-
-  // Si no hay error y no está cargando, pero tampoco tiene permiso para ver
-  if (!canPerformAction("ver_paises")) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-md">
-            Acceso denegado. No tienes permisos para ver la lista de países.
-          </Typography>
-        </Alert>
-      </Box>
-    );
-  }
-
-  return (
-    <Box p={2}>
-      <CountriesToolBar
-        onAdd={handleAddCountry}
-        onSearch={(text) => setSearchText(text)}
-        canAdd={canPerformAction("crear_paises")} // Pasa el permiso al toolbar
-      />
-
-      <CountriesTable
-        countries={filteredCountries}
-        onEdit={handleEdit}
-        onDelete={handleDelete} // Pasa la función de eliminar
-        canEdit={canPerformAction("editar_paises")} // Pasa el permiso a la tabla
-        canDelete={canPerformAction("eliminar_paises")} // Pasa el permiso a la tabla
-      />
-
-      <CountriesModal
-        open={openModal}
-        onClose={() => {
+    // crear
+    if (!payload?.id) {
+      if (!canCreate) return showToast("No tienes permiso para crear países.", "warning");
+      try {
+        const r = await addCountry({ nombre });
+        if (r && !r.error) {
+          showToast("País agregado correctamente", "success");
           setOpenModal(false);
           setEditCountry(null);
-        }}
-        initialValues={editCountry || undefined}
-        onSubmit={handleSubmitCountry}
-      />
-    </Box>
+          loadCountries();
+        } else {
+          showToast("Error al agregar el país.", "danger");
+        }
+      } catch {
+        showToast("Error de conexión al guardar el país.", "danger");
+      }
+      return;
+    }
+
+    // actualizar
+    if (!canEdit) return showToast("No tienes permiso para editar países.", "warning");
+    try {
+      const r = await updateCountry(payload.id, { id: payload.id, nombre });
+      if (r && !r.error) {
+        showToast("País actualizado correctamente", "success");
+        setOpenModal(false);
+        setEditCountry(null);
+        loadCountries();
+      } else {
+        showToast("Error al actualizar el país.", "danger");
+      }
+    } catch {
+      showToast("Error de conexión al actualizar el país.", "danger");
+    }
+  };
+
+  // ---- filtered ----
+  const filtered = useMemo(() => {
+    const s = (search || "").toLowerCase();
+    return (Array.isArray(countries) ? countries : []).filter((c) =>
+      (c?.nombre || "").toLowerCase().includes(s)
+    );
+  }, [countries, search]);
+
+  // ---- view state ----
+  const viewState =
+    checkingSession
+      ? "checking"
+      : !canView
+        ? "no-permission"
+        : error
+          ? "error"
+          : !loading && filtered.length === 0
+            ? "empty"
+            : loading
+              ? "loading"
+              : "data";
+
+  const renderStatus = () => {
+    if (viewState === "checking") {
+      return (
+        <StatusCard
+          icon={<HourglassEmptyRoundedIcon />}
+          title="Verificando sesión…"
+          description={
+            <Stack alignItems="center" spacing={1}>
+              <CircularProgress size="sm" />
+              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+                Por favor, espera un momento.
+              </Typography>
+            </Stack>
+          }
+        />
+      );
+    }
+    if (viewState === "no-permission") {
+      return (
+        <StatusCard
+          color="danger"
+          icon={<LockPersonRoundedIcon />}
+          title="Sin permisos para ver países"
+          description="Consulta con un administrador para obtener acceso."
+        />
+      );
+    }
+    if (viewState === "error") {
+      const isNetwork = /conexión|failed to fetch/i.test(error || "");
+      return (
+        <StatusCard
+          color={isNetwork ? "warning" : "danger"}
+          icon={isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />}
+          title={isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"}
+          description={error}
+          actions={
+            <Button startDecorator={<RestartAltRoundedIcon />} onClick={loadCountries} variant="soft">
+              Reintentar
+            </Button>
+          }
+        />
+      );
+    }
+    if (viewState === "empty") {
+      return (
+        <StatusCard
+          color="neutral"
+          icon={<InfoOutlinedIcon />}
+          title="Sin países"
+          description="Aún no hay países registrados."
+        />
+      );
+    }
+    if (viewState === "loading") {
+      return (
+        <Sheet p={3} sx={{ textAlign: "center" }}>
+          <Stack spacing={1} alignItems="center">
+            <CircularProgress />
+            <Typography level="body-sm">Cargando…</Typography>
+          </Stack>
+        </Sheet>
+      );
+    }
+    return null;
+  };
+
+  // ---- UI ----
+  return (
+    <Sheet
+      variant="plain"
+      sx={{
+        flex: 1,
+        width: "100%",
+        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
+        pb: { xs: 2, sm: 2, md: 4 },
+        px: { xs: 2, md: 4 },
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "auto",
+        minHeight: "100dvh",
+        bgcolor: "background.body",
+      }}
+    >
+      <Box sx={{ width: "100%" }}>
+        {/* Header */}
+        <CountriesToolBar
+          onSearch={(text) => setSearch(text)}
+          onAdd={onNew}
+          canAdd={canCreate}
+        />
+
+        {/* Contenedor principal */}
+        <Card variant="plain" sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+          {viewState !== "data" ? (
+            <Box p={2}>{renderStatus()}</Box>
+          ) : (
+            <CountriesTable
+              countries={filtered}
+              onEdit={canEdit ? onEdit : undefined}
+              onDelete={canDelete ? onDelete : undefined}
+              canEdit={canEdit}
+              canDelete={canDelete}
+            />
+          )}
+        </Card>
+
+        {/* Modal crear/editar */}
+        {openModal && (
+          <CountriesModal
+            open={openModal}
+            onClose={() => {
+              setOpenModal(false);
+              setEditCountry(null);
+            }}
+            initialValues={editCountry || undefined}
+            onSubmit={onSubmitCountry}
+          />
+        )}
+      </Box>
+    </Sheet>
   );
 }

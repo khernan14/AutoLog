@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import {
   Box,
   Table,
@@ -11,146 +11,163 @@ import {
   Sheet,
   Button,
   Stack,
+  Chip,
 } from "@mui/joy";
-import { useTheme } from "@mui/joy/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 
+/* Hook simple (sin @mui/material) para detectar móvil */
+function useIsMobile(bp = 768) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.matchMedia(`(max-width:${bp}px)`).matches : false
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia(`(max-width:${bp}px)`);
+    const onChange = (e) => setIsMobile(e.matches);
+    mql.addEventListener?.("change", onChange);
+    mql.addListener?.(onChange);
+    return () => {
+      mql.removeEventListener?.("change", onChange);
+      mql.removeListener?.(onChange);
+    };
+  }, [bp]);
+  return isMobile;
+}
+
+/**
+ * Presentacional.
+ * Props:
+ * - vehiculos: Array<{ id, placa, marca, modelo, estado, nombre_ubicacion }>
+ * - onEdit?: (vehiculo) => void
+ * - onDelete?: (id) => void
+ * - onRestore?: (id) => void
+ * - canEdit?: boolean
+ * - canDelete?: boolean
+ * - canRestore?: boolean
+ */
 export default function VehiculosTable({
-  vehiculos,
+  vehiculos = [],
   onEdit,
   onDelete,
-  onBulkDelete,
   onRestore,
+  canEdit = false,
+  canDelete = false,
+  canRestore = false,
 }) {
-  const [selected, setSelected] = useState([]);
+  const isMobile = useIsMobile(768);
+
   const [sortField, setSortField] = useState("placa");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  const toggleSelectAll = useCallback(
-    (checked) => {
-      setSelected(checked ? vehiculos.map((v) => v.id) : []);
-    },
-    [vehiculos]
-  );
-
-  const toggleSelectOne = useCallback((id) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  }, []);
-
-  const handleSort = useCallback(
-    (field) => {
-      if (field === sortField) {
-        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-      } else {
-        setSortField(field);
-        setSortOrder("asc");
-      }
-    },
-    [sortField]
-  );
+  const handleSort = useCallback((field) => {
+    if (field === sortField) {
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  }, [sortField]);
 
   const sortedVehiculos = useMemo(() => {
-    return [...vehiculos].sort((a, b) => {
-      const valA = a[sortField]?.toString().toLowerCase() ?? "";
-      const valB = b[sortField]?.toString().toLowerCase() ?? "";
-      return sortOrder === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
+    const arr = Array.isArray(vehiculos) ? [...vehiculos] : [];
+    arr.sort((a, b) => {
+      const A = (a?.[sortField] ?? "").toString().toLowerCase();
+      const B = (b?.[sortField] ?? "").toString().toLowerCase();
+      if (A < B) return sortOrder === "asc" ? -1 : 1;
+      if (A > B) return sortOrder === "asc" ? 1 : -1;
+      return 0;
     });
+    return arr;
   }, [vehiculos, sortField, sortOrder]);
 
-  const isInactive = (vehiculo) => vehiculo.estado === "Inactivo";
+  const hasActions =
+    (canEdit && typeof onEdit === "function") ||
+    (canDelete && typeof onDelete === "function") ||
+    (canRestore && typeof onRestore === "function");
 
+  const isInactive = (v) => (v?.estado || "").toLowerCase() === "inactivo";
+
+  // ====== MÓVIL: Tarjetas ======
   if (isMobile) {
     return (
-      <Stack spacing={2}>
-        {selected.length > 0 && (
-          <Button
-            color="danger"
-            variant="soft"
-            startDecorator={<DeleteRoundedIcon />}
-            onClick={() => onBulkDelete(selected)}>
-            Eliminar seleccionados ({selected.length})
-          </Button>
-        )}
+      <Stack spacing={2} p={2}>
+        {sortedVehiculos.map((v) => {
+          const showMenu =
+            (canEdit && onEdit) || (canDelete && onDelete && !isInactive(v)) || (canRestore && onRestore && isInactive(v));
 
-        {sortedVehiculos.map((vehiculo) => (
-          <Sheet
-            key={vehiculo.id}
-            variant="outlined"
-            sx={{ p: 2, borderRadius: "md" }}>
-            <Stack spacing={1}>
-              <Stack direction="row" justifyContent="space-between">
-                <Typography level="title-md">{vehiculo.placa}</Typography>
-                <Dropdown>
-                  <MenuButton
-                    slots={{ root: IconButton }}
-                    slotProps={{
-                      root: { variant: "plain", color: "neutral" },
-                    }}>
-                    <MoreHorizRoundedIcon />
-                  </MenuButton>
-                  <Menu>
-                    <MenuItem onClick={() => onEdit(vehiculo)}>Editar</MenuItem>
-                    {isInactive(vehiculo) ? (
-                      <MenuItem onClick={() => onRestore(vehiculo.id)}>
-                        Restaurar
-                      </MenuItem>
-                    ) : (
-                      <MenuItem onClick={() => onDelete(vehiculo.id)}>
-                        Eliminar
-                      </MenuItem>
-                    )}
-                  </Menu>
-                </Dropdown>
+          return (
+            <Sheet key={v.id} variant="outlined" sx={{ p: 2, borderRadius: "md" }}>
+              <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Box>
+                    <Typography level="title-md">{v.placa}</Typography>
+                    <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                      {v.marca} · {v.modelo}
+                    </Typography>
+                  </Box>
+
+                  {showMenu && (
+                    <Dropdown>
+                      <MenuButton
+                        slots={{ root: IconButton }}
+                        slotProps={{ root: { variant: "plain", color: "neutral" } }}
+                        aria-label="Acciones">
+                        <MoreHorizRoundedIcon />
+                      </MenuButton>
+                      <Menu>
+                        {canEdit && onEdit && (
+                          <MenuItem onClick={() => onEdit(v)}>
+                            <EditRoundedIcon fontSize="small" />
+                            Editar
+                          </MenuItem>
+                        )}
+                        {isInactive(v)
+                          ? (canRestore && onRestore && (
+                            <MenuItem onClick={() => onRestore(v.id)}>
+                              <RestoreRoundedIcon fontSize="small" />
+                              Restaurar
+                            </MenuItem>
+                          ))
+                          : (canDelete && onDelete && (
+                            <MenuItem onClick={() => onDelete(v.id)}>
+                              <DeleteRoundedIcon fontSize="small" />
+                              Inactivar
+                            </MenuItem>
+                          ))}
+                      </Menu>
+                    </Dropdown>
+                  )}
+                </Stack>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={v.estado === "Disponible" ? "success" : "warning"}
+                  >
+                    {v.estado || "—"}
+                  </Chip>
+                  <Chip size="sm" variant="soft">
+                    {v.nombre_ubicacion || "Sin ubicación"}
+                  </Chip>
+                </Stack>
               </Stack>
-              <Typography level="body-sm">
-                <strong>Marca:</strong> {vehiculo.marca}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Modelo:</strong> {vehiculo.modelo}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Estado:</strong> {vehiculo.estado}
-              </Typography>
-              <Typography level="body-sm">
-                <strong>Ubicación:</strong> {vehiculo.nombre_ubicacion}
-              </Typography>
-            </Stack>
-          </Sheet>
-        ))}
+            </Sheet>
+          );
+        })}
       </Stack>
     );
   }
 
+  // ====== ESCRITORIO: Tabla ======
   return (
     <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
-      {selected.length > 0 && (
-        <Box sx={{ mb: 1 }}>
-          <Button
-            color="danger"
-            variant="soft"
-            startDecorator={<DeleteRoundedIcon />}
-            onClick={() => onBulkDelete(selected)}>
-            Eliminar seleccionados ({selected.length})
-          </Button>
-        </Box>
-      )}
-      <Table
-        hoverRow
-        aria-label="Tabla de vehículos"
-        size="sm"
-        stickyHeader
-        sx={{ minWidth: 800 }}>
+      <Table hoverRow aria-label="Tabla de vehículos" size="sm" stickyHeader sx={{ minWidth: 800 }}>
         <thead>
           <tr>
             {[
@@ -165,53 +182,75 @@ export default function VehiculosTable({
                   variant="plain"
                   size="sm"
                   onClick={() => handleSort(col.key)}
-                  endDecorator={<ArrowDropDownIcon />}>
+                  endDecorator={
+                    <ArrowDropDownIcon
+                      sx={{
+                        transform:
+                          sortField === col.key && sortOrder === "desc"
+                            ? "rotate(180deg)"
+                            : "none",
+                        transition: "0.2s",
+                      }}
+                    />
+                  }
+                >
                   {col.label}
                 </Button>
               </th>
             ))}
-            <th>Acciones</th>
+
+            {hasActions && <th>Acciones</th>}
           </tr>
         </thead>
         <tbody>
-          {sortedVehiculos.map((vehiculo) => (
-            <tr key={vehiculo.id}>
-              <td>{vehiculo.placa}</td>
-              <td>{vehiculo.marca}</td>
-              <td>{vehiculo.modelo}</td>
+          {sortedVehiculos.map((v) => (
+            <tr key={v.id}>
+              <td>{v.placa}</td>
+              <td>{v.marca}</td>
+              <td>{v.modelo}</td>
               <td>
                 <Typography
                   level="body-sm"
-                  color={
-                    vehiculo.estado === "Disponible" ? "success" : "warning"
-                  }>
-                  {vehiculo.estado}
+                  color={v.estado === "Disponible" ? "success" : "warning"}
+                >
+                  {v.estado}
                 </Typography>
               </td>
-              <td>{vehiculo.nombre_ubicacion}</td>
-              <td>
-                <Dropdown>
-                  <MenuButton
-                    slots={{ root: IconButton }}
-                    slotProps={{
-                      root: { variant: "plain", color: "neutral" },
-                    }}>
-                    <MoreHorizRoundedIcon />
-                  </MenuButton>
-                  <Menu>
-                    <MenuItem onClick={() => onEdit(vehiculo)}>Editar</MenuItem>
-                    {isInactive(vehiculo) ? (
-                      <MenuItem onClick={() => onRestore(vehiculo.id)}>
-                        Restaurar
-                      </MenuItem>
-                    ) : (
-                      <MenuItem onClick={() => onDelete(vehiculo.id)}>
-                        Eliminar
-                      </MenuItem>
-                    )}
-                  </Menu>
-                </Dropdown>
-              </td>
+              <td>{v.nombre_ubicacion}</td>
+
+              {hasActions && (
+                <td>
+                  <Dropdown>
+                    <MenuButton
+                      slots={{ root: IconButton }}
+                      slotProps={{ root: { variant: "plain", color: "neutral" } }}
+                      aria-label="Acciones">
+                      <MoreHorizRoundedIcon />
+                    </MenuButton>
+                    <Menu>
+                      {canEdit && onEdit && (
+                        <MenuItem onClick={() => onEdit(v)}>
+                          <EditRoundedIcon fontSize="small" />
+                          Editar
+                        </MenuItem>
+                      )}
+                      {isInactive(v)
+                        ? (canRestore && onRestore && (
+                          <MenuItem onClick={() => onRestore(v.id)}>
+                            <RestoreRoundedIcon fontSize="small" />
+                            Restaurar
+                          </MenuItem>
+                        ))
+                        : (canDelete && onDelete && (
+                          <MenuItem onClick={() => onDelete(v.id)}>
+                            <DeleteRoundedIcon fontSize="small" />
+                            Inhabilitar
+                          </MenuItem>
+                        ))}
+                    </Menu>
+                  </Dropdown>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

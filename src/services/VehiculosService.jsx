@@ -8,10 +8,11 @@ export async function obtenerVehiculos() {
     });
 
     if (!res.ok) throw new Error("No se pudo obtener los vehículos");
-    return await res.json();
+    const json = await res.json();
+    return json;
   } catch (err) {
-    console.error("Login error:", err);
-    return null;
+    console.error("Error getVehiculos:", err);
+    throw err;
   }
 }
 

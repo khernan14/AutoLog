@@ -1,76 +1,123 @@
-// components/UserToolbar.jsx
-import React from "react";
-import { Box, Input, Button, Stack } from "@mui/joy";
+import { useMemo } from "react";
+import {
+  Box,
+  Input,
+  Button,
+  Stack,
+  IconButton,
+  Tooltip,
+  Switch,
+  Chip,
+} from "@mui/joy";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
-import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
-import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ClearIcon from "@mui/icons-material/Clear";
+import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
 
 export default function UserToolbar({
+  search,
   onSearch,
-  onAdd,
   showInactive,
-  setShowInactive,
-  onDelete,
-  selectedUsers,
+  onToggleInactive,
+  onNew,
+  canCreate,
+  selectedCount = 0,
+  onBulkDelete,
+  canBulkDelete,
 }) {
+  const hasSelection = selectedCount > 0;
+
   return (
     <Box
       sx={{
+        mb: 2,
         display: "flex",
         flexDirection: { xs: "column", sm: "row" },
-        alignItems: "center",
+        alignItems: { xs: "stretch", sm: "center" },
         justifyContent: "space-between",
-        gap: 2,
-        mb: 2,
+        gap: 1.5,
       }}>
-      <Input
-        placeholder="Buscar usuario..."
-        startDecorator={<SearchRoundedIcon />}
-        onChange={(e) => onSearch?.(e.target.value)}
-        sx={{ width: { xs: "100%", sm: "300px" } }}
-      />
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        sx={{ width: { xs: "100%", sm: "auto" } }}>
+        <Input
+          placeholder="Buscar por nombre, email, usuario, rol, puesto o ciudad…"
+          value={search}
+          onChange={(e) => onSearch?.(e.target.value)}
+          startDecorator={<SearchRoundedIcon />}
+          endDecorator={
+            search && (
+              <IconButton
+                size="sm"
+                variant="plain"
+                color="neutral"
+                onClick={() => onSearch?.("")}
+                aria-label="Limpiar búsqueda">
+                <ClearIcon />
+              </IconButton>
+            )
+          }
+          sx={{ width: { xs: "100%", sm: 360 } }}
+        />
 
-      <Stack direction="row" spacing={1} flexWrap="wrap">
-        <Button
-          variant="outlined"
-          color={showInactive ? "success" : "neutral"}
-          onClick={() => setShowInactive(!showInactive)}>
-          {showInactive ? "Ocultar inactivos" : "Mostrar inactivos"}
-        </Button>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1.25}
+          sx={{ ml: 0.5 }}>
+          <Switch
+            checked={!!showInactive}
+            onChange={(e) => onToggleInactive?.(e.target.checked)}
+            slotProps={{ input: { "aria-label": "Ver inactivos" } }}
+          />
+          <span style={{ fontSize: 13, opacity: 0.9 }}>Ver inactivos</span>
+        </Stack>
+      </Stack>
 
-        {selectedUsers?.length > 0 && (
-          <Button variant="soft" color="danger" onClick={onDelete}>
-            Eliminar seleccionados ({selectedUsers.length})
-          </Button>
+      <Stack
+        direction="row"
+        spacing={1}
+        flexWrap="wrap"
+        justifyContent={{ xs: "space-between", sm: "flex-end" }}>
+        {hasSelection && (
+          <Tooltip
+            title={
+              canBulkDelete
+                ? "Inactivar seleccionados"
+                : "Sin permiso para inactivar"
+            }
+            variant="soft">
+            <span>
+              <Button
+                startDecorator={<DeleteForeverRoundedIcon />}
+                color="danger"
+                variant={canBulkDelete ? "soft" : "plain"}
+                disabled={!canBulkDelete}
+                onClick={onBulkDelete}>
+                Inactivar ({selectedCount})
+              </Button>
+            </span>
+          </Tooltip>
         )}
 
-        {/* <Button
-          variant="outlined"
-          color="neutral"
-          startDecorator={<PrintRoundedIcon />}>
-          Imprimir
-        </Button>
-        <Button
-          variant="outlined"
-          color="neutral"
-          startDecorator={<PictureAsPdfRoundedIcon />}>
-          PDF
-        </Button>
-        <Button
-          variant="outlined"
-          color="neutral"
-          startDecorator={<FileDownloadRoundedIcon />}>
-          Excel
-        </Button> */}
-        <Button
-          variant="solid"
-          color="primary"
-          startDecorator={<AddRoundedIcon />}
-          onClick={onAdd}>
-          Agregar Usuario
-        </Button>
+        <Tooltip
+          title={canCreate ? "Crear usuario" : "No tienes permiso para crear."}
+          variant="soft"
+          placement="top-end">
+          <span>
+            <Button
+              startDecorator={<AddRoundedIcon />}
+              onClick={onNew}
+              disabled={!canCreate}
+              aria-disabled={!canCreate}
+              variant={canCreate ? "solid" : "soft"}
+              color={canCreate ? "primary" : "neutral"}>
+              Nuevo
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
     </Box>
   );

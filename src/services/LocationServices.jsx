@@ -8,10 +8,11 @@ export async function getCountries() {
     });
 
     if (!res.ok) throw new Error("No se pudo obtener los paises");
-    return await res.json();
+    const json = await res.json();
+    return json;
   } catch (err) {
-    console.error("Login error:", err);
-    return [];
+    console.error("Error getCountries:", err);
+    throw err;
   }
 }
 

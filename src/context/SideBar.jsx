@@ -35,12 +35,17 @@ import SupportAgentIcon from "@mui/icons-material/SupportAgent"; // Nuevo icono 
 import QuestionAnswerRoundedIcon from "@mui/icons-material/QuestionAnswerRounded"; // Icono para FAQs
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded"; // Icono para Tutoriales
 import AnnouncementRoundedIcon from "@mui/icons-material/AnnouncementRounded"; // Icono para Novedades
-import DnsRoundedIcon from "@mui/icons-material/DnsRounded"; // Icono para Estado del Sistema
+import InsertInvitationIcon from "@mui/icons-material/InsertInvitation";
+import FactoryRoundedIcon from "@mui/icons-material/FactoryRounded";
+import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 
 import { useAuth } from "./AuthContext"; // Asegúrate de que la ruta sea correcta
 
 import ColorSchemeToggle from "./ColorSchemeToggle"; // Asume que este componente está en la misma carpeta
+import { useColorScheme } from "@mui/joy/styles";
 import { closeSidebar } from "../utils/ToggleSidebar"; // Asume que esta utilidad existe
+import logoLight from "../assets/newLogoTecnasaBlack.png";
+import logoDark from "../assets/newLogoTecnasa.png";
 
 import Swal from "sweetalert2";
 
@@ -131,6 +136,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
+  const { mode } = useColorScheme(); // "light" | "dark" | "system"
 
   const userName = userData?.nombre || "Usuario";
   const userEmail = userData?.email || "usuario@test.com";
@@ -173,7 +179,7 @@ export default function Sidebar() {
       icon: <HomeRoundedIcon />,
       label: "Inicio",
       canView: true,
-    }, // Siempre visible
+    },
     {
       path: "/admin/dashboard",
       icon: <DashboardRoundedIcon />,
@@ -192,6 +198,12 @@ export default function Sidebar() {
       label: "Registros",
       canView: checkPermission("registrar_uso"),
     },
+    // {
+    //   path: "/admin/reservas",
+    //   icon: <InsertInvitationIcon />,
+    //   label: "Reservas",
+    //   canView: checkPermission("registrar_reservas"),
+    // },
     {
       path: "/admin/reports",
       icon: <AssessmentIcon />,
@@ -200,28 +212,13 @@ export default function Sidebar() {
     },
   ];
 
-  const userManagementItems = [
+  const managementItems = [
     {
-      path: "/admin/mi-cuenta",
-      icon: <AccountCircleIcon />,
-      label: "Mi Perfil",
-      canView: true, // Siempre visible
+      path: "/admin/clientes",
+      icon: <GroupRoundedIcon />,
+      label: "Compañías",
+      canView: checkPermission("gestionar_companias"),
     },
-    {
-      path: "/admin/usuarios",
-      icon: <SupervisorAccountIcon />,
-      label: "Gestionar Usuarios",
-      canView: checkPermission("gestionar_usuarios"),
-    },
-    {
-      path: "/admin/permissions",
-      icon: <VpnKeyIcon />,
-      label: "Roles y Permisos",
-      canView: checkPermission("asignar_permisos"),
-    },
-  ];
-
-  const administrationItems = [
     {
       path: "/admin/countries",
       icon: <PublicIcon />,
@@ -242,41 +239,40 @@ export default function Sidebar() {
     },
   ];
 
-  // NUEVOS ITEMS PARA EL MENÚ DE SOPORTE (ADMIN)
-  const supportAdminItems = [
+  const inventoryItems = [
     {
-      path: "/admin/faqs",
-      icon: <QuestionAnswerRoundedIcon />,
-      label: "Gestionar FAQs",
-      canView: checkPermission("gestionar_faqs"), // Nuevo permiso
+      path: "/admin/inventario/bodegas",
+      icon: <FactoryRoundedIcon />,
+      label: "Bodegas",
+      canView: checkPermission("gestionar_bodegas"),
     },
     {
-      path: "/admin/help/tutorials",
-      icon: <VideoLibraryRoundedIcon />,
-      label: "Gestionar Tutoriales",
-      canView: checkPermission("gestionar_tutoriales"), // Nuevo permiso
-    },
-    {
-      path: "/admin/help/changelogs",
-      icon: <AnnouncementRoundedIcon />,
-      label: "Gestionar Novedades",
-      canView: checkPermission("gestionar_novedades"), // Nuevo permiso
-    },
-    {
-      path: "/admin/help/services",
+      path: "/admin/inventario/activos",
       icon: <DnsRoundedIcon />,
-      label: "Estado de Servicios",
-      canView: checkPermission("gestionar_servicios_sistema"), // Nuevo permiso
+      label: "Activos",
+      canView: checkPermission("gestionar_activos"),
     },
   ];
 
-  const supportItems = [
+  const systemItems = [
     {
-      path: "/admin/soporte",
-      icon: <HelpCenterIcon />,
-      label: "Centro de Ayuda",
+      path: "/admin/mi-cuenta",
+      icon: <AccountCircleIcon />,
+      label: "Mi Perfil",
       canView: true,
-    }, // Siempre visible para todos los usuarios
+    },
+    {
+      path: "/admin/usuarios",
+      icon: <SupervisorAccountIcon />,
+      label: "Gestionar Usuarios",
+      canView: checkPermission("gestionar_usuarios"),
+    },
+    {
+      path: "/admin/permissions",
+      icon: <VpnKeyIcon />,
+      label: "Roles y Permisos",
+      canView: checkPermission("asignar_permisos"),
+    },
     {
       path: "/admin/configuraciones",
       icon: <SettingsRoundedIcon />,
@@ -284,6 +280,40 @@ export default function Sidebar() {
       canView: checkPermission("ver_configuraciones"),
     },
   ];
+
+  const supportAndHelpItems = [
+    {
+      path: "/admin/soporte",
+      icon: <HelpCenterIcon />,
+      label: "Centro de Ayuda",
+      canView: true,
+    },
+    {
+      path: "/admin/faqs",
+      icon: <QuestionAnswerRoundedIcon />,
+      label: "Gestionar FAQs",
+      canView: checkPermission("gestionar_faqs"),
+    },
+    {
+      path: "/admin/help/tutorials",
+      icon: <VideoLibraryRoundedIcon />,
+      label: "Gestionar Tutoriales",
+      canView: checkPermission("gestionar_tutoriales"),
+    },
+    {
+      path: "/admin/help/changelogs",
+      icon: <AnnouncementRoundedIcon />,
+      label: "Gestionar Novedades",
+      canView: checkPermission("gestionar_novedades"),
+    },
+    {
+      path: "/admin/help/services",
+      icon: <DnsRoundedIcon />,
+      label: "Estado de Servicios",
+      canView: checkPermission("gestionar_servicios_sistema"),
+    },
+  ];
+
 
   return (
     <Sheet
@@ -321,7 +351,7 @@ export default function Sidebar() {
       <Box className="Sidebar-overlay" onClick={closeSidebar} />
 
       {/* Encabezado del Sidebar: Logo y Toggle de Tema */}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+      {/* <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <IconButton
           variant="soft"
           color="primary"
@@ -334,7 +364,14 @@ export default function Sidebar() {
           sx={{ fontWeight: "xl", color: "primary.plainColor" }}>
           AutoLog
         </Typography>
-        {/* <ColorSchemeToggle sx={{ ml: "auto" }} /> */}
+        <ColorSchemeToggle sx={{ ml: "auto" }} />
+      </Box>*/}
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <img
+          src={mode === "dark" ? logoDark : logoLight}
+          alt="Logo cliente"
+          style={{ width: 240, height: 75, objectFit: "contain" }}
+        />
       </Box>
 
       {/* Barra de Búsqueda */}
@@ -390,139 +427,181 @@ export default function Sidebar() {
             />
           ))}
 
-          {/* Menú Anidado para Usuarios */}
           {/* Solo se muestra el toggler si el usuario puede ver al menos un elemento dentro */}
-          {(checkPermission("cambiar_password") ||
-            checkPermission("asignar_permisos") ||
-            checkPermission("gestionar_usuarios")) && ( // Agregado gestionar_usuarios aquí
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": {
-                        backgroundColor: "neutral.softBg",
-                      },
-                    }}>
-                    <GroupRoundedIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Usuarios</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
-                      sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  </ListItemButton>
-                )}>
-                {userManagementItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
-
-          {/* Menú Anidado para Administración */}
-          {(checkPermission("gestionar_paises") ||
+          {(checkPermission("gestionar_companias") ||
+            checkPermission("gestionar_paises") ||
             checkPermission("gestionar_ciudades") ||
             checkPermission("gestionar_estacionamientos")) && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": {
-                        backgroundColor: "neutral.softBg",
-                      },
-                    }}>
-                    <AdminPanelSettingsIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Administración</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
                       sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
+                        fontWeight: "md",
+                        "&:hover": {
+                          backgroundColor: "neutral.softBg",
+                        },
+                      }}>
+                      <AdminPanelSettingsIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Gestión</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {managementItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
                     />
-                  </ListItemButton>
-                )}>
-                {administrationItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
+
+          {/* Menú Anidado para Inventario */}
+          {(checkPermission("gestionar_bodegas") ||
+            checkPermission("gestionar_activos")) && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": {
+                          backgroundColor: "neutral.softBg",
+                        },
+                      }}>
+                      <DnsRoundedIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Inventario</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {inventoryItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
+
+          {/* Menú Anidado para Sistema */}
+          {(checkPermission("cambiar_password") ||
+            checkPermission("asignar_permisos") ||
+            checkPermission("gestionar_usuarios")) && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": {
+                          backgroundColor: "neutral.softBg",
+                        },
+                      }}>
+                      <SettingsRoundedIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Sistema</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {systemItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
 
           {/* NUEVO: Menú Anidado para Soporte (Admin) */}
           {(checkPermission("gestionar_faqs") ||
             checkPermission("gestionar_tutoriales") ||
             checkPermission("gestionar_novedades") ||
             checkPermission("gestionar_servicios_sistema")) && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": {
-                        backgroundColor: "neutral.softBg",
-                      },
-                    }}>
-                    <SupportAgentIcon /> {/* Icono para Soporte Admin */}
-                    <ListItemContent>
-                      <Typography level="title-sm">Soporte (Admin)</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
                       sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
+                        fontWeight: "md",
+                        "&:hover": {
+                          backgroundColor: "neutral.softBg",
+                        },
+                      }}>
+                      <SupportAgentIcon /> {/* Icono para Soporte Admin */}
+                      <ListItemContent>
+                        <Typography level="title-sm">Soporte y Ayuda</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {supportAndHelpItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
                     />
-                  </ListItemButton>
-                )}>
-                {supportAdminItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
         </List>
 
-        <Typography
+        {/* <Typography
           level="body-xs"
           sx={{
             pl: 2,
@@ -532,9 +611,9 @@ export default function Sidebar() {
             textTransform: "uppercase",
           }}>
           Soporte
-        </Typography>
-        <List size="sm" sx={{ gap: 1, mt: "auto", flexGrow: 0, mb: 2 }}>
-          {supportItems.map((item) => (
+        </Typography> */}
+        {/* <List size="sm" sx={{ gap: 1, mt: "auto", flexGrow: 0, mb: 2 }}>
+          {supportAndHelpItems.map((item) => (
             <NavItem
               key={item.path}
               path={item.path}
@@ -545,7 +624,7 @@ export default function Sidebar() {
               canView={item.canView}
             />
           ))}
-        </List>
+        </List> */}
       </Box>
 
       {/* Sección del Perfil de Usuario en el pie del Sidebar */}

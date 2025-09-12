@@ -103,6 +103,38 @@ export const endpoints = {
   // System Overall Status Log (Historial de Estado General)
   getOverallStatusHistory: `${API_BASE_URL}/help/status/history`,
   addOverallStatusLog: `${API_BASE_URL}/help/status/log`,
+
+  // INVENTARIO
+  getClientes: `${API_BASE_URL}/clientes/`,
+  addCliente: `${API_BASE_URL}/clientes/`,
+  updateCliente: `${API_BASE_URL}/clientes/`,
+
+  getSites: `${API_BASE_URL}/sites/`,
+  addSite: `${API_BASE_URL}/sites/`,
+  updateSite: `${API_BASE_URL}/sites/`,
+
+  // Bodegas
+  getBodegas: `${API_BASE_URL}/inventario/bodegas/`,
+  addBodega: `${API_BASE_URL}/inventario/bodegas/`,
+  updateBodega: `${API_BASE_URL}/inventario/bodegas/`,
+
+  // Activos
+  getActivos: `${API_BASE_URL}/inventario/activos/`,
+  getActivoById: `${API_BASE_URL}/inventario/activos/`,
+  addActivo: `${API_BASE_URL}/inventario/activos/`,
+  updateActivo: `${API_BASE_URL}/inventario/activos/`,
+  getActivosByCliente: `${API_BASE_URL}/inventario/activos/cliente/`,
+
+  // Activos por bodega
+  getActivosByBodega: `${API_BASE_URL}/inventario/activos/bodega/`,
+  // getActivosEnBodegas: `${API_BASE_URL}/inventario/activos/bodegas/all`,
+  getActivosGlobal: `${API_BASE_URL}/inventario/activos/all`,
+
+
+  // Ubicaciones
+  moverActivo: `${API_BASE_URL}/inventario/ubicaciones/mover`,
+  movimientosByActivo: `${API_BASE_URL}/inventario/ubicaciones/movimientos/`,
+
 };
 
 // src/js/config/variables.js

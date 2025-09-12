@@ -1,463 +1,259 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   ModalDialog,
   Typography,
-  Button,
+  Divider,
+  Stack,
   FormControl,
   FormLabel,
   Input,
   Select,
   Option,
-  Switch,
-  Box,
-  Stack,
+  Button,
 } from "@mui/joy";
-import Swal from "sweetalert2";
-import { Formik, Form, Field } from "formik";
-import * as Yup from "yup";
+
+const ROLES_DEFAULT = ["Empleado", "Supervisor"]; // 🔧 ajusta si tienes roles fijos desde backend
+
+// Lista de puestos por defecto (puedes editarla aquí)
+const PUESTOS_DEFAULT = [
+  "Gerente de Ingeniería",
+  "Gerente de Finanzas",
+  "Oficial de servicios",
+  "Supervisor Tecnico - ATM",
+  "Supervisor Tecnico - Microsistemas",
+  "Técnico de ATM",
+  "Técnico de Microsistemas",
+  "Técnico de Alta Disponibilidad",
+  "Técnico de Soporte",
+  "Técnico de Inventario",
+  "Asistente de Contabilidad",
+  "Asistente de Cuentas por Cobrar",
+  "Especialista de Soluciones",
+];
 
 export default function UserFormModal({
   open,
   onClose,
-  onSave,
-  user,
-  ciudades,
-  supervisores = [], // <-- nueva prop para supervisores
-  roles = ["Empleado", "Supervisor"],
-  puestos = [
-    "Gerente de Ingeniería",
-    "Gerente de Finanzas",
-    "Oficial de servicios",
-    "Supervisor Tecnico - ATM",
-    "Supervisor Tecnico - Microsistemas",
-    "Técnico de ATM",
-    "Técnico de Microsistemas",
-    "Técnico de Alta Disponibilidad",
-    "Técnico de Soporte",
-    "Técnico de Inventario",
-    "Asistente de Contabilidad",
-    "Asistente de Cuentas por Cobrar",
-    "Especialista de Soluciones",
-  ],
+  onSubmit,
+  initialValues = null, // user para editar o null para crear
+  ciudades = [],
+  supervisores = [],
+  puestosOptions = PUESTOS_DEFAULT, // <- opcional: pasar desde el padre
+  saving = false,
 }) {
-  const [showPassword, setShowPassword] = useState(false);
+  const isEditing = !!initialValues?.id_usuario;
 
-  const isEditMode = Boolean(user);
-
-  const validationSchema = Yup.object({
-    nombre: Yup.string().required("El nombre es obligatorio"),
-    email: Yup.string()
-      .email("Email inválido")
-      .required("El email es obligatorio"),
-    username: Yup.string().required("El username es obligatorio"),
-    rol: Yup.string().oneOf(roles).required("El rol es obligatorio"),
-    puesto: Yup.string().oneOf(puestos).required("El puesto es obligatorio"),
-    ciudad: Yup.string()
-      .oneOf(ciudades.map((c) => String(c.id)))
-      .required("La ciudad es obligatoria"),
-    supervisor_id: Yup.string().nullable(), // puede ser cadena vacía o nulo
-    password: isEditMode
-      ? Yup.string().when("changePassword", {
-          is: true,
-          then: Yup.string()
-            .min(6, "Mínimo 6 caracteres")
-            .required("La contraseña es obligatoria"),
-        })
-      : Yup.string()
-          .min(6, "Mínimo 6 caracteres")
-          .required("La contraseña es obligatoria"),
-    estatus: Yup.boolean(),
-    changePassword: Yup.boolean(),
+  const [form, setForm] = useState({
+    id_usuario: null,
+    nombre: "",
+    email: "",
+    username: "",
+    password: "",
+    rol: "",
+    puesto: "",
+    ciudad: "", // id ciudad
+    supervisor_id: "", // id supervisor
   });
 
-  const initialValues = {
-    id_usuario: user?.id_usuario || null,
-    nombre: user?.nombre || "",
-    email: user?.email || "",
-    username: user?.username || "",
-    rol: user?.rol || "",
-    puesto: user?.puesto || "",
-    ciudad: user?.id_ciudad ? String(user.id_ciudad) : "",
-    supervisor_id: user?.supervisor_id ? String(user.supervisor_id) : "", // <-- nuevo campo
-    password: "",
-    estatus: user ? user.estatus === "Activo" : true,
-    changePassword: false,
-  };
-
-  const handleSubmit = async (values, { setSubmitting, resetForm }) => {
-    try {
-      const { changePassword, ciudad, supervisor_id, ...formRest } = values;
-
-      const dataToSend = {
-        ...formRest,
-        estatus: values.estatus ? "Activo" : "Inactivo",
-      };
-
-      if (values.id_usuario) {
-        dataToSend.id_usuario = values.id_usuario;
-      }
-
-      if (ciudad && !isNaN(parseInt(ciudad, 10))) {
-        dataToSend.id_ciudad = parseInt(ciudad, 10);
-      }
-
-      if (supervisor_id && supervisor_id !== "") {
-        dataToSend.supervisor_id = parseInt(supervisor_id, 10);
-      } else {
-        dataToSend.supervisor_id = null; // o eliminar la propiedad si prefieres
-      }
-
-      if (isEditMode && !changePassword) {
-        delete dataToSend.password;
-      }
-
-      const result = await onSave(dataToSend);
-
-      if (!result || result.error) {
-        throw new Error(result?.error || "No se pudo guardar el usuario.");
-      }
-
-      Swal.fire({
-        icon: "success",
-        title: "¡Gracias!",
-        text: "Se guardó el usuario con éxito",
-        confirmButtonColor: "#03624C",
-        customClass: { popup: "swal2-override" },
-      }).then(() => {
-        resetForm();
-        setShowPassword(false);
-        onClose();
+  useEffect(() => {
+    if (!open) return;
+    if (isEditing) {
+      setForm({
+        id_usuario: initialValues.id_usuario,
+        nombre: initialValues.nombre || "",
+        email: initialValues.email || "",
+        username: initialValues.username || "",
+        password: "",
+        rol: initialValues.rol || "",
+        puesto: initialValues.puesto || "",
+        ciudad: String(initialValues.id_ciudad ?? initialValues.ciudad ?? ""),
+        supervisor_id:
+          initialValues.supervisor_id != null
+            ? String(initialValues.supervisor_id)
+            : "",
       });
-    } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error.message || "Ocurrió un error inesperado.",
-        confirmButtonColor: "#d33",
-        customClass: { popup: "swal2-override" },
+    } else {
+      setForm({
+        id_usuario: null,
+        nombre: "",
+        email: "",
+        username: "",
+        password: "",
+        rol: "",
+        puesto: "",
+        ciudad: "",
+        supervisor_id: "",
       });
-    } finally {
-      setSubmitting(false);
     }
+  }, [open, isEditing, initialValues]);
+
+  const canSubmit = useMemo(() => {
+    if (!form.nombre.trim()) return false;
+    if (!form.email.trim()) return false;
+    if (!form.username.trim()) return false;
+    if (!isEditing && !form.password.trim()) return false;
+    return true;
+  }, [form, isEditing]);
+
+  const handleSubmit = (e) => {
+    e?.preventDefault?.();
+    if (!canSubmit) return;
+
+    const payload = {
+      id_usuario: form.id_usuario || undefined,
+      nombre: form.nombre.trim(),
+      email: form.email.trim(),
+      username: form.username.trim(),
+      password: form.password || undefined,
+      rol: form.rol || undefined,
+      puesto: form.puesto || undefined,
+      id_ciudad: form.ciudad || undefined,
+      supervisor_id: form.supervisor_id || undefined,
+    };
+    onSubmit?.(payload);
   };
 
   return (
-    <>
-      <style>
-        {`
-        .swal2-container.swal2-backdrop-show,
-        .swal2-container.swal2-modal-show {
-          z-index: 1600;
-        }
-        `}
-      </style>
+    <Modal open={open} onClose={onClose}>
+      <ModalDialog
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{ width: { xs: "100%", sm: 640 } }}>
+        <Typography level="title-lg">
+          {isEditing ? "Editar usuario" : "Nuevo usuario"}
+        </Typography>
+        <Divider />
 
-      <Formik
-        initialValues={initialValues}
-        enableReinitialize
-        validationSchema={validationSchema}
-        onSubmit={handleSubmit}>
-        {({
-          values,
-          errors,
-          touched,
-          isSubmitting,
-          setFieldValue,
-          resetForm,
-        }) => (
-          <Modal
-            open={open}
-            onClose={() => {
-              resetForm();
-              setShowPassword(false);
-              onClose();
-            }}>
-            <ModalDialog
-              sx={{
-                maxWidth: 800,
-                width: "100%",
-                overflow: "auto",
-                zIndex: 1500,
-              }}>
-              <Typography level="h4" component="h2" mb={2}>
-                {isEditMode ? "Editar usuario" : "Agregar usuario"}
-              </Typography>
+        <Stack spacing={1.5} mt={1}>
+          <FormControl required>
+            <FormLabel>Nombre</FormLabel>
+            <Input
+              value={form.nombre}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, nombre: e.target.value }))
+              }
+              disabled={saving}
+            />
+          </FormControl>
 
-              <Form>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gap: 2,
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                  }}>
-                  {/* Nombre */}
-                  <FormControl
-                    error={touched.nombre && Boolean(errors.nombre)}
-                    required>
-                    <FormLabel>Nombre</FormLabel>
-                    <Field name="nombre">
-                      {({ field }) => <Input {...field} fullWidth />}
-                    </Field>
-                    {touched.nombre && errors.nombre && (
-                      <Typography level="body3" color="danger">
-                        {errors.nombre}
-                      </Typography>
-                    )}
-                  </FormControl>
+          <FormControl required>
+            <FormLabel>Email</FormLabel>
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, email: e.target.value }))
+              }
+              disabled={saving}
+            />
+          </FormControl>
 
-                  {/* Email */}
-                  <FormControl
-                    error={touched.email && Boolean(errors.email)}
-                    required>
-                    <FormLabel>Email</FormLabel>
-                    <Field name="email">
-                      {({ field }) => (
-                        <Input type="email" {...field} fullWidth />
-                      )}
-                    </Field>
-                    {touched.email && errors.email && (
-                      <Typography level="body3" color="danger">
-                        {errors.email}
-                      </Typography>
-                    )}
-                  </FormControl>
+          <FormControl required>
+            <FormLabel>Usuario</FormLabel>
+            <Input
+              value={form.username}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, username: e.target.value }))
+              }
+              disabled={saving}
+            />
+          </FormControl>
 
-                  {/* Username */}
-                  <FormControl
-                    error={touched.username && Boolean(errors.username)}
-                    required>
-                    <FormLabel>Username</FormLabel>
-                    <Field name="username">
-                      {({ field }) => <Input {...field} fullWidth />}
-                    </Field>
-                    {touched.username && errors.username && (
-                      <Typography level="body3" color="danger">
-                        {errors.username}
-                      </Typography>
-                    )}
-                  </FormControl>
+          {!isEditing && (
+            <FormControl required>
+              <FormLabel>Contraseña</FormLabel>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, password: e.target.value }))
+                }
+                disabled={saving}
+              />
+            </FormControl>
+          )}
 
-                  {/* Rol */}
-                  <FormControl
-                    error={touched.rol && Boolean(errors.rol)}
-                    required>
-                    <FormLabel>Rol</FormLabel>
-                    <Select
-                      disabled={
-                        !Array.isArray(ciudades) || ciudades.length === 0
-                      }
-                      value={values.rol}
-                      onChange={(_, v) => setFieldValue("rol", v)}
-                      fullWidth>
-                      {roles.map((r) => (
-                        <Option key={r} value={r}>
-                          {r}
-                        </Option>
-                      ))}
-                    </Select>
-                    {touched.rol && errors.rol && (
-                      <Typography level="body3" color="danger">
-                        {errors.rol}
-                      </Typography>
-                    )}
-                  </FormControl>
+          <FormControl>
+            <FormLabel>Rol</FormLabel>
+            <Select
+              value={form.rol || ""}
+              onChange={(_, v) => setForm((s) => ({ ...s, rol: v || "" }))}
+              disabled={saving}
+              placeholder="Selecciona rol">
+              <Option value="">—</Option>
+              {ROLES_DEFAULT.map((r) => (
+                <Option key={r} value={r}>
+                  {r}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
 
-                  {/* Puesto */}
-                  <FormControl
-                    error={touched.puesto && Boolean(errors.puesto)}
-                    required>
-                    <FormLabel>Puesto</FormLabel>
-                    <Select
-                      value={values.puesto}
-                      onChange={(_, v) => setFieldValue("puesto", v)}
-                      fullWidth>
-                      {puestos.map((p) => (
-                        <Option key={p} value={p}>
-                          {p}
-                        </Option>
-                      ))}
-                    </Select>
-                    {touched.puesto && errors.puesto && (
-                      <Typography level="body3" color="danger">
-                        {errors.puesto}
-                      </Typography>
-                    )}
-                  </FormControl>
+          {/* Puesto como Select */}
+          <FormControl>
+            <FormLabel>Puesto</FormLabel>
+            <Select
+              value={form.puesto || ""}
+              onChange={(_, v) => setForm((s) => ({ ...s, puesto: v || "" }))}
+              disabled={saving}
+              placeholder="Selecciona puesto">
+              <Option value="">—</Option>
+              {puestosOptions.map((p) => (
+                <Option key={p} value={p}>
+                  {p}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
 
-                  {/* Ciudad */}
-                  <FormControl
-                    error={touched.ciudad && Boolean(errors.ciudad)}
-                    required>
-                    <FormLabel>Ciudad</FormLabel>
-                    <Select
-                      value={values.ciudad}
-                      onChange={(_, v) => setFieldValue("ciudad", v)}
-                      fullWidth>
-                      {ciudades && ciudades.length > 0 ? (
-                        ciudades.map((c) => (
-                          <Option key={c.id} value={String(c.id)}>
-                            {c.nombre}
-                          </Option>
-                        ))
-                      ) : (
-                        <Typography level="body-sm" color="danger">
-                          No hay ciudades disponibles o no tienes permisos.
-                        </Typography>
-                      )}
-                    </Select>
-                    {touched.ciudad && errors.ciudad && (
-                      <Typography level="body3" color="danger">
-                        {errors.ciudad}
-                      </Typography>
-                    )}
-                  </FormControl>
+          <FormControl>
+            <FormLabel>Ciudad</FormLabel>
+            <Select
+              value={form.ciudad || ""}
+              onChange={(_, v) => setForm((s) => ({ ...s, ciudad: v || "" }))}
+              disabled={saving}
+              placeholder="Selecciona ciudad">
+              <Option value="">—</Option>
+              {ciudades.map((c) => (
+                <Option key={c.id} value={String(c.id)}>
+                  {c.nombre /* si tu API usa c.ciudad, cámbialo */}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
 
-                  {/* Supervisor */}
-                  <FormControl
-                    error={
-                      touched.supervisor_id && Boolean(errors.supervisor_id)
-                    }>
-                    <FormLabel>Supervisor</FormLabel>
-                    <Select
-                      value={values.supervisor_id}
-                      onChange={(_, v) => setFieldValue("supervisor_id", v)}
-                      displayEmpty
-                      fullWidth>
-                      <Option value="">-- Ninguno --</Option>
-                      {supervisores.map((sup) => (
-                        <Option
-                          key={sup.id_usuario}
-                          value={String(sup.id_usuario)}>
-                          {sup.nombre}
-                        </Option>
-                      ))}
-                    </Select>
-                    {touched.supervisor_id && errors.supervisor_id && (
-                      <Typography level="body3" color="danger">
-                        {errors.supervisor_id}
-                      </Typography>
-                    )}
-                  </FormControl>
+          <FormControl>
+            <FormLabel>Supervisor</FormLabel>
+            <Select
+              value={form.supervisor_id || ""}
+              onChange={(_, v) =>
+                setForm((s) => ({ ...s, supervisor_id: v || "" }))
+              }
+              disabled={saving}
+              placeholder="Selecciona supervisor">
+              <Option value="">—</Option>
+              {supervisores.map((s) => (
+                <Option key={s.id} value={String(s.id)}>
+                  {s.nombre}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
 
-                  {/* Password - solo si no es edición */}
-                  {!isEditMode ? (
-                    <FormControl
-                      error={touched.password && Boolean(errors.password)}
-                      required>
-                      <FormLabel>Contraseña</FormLabel>
-                      <Field name="password">
-                        {({ field }) => (
-                          <Input type="password" {...field} fullWidth />
-                        )}
-                      </Field>
-                      {touched.password && errors.password && (
-                        <Typography level="body3" color="danger">
-                          {errors.password}
-                        </Typography>
-                      )}
-                    </FormControl>
-                  ) : (
-                    <>
-                      <FormControl
-                        sx={{
-                          gridColumn: "1 / -1",
-                          display: "flex",
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 2,
-                        }}>
-                        <FormLabel sx={{ whiteSpace: "nowrap" }}>
-                          Contraseña
-                        </FormLabel>
-                        <Button
-                          variant="soft"
-                          size="sm"
-                          onClick={() =>
-                            setFieldValue(
-                              "changePassword",
-                              !values.changePassword
-                            )
-                          }>
-                          {values.changePassword
-                            ? "Cancelar cambio"
-                            : "Cambiar contraseña"}
-                        </Button>
-                      </FormControl>
-
-                      {values.changePassword && (
-                        <FormControl
-                          error={touched.password && Boolean(errors.password)}
-                          required
-                          sx={{ gridColumn: "1 / -1" }}>
-                          <FormLabel>Nueva contraseña</FormLabel>
-                          <Box sx={{ display: "flex", gap: 1 }}>
-                            <Field name="password">
-                              {({ field }) => (
-                                <Input
-                                  type={showPassword ? "text" : "password"}
-                                  {...field}
-                                  fullWidth
-                                />
-                              )}
-                            </Field>
-                            <Button
-                              size="sm"
-                              variant="outlined"
-                              onClick={() => setShowPassword((prev) => !prev)}>
-                              {showPassword ? "Ocultar" : "Ver"}
-                            </Button>
-                          </Box>
-                          {touched.password && errors.password && (
-                            <Typography level="body3" color="danger">
-                              {errors.password}
-                            </Typography>
-                          )}
-                        </FormControl>
-                      )}
-                    </>
-                  )}
-
-                  {/* Estatus */}
-                  <Box sx={{ gridColumn: "1 / -1" }}>
-                    <FormControl orientation="horizontal">
-                      <FormLabel>Estatus</FormLabel>
-                      <Switch
-                        checked={values.estatus}
-                        onChange={(e) =>
-                          setFieldValue("estatus", e.target.checked)
-                        }
-                        endDecorator={values.estatus ? "Activo" : "Inactivo"}
-                      />
-                    </FormControl>
-                  </Box>
-                </Box>
-
-                {/* Botones */}
-                <Stack
-                  direction="row"
-                  justifyContent="flex-end"
-                  spacing={1}
-                  mt={3}>
-                  <Button
-                    variant="plain"
-                    color="neutral"
-                    onClick={() => {
-                      resetForm();
-                      setShowPassword(false);
-                      onClose();
-                    }}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isEditMode ? "Guardar cambios" : "Agregar"}
-                  </Button>
-                </Stack>
-              </Form>
-            </ModalDialog>
-          </Modal>
-        )}
-      </Formik>
-    </>
+        <Stack direction="row" justifyContent="flex-end" spacing={1.25} mt={2}>
+          <Button variant="plain" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={!canSubmit || saving}>
+            Guardar
+          </Button>
+        </Stack>
+      </ModalDialog>
+    </Modal>
   );
 }

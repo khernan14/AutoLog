@@ -1,18 +1,25 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { toast } from "react-toastify";
 import {
   obtenerVehiculos,
   deleteVehiculo,
   addVehiculos,
   actualizarVehiculo,
   restoreVehiculo,
-} from "../../services/VehiculosService"; // Asegúrate de que las rutas sean correctas
-import VehiculosTable from "../../components/VehiculosForm/VehiculosTable"; // Asegúrate de que la ruta sea correcta
-import VehiculoModal from "../../components/VehiculosForm/VehiculosModal"; // Asegúrate de que la ruta sea correcta
-import VehiculosToolBar from "../../components/VehiculosForm/VehiculosToolBar"; // Asegúrate de que la ruta sea correcta
-import { Box, CircularProgress, Typography, Button, Alert } from "@mui/joy"; // Añadido Alert para mensajes de error
-import { useAuth } from "../../context/AuthContext"; // Asegúrate de que la ruta sea correcta
-import Swal from "sweetalert2"; // Para las confirmaciones de eliminación/restauración
+} from "../../services/VehiculosService";
+import VehiculosTable from "../../components/VehiculosForm/VehiculosTable";
+import VehiculoModal from "../../components/VehiculosForm/VehiculosModal";
+import VehiculosToolBar from "../../components/VehiculosForm/VehiculosToolBar";
+import { Box, Card } from "@mui/joy";
+import Swal from "sweetalert2";
+import { useAuth } from "../../context/AuthContext";
+
+// ✅ utilitarios reusables
+import ResourceState from "../../components/common/ResourceState";
+import usePermissions from "../../hooks/usePermissions";
+import { getViewState } from "../../utils/viewState";
+
+// ✅ tu ToastContext
+import { useToast } from "../../context/ToastContext";
 
 export default function Vehiculos() {
   const [vehiculos, setVehiculos] = useState([]);
@@ -23,62 +30,45 @@ export default function Vehiculos() {
   const [showInactive, setShowInactive] = useState(false);
   const [searchText, setSearchText] = useState("");
 
-  const { userData, checkingSession, hasPermiso } = useAuth();
-  const esAdmin = userData?.rol?.toLowerCase() === "admin";
+  const { checkingSession } = useAuth();
+  const { canAny } = usePermissions();
+  const { showToast } = useToast();
 
-  // Función auxiliar para verificar permisos (Admin o permiso específico)
-  const canPerformAction = useCallback(
-    (permissionName) => {
-      return esAdmin || hasPermiso(permissionName);
-    },
-    [esAdmin, hasPermiso]
-  );
+  // permisos normalizados
+  const canView = canAny("ver_vehiculos");
+  const canCreate = canAny("crear_vehiculo");
+  const canEdit = canAny("editar_vehiculo");
+  const canDelete = canAny("eliminar_vehiculo");
+  const canRestore = canAny("gestionar_vehiculos");
 
-  // Carga de vehículos con manejo de permisos y estado de sesión
   const loadVehiculos = useCallback(async () => {
-    // Si aún estamos verificando la sesión, no hacemos nada.
-    if (checkingSession) {
-      setLoading(true); // Mantener el spinner mientras se verifica
-      return;
-    }
-
-    // Verificar permiso para VER vehículos
-    if (!canPerformAction("ver_vehiculos")) {
-      // Asumo 'ver_vehiculos' para la lista
-      setError("No tienes permisos para ver la lista de vehículos.");
-      setLoading(false);
-      return;
-    }
+    if (checkingSession) { setLoading(true); return; }
+    if (!canView) { setLoading(false); setError(null); return; }
 
     setLoading(true);
-    setError(null); // Limpiar errores previos
-
+    setError(null);
     try {
       const data = await obtenerVehiculos();
-      if (data) {
+      if (Array.isArray(data)) {
         setVehiculos(data);
       } else {
-        // Si la API devuelve un array vacío o null pero no lanza un error
         setError("No se pudieron cargar los vehículos. Intenta más tarde.");
       }
     } catch (err) {
-      console.error("Error al cargar vehículos:", err);
-      setError("No se pudo conectar con el servidor. Intenta más tarde.");
+      const msg = (err?.message || "").toLowerCase();
+      const isNetwork = msg.includes("failed to fetch") || msg.includes("networkerror");
+      setError(isNetwork ? "No hay conexión con el servidor." : (err?.message || "Error desconocido."));
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canPerformAction]); // Dependencias: checkingSession, canPerformAction
+  }, [checkingSession, canView]);
 
-  useEffect(() => {
-    loadVehiculos();
-  }, [loadVehiculos]);
+  useEffect(() => { loadVehiculos(); }, [loadVehiculos]);
 
-  // --- Handlers de acciones con lógica de permisos ---
-
+  // ---- handlers CRUD con showToast ----
   const handleAddVehiculo = () => {
-    if (!canPerformAction("crear_vehiculo")) {
-      // Permiso para agregar
-      toast.error("No tienes permisos para agregar vehículos.");
+    if (!canCreate) {
+      showToast("No tienes permiso para crear vehículos.", "warning");
       return;
     }
     setEditVehiculo(null);
@@ -86,213 +76,174 @@ export default function Vehiculos() {
   };
 
   const handleEdit = (vehiculo) => {
-    if (!canPerformAction("editar_vehiculo")) {
-      toast.error("No tienes permisos para editar vehículos.");
+    if (!canEdit) {
+      showToast("No tienes permiso para editar vehículos.", "warning");
       return;
     }
-
-    const vehiculoTransformado = {
-      ...vehiculo,
-      id_ubicacion_actual: vehiculo.LocationID,
-    };
-
+    const vehiculoTransformado = { ...vehiculo, id_ubicacion_actual: vehiculo.LocationID };
     setEditVehiculo(vehiculoTransformado);
     setOpenModal(true);
   };
 
   const handleDelete = async (id) => {
-    if (!canPerformAction("eliminar_vehiculo")) {
-      // Permiso para eliminar
-      toast.error("No tienes permisos para eliminar vehículos.");
+    if (!canDelete) {
+      showToast("No tienes permiso para inhabilitar vehículos.", "warning");
       return;
     }
-
     const result = await Swal.fire({
       title: "¿Estás seguro?",
-      text: "El vehículo será marcado como inactivo y no aparecerá en la lista principal.",
+      text: "El vehículo será marcado como inactivo.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#d33", // Rojo para eliminar
+      confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Sí, inactivar",
       cancelButtonText: "Cancelar",
     });
-
     if (result.isConfirmed) {
       try {
-        const deleteResult = await deleteVehiculo(id);
-        if (deleteResult && !deleteResult.error) {
-          setVehiculos((prev) =>
-            prev.map((v) => (v.id === id ? { ...v, estado: "Inactivo" } : v))
-          );
-          toast.success("Vehículo inactivado correctamente");
+        const resp = await deleteVehiculo(id);
+        if (resp && !resp.error) {
+          setVehiculos(prev => prev.map(v => (v.id === id ? { ...v, estado: "Inactivo" } : v)));
+          showToast("Vehículo inactivado correctamente", "success");
         } else {
-          toast.error("Error al inactivar el vehículo.");
+          showToast("Error al inactivar el vehículo.", "danger");
         }
       } catch (err) {
-        console.error("Error al eliminar vehículo:", err);
-        toast.error("Error de conexión al intentar inactivar el vehículo.");
+        showToast("Error de conexión al intentar inactivar el vehículo.", "danger");
       }
     }
   };
 
   const handleRestore = async (id) => {
-    if (!canPerformAction("gestionar_vehiculos")) {
-      // Permiso para restaurar (asumo el mismo que gestionar)
-      toast.error("No tienes permisos para restaurar vehículos.");
+    if (!canRestore) {
+      showToast("No tienes permiso para restaurar vehículos.", "warning");
       return;
     }
-
     const result = await Swal.fire({
       title: "¿Restaurar vehículo?",
       text: "El vehículo será marcado como disponible nuevamente.",
       icon: "info",
       showCancelButton: true,
-      confirmButtonColor: "#03624C", // Verde para restaurar
+      confirmButtonColor: "#03624C",
       cancelButtonColor: "#d33",
       confirmButtonText: "Sí, restaurar",
       cancelButtonText: "Cancelar",
     });
-
     if (result.isConfirmed) {
       try {
-        const restoreResult = await restoreVehiculo(id);
-        if (restoreResult && !restoreResult.error) {
-          setVehiculos((prev) =>
-            prev.map((v) => (v.id === id ? { ...v, estado: "Disponible" } : v))
-          );
-          toast.success("Vehículo restaurado correctamente");
+        const resp = await restoreVehiculo(id);
+        if (resp && !resp.error) {
+          setVehiculos(prev => prev.map(v => (v.id === id ? { ...v, estado: "Disponible" } : v)));
+          showToast("Vehículo restaurado correctamente", "success");
         } else {
-          toast.error("Error al restaurar el vehículo.");
+          showToast("Error al restaurar el vehículo.", "danger");
         }
       } catch (err) {
-        console.error("Error al restaurar vehículo:", err);
-        toast.error("Error de conexión al intentar restaurar el vehículo.");
+        showToast("Error de conexión al intentar restaurar el vehículo.", "danger");
       }
     }
   };
 
   const handleSubmitVehiculo = async (vehiculo) => {
-    // Permiso para agregar/actualizar
-    if (!canPerformAction("gestionar_vehiculos")) {
-      // ✅ Esto es el mismo que crear_vehiculo
-      toast.error("No tienes permisos para guardar vehículos.");
+    if (!canAny("crear_vehiculo", "editar_vehiculo")) {
+      showToast("No tienes permisos para guardar vehículos.", "warning");
       return;
     }
-
     try {
       if (vehiculo.id) {
-        const result = await actualizarVehiculo(vehiculo.id, vehiculo);
-        if (result && !result.error) {
-          toast.success("Vehículo actualizado correctamente");
-        } else {
-          toast.error("Error al actualizar el vehículo.");
-        }
+        const resp = await actualizarVehiculo(vehiculo.id, vehiculo);
+        if (resp && !resp.error) showToast("Vehículo actualizado correctamente", "success");
+        else showToast("Error al actualizar el vehículo.", "danger");
       } else {
-        const result = await addVehiculos(vehiculo);
-        if (result && !result.error) {
-          toast.success("Vehículo agregado correctamente");
-        } else {
-          toast.error("Error al agregar el vehículo.");
-        }
+        const resp = await addVehiculos(vehiculo);
+        if (resp && !resp.error) showToast("Vehículo agregado correctamente", "success");
+        else showToast("Error al agregar el vehículo.", "danger");
       }
     } catch (err) {
-      console.error("Error al guardar vehículo:", err);
-      toast.error("Error de conexión al guardar el vehículo.");
+      showToast("Error de conexión al guardar el vehículo.", "danger");
     } finally {
       setOpenModal(false);
       setEditVehiculo(null);
-      loadVehiculos(); // Recargar la lista después de guardar
+      loadVehiculos();
     }
   };
 
+  // ---- filtros/búsqueda ----
   const filteredVehiculos = useMemo(() => {
     const search = searchText.toLowerCase();
     return (vehiculos || []).filter((u) => {
       const matchesStatus = showInactive ? true : u.estado === "Disponible";
-      const matchesSearch =
-        `${u.placa} ${u.marca} ${u.modelo} ${u.nombre_ubicacion}`
-          .toLowerCase()
-          .includes(search);
+      const matchesSearch = `${u.placa} ${u.marca} ${u.modelo} ${u.nombre_ubicacion}`.toLowerCase().includes(search);
       return matchesStatus && matchesSearch;
     });
   }, [vehiculos, showInactive, searchText]);
 
-  // Renderizado principal del componente
-  if (checkingSession || loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="80vh">
-        <CircularProgress size="lg" />
-        <Typography level="body-lg" sx={{ ml: 2 }}>
-          {checkingSession ? "Verificando sesión..." : "Cargando vehículos..."}
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-md" mb={2}>
-            {error}
-          </Typography>
-          {/* Solo mostrar botón de reintentar si el error no es de permisos */}
-          {!error.includes("No tienes permisos") && (
-            <Button onClick={loadVehiculos} variant="outlined" color="danger">
-              Reintentar
-            </Button>
-          )}
-        </Alert>
-      </Box>
-    );
-  }
-
-  // Si no hay error y no está cargando, pero tampoco tiene permiso para ver
-  // (Esto es un fallback, ya que loadVehiculos ya debería haber establecido el error)
-  if (!canPerformAction("ver_vehiculos")) {
-    return (
-      <Box textAlign="center" mt={4} p={3}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-md">
-            Acceso denegado. No tienes permisos para ver este contenido.
-          </Typography>
-        </Alert>
-      </Box>
-    );
-  }
+  // estado de vista reutilizable
+  const viewState = getViewState({
+    checkingSession,
+    canView,
+    error,
+    loading,
+    hasData: Array.isArray(vehiculos) && vehiculos.length > 0,
+  });
 
   return (
     <Box p={2}>
-      <VehiculosToolBar
-        onAdd={handleAddVehiculo}
-        showInactive={showInactive}
-        setShowInactive={setShowInactive}
-        onSearch={(text) => setSearchText(text)}
-        canAdd={canPerformAction("crear_vehiculos")} // Pasa el permiso al toolbar
-      />
+      <Card variant="plain" sx={{ p: 2, backgroundColor: "white" }}>
+        {viewState !== "data" ? (
+          <ResourceState
+            state={viewState}
+            error={error}
+            onRetry={loadVehiculos}
+            emptyTitle="Sin vehículos"
+            emptyDescription="Aún no hay vehículos registrados."
+          />
+        ) : (
+          <>
+            <VehiculosToolBar
+              searchText={searchText}
+              onSearch={setSearchText}
+              onAdd={handleAddVehiculo}
+              showInactive={showInactive}
+              setShowInactive={setShowInactive}
+              canAdd={canCreate}
+              addDisabledReason={
+                !canCreate ? "No tienes permiso para crear. Solicítalo al administrador." : undefined
+              }
+            />
 
-      <VehiculosTable
-        vehiculos={filteredVehiculos}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onRestore={handleRestore}
-        showInactive={showInactive}
-        setShowInactive={setShowInactive}
-        canEdit={canPerformAction("editar_vehiculo")} // Pasa el permiso a la tabla
-        canDelete={canPerformAction("eliminar_vehiculo")} // Pasa el permiso a la tabla
-      />
+            {filteredVehiculos.length === 0 ? (
+              <Box sx={{ p: 2 }}>
+                <ResourceState
+                  state="empty"
+                  emptyTitle={vehiculos.length ? "Sin coincidencias" : "Sin vehículos"}
+                  emptyDescription={
+                    vehiculos.length
+                      ? "No encontramos vehículos con los filtros actuales."
+                      : "Aún no hay vehículos registrados."
+                  }
+                />
+              </Box>
+            ) : (
+              <VehiculosTable
+                vehiculos={filteredVehiculos}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onRestore={handleRestore}
+                showInactive={showInactive}
+                setShowInactive={setShowInactive}
+                canEdit={canEdit}
+                canDelete={canDelete}
+              />
+            )}
+          </>
+        )}
+      </Card>
 
       <VehiculoModal
         open={openModal}
-        onClose={() => {
-          setOpenModal(false);
-          setEditVehiculo(null);
-        }}
+        onClose={() => { setOpenModal(false); setEditVehiculo(null); }}
         initialValues={editVehiculo || undefined}
         onSubmit={handleSubmitVehiculo}
       />

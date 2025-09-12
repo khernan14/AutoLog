@@ -18,6 +18,12 @@ import Reports from "../pages/Reports/ReportsPage.jsx";
 import HelpPage from "../pages/HelpPage/HelpPage.jsx";
 import FAQsAdminPage from "../pages/SoporteAdmin/FAQsAdminPage.jsx";
 import ConfigPage from "../pages/Configuraciones/ConfigPage.jsx";
+import ClientesList from "../pages/Clientes/ClientesList.jsx";
+import ClienteDetail from "../pages/Clientes/ClienteDetail.jsx";
+import SitesList from "../pages/Clientes/SitesList.jsx";
+import BodegasList from "../pages/Inventario/BodegasList.jsx";
+import BodegaDetail from "../pages/Inventario/BodegaDetail.jsx";
+import ActivosList from "../pages/Inventario/ActivosList.jsx";
 
 export default function DashboardRoutes() {
   return (
@@ -27,11 +33,12 @@ export default function DashboardRoutes() {
         <Route path="home" element={<Home />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="vehiculos" element={<Vehiculos />} />
-        {/* <Route path="registrar-uso" element={<Empleado />} /> */}
         <Route path="mi-cuenta" element={<MyAccount />} />
         <Route path="panel-vehiculos" element={<Register />} />
         <Route path="panel-vehiculos/register" element={<RegisterForm />} />
         <Route path="reservas" element={<Reservas />} />
+
+        {/* Administración */}
         <Route path="countries" element={<Countries />} />
         <Route path="cities" element={<Cities />} />
         <Route path="parkings" element={<Parkings />} />
@@ -44,6 +51,20 @@ export default function DashboardRoutes() {
         <Route path="soporte" element={<HelpPage />} />
         <Route path="faqs" element={<FAQsAdminPage />} />
         <Route path="configuraciones" element={<ConfigPage />} />
+
+        {/* Clientes */}
+        <Route path="clientes" element={<ClientesList />} />
+        <Route path="clientes/:id/*" element={<ClienteDetail />} />
+        <Route path="sites" element={<SitesList />} />
+
+        {/* Inventario (ANIDADO) */}
+        <Route path="inventario">
+          <Route path="bodegas">
+            <Route index element={<BodegasList />} />
+            <Route path=":id" element={<BodegaDetail />} />
+          </Route>
+          <Route path="activos" element={<ActivosList />} />
+        </Route>
       </Route>
     </Routes>
   );

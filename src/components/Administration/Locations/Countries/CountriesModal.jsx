@@ -1,8 +1,8 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import {
   Modal,
+  ModalDialog,
   ModalClose,
-  Sheet,
   Typography,
   FormControl,
   FormLabel,
@@ -14,7 +14,12 @@ import { useFormik } from "formik";
 import * as yup from "yup";
 
 const validationSchema = yup.object({
-  nombre: yup.string().required("El nombre del país es requerido"),
+  nombre: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? v.trim() : v))
+    .min(2, "Debe tener al menos 2 caracteres")
+    .max(60, "Máximo 60 caracteres")
+    .required("El nombre del país es requerido"),
 });
 
 export default function CountriesModal({
@@ -22,73 +27,89 @@ export default function CountriesModal({
   onClose,
   onSubmit,
   initialValues = { id: null, nombre: "" },
+  saving, // opcional: si el padre quiere forzar el loading externo
 }) {
   const formik = useFormik({
     initialValues,
     validationSchema,
     enableReinitialize: true,
-    onSubmit: (values) => {
-      onSubmit(values);
+    onSubmit: async (values, helpers) => {
+      try {
+        // Enviamos con nombre ya "trimeado"
+        await onSubmit?.({ ...values, nombre: values.nombre.trim() });
+      } finally {
+        helpers.setSubmitting(false);
+      }
     },
   });
 
+  const isSaving = saving || formik.isSubmitting;
+
   useEffect(() => {
-    if (!open) {
-      formik.resetForm();
-    }
-  }, [open]);
+    if (!open) formik.resetForm();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = useCallback(() => {
+    if (isSaving) return; // no cerrar mientras guarda
     formik.resetForm();
-    onClose();
-  }, [formik, onClose]);
+    onClose?.();
+  }, [isSaving, formik, onClose]);
 
   return (
-    <Modal open={open} onClose={handleClose} aria-labelledby="modal-title">
-      <Sheet
+    <Modal open={open} onClose={handleClose} aria-labelledby="country-modal-title">
+      <ModalDialog
         variant="outlined"
-        sx={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          maxWidth: 400,
-          width: "90%",
-          p: 3,
-          borderRadius: "md",
-          boxShadow: "lg",
-          bgcolor: "background.body",
-        }}>
-        <ModalClose />
-        <Typography id="modal-title" level="h5" mb={2}>
+        sx={{ width: { xs: "100%", sm: 480 } }}
+      >
+        <ModalClose disabled={isSaving} />
+        <Typography id="country-modal-title" level="h5" mb={1.5}>
           {initialValues?.id ? "Editar País" : "Agregar País"}
         </Typography>
 
         <form onSubmit={formik.handleSubmit} noValidate>
           <Stack spacing={2}>
-            <FormControl required>
-              <FormLabel>País</FormLabel>
+            <FormControl
+              required
+              error={formik.touched.nombre && Boolean(formik.errors.nombre)}
+            >
+              <FormLabel htmlFor="country-name">País</FormLabel>
               <Input
+                id="country-name"
                 name="nombre"
                 value={formik.values.nombre}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.nombre && Boolean(formik.errors.nombre)}
                 placeholder="Ej. Honduras"
+                autoFocus
+                aria-describedby={
+                  formik.touched.nombre && formik.errors.nombre
+                    ? "country-name-error"
+                    : undefined
+                }
               />
               {formik.touched.nombre && formik.errors.nombre && (
-                <Typography level="body-xs" color="danger" mt={0.5}>
+                <Typography
+                  id="country-name-error"
+                  level="body-xs"
+                  color="danger"
+                  sx={{ mt: 0.5 }}
+                >
                   {formik.errors.nombre}
                 </Typography>
               )}
             </FormControl>
 
-            <Button type="submit" variant="solid" color="primary">
-              {initialValues?.id ? "Actualizar" : "Agregar"}
-            </Button>
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              <Button variant="plain" onClick={handleClose} disabled={isSaving}>
+                Cancelar
+              </Button>
+              <Button type="submit" loading={isSaving} disabled={isSaving}>
+                {initialValues?.id ? "Actualizar" : "Agregar"}
+              </Button>
+            </Stack>
           </Stack>
         </form>
-      </Sheet>
+      </ModalDialog>
     </Modal>
   );
 }
