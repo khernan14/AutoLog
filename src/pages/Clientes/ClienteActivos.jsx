@@ -50,6 +50,7 @@ import useIsMobile from "../../hooks/useIsMobile"; // ajusta si es otro path
 
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
+import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
 const ESTATUS = ["Activo", "Inactivo", "Arrendado", "En Mantenimiento"];
 const TIPOS = ["Impresora", "UPS", "ATM", "Silla", "Mueble", "Otro"];
@@ -820,7 +821,7 @@ export default function ClienteActivos() {
                 text={`${
                   window.location.origin
                 }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
-                logoUrl="/src/assets/newLogoTecnasaBlack.png"
+                logoUrl={logoTecnasa}
                 size={220}
               />
               <Typography level="body-sm" sx={{ mt: 1 }}>

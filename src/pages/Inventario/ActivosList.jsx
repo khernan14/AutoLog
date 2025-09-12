@@ -52,6 +52,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
+import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
 const ESTATUS = [
   "Activo",
@@ -956,7 +957,7 @@ export default function ActivosList() {
                   text={`${
                     window.location.origin
                   }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
-                  logoUrl="/src/assets/newLogoTecnasaBlack.png"
+                  logoUrl={logoTecnasa}
                   size={220}
                 />
                 <Typography level="body-sm" sx={{ mt: 1 }}>
