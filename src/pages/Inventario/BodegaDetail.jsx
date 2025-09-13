@@ -197,9 +197,16 @@ export default function BodegaDetail() {
     }
   };
 
-  const descargarQR = () => {
+  const descargarPNG = () => {
     if (!qrRef.current || !activoQR) return;
+    // PNG a alta resolución (usa exportScale de StyledQR)
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
+  };
+
+  const descargarSVG = () => {
+    if (!qrRef.current || !activoQR) return;
+    // Vector perfecto para imprenta
+    qrRef.current.download("svg", `QR_${activoQR.codigo}`);
   };
 
   // filtro
@@ -641,23 +648,28 @@ export default function BodegaDetail() {
               sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
               <Typography level="title-lg">QR del Activo</Typography>
               <Divider sx={{ my: 1 }} />
+
               {activoQR && (
-                <Stack alignItems="center" spacing={1}>
+                <Stack alignItems="center" spacing={1.5}>
                   <Typography level="body-md">
                     {activoQR.nombre} ({activoQR.codigo})
                   </Typography>
 
-                  <StyledQR
-                    ref={qrRef}
-                    text={
-                      publicLink ||
-                      `${
-                        window.location.origin
-                      }/public/activos/${encodeURIComponent(activoQR.codigo)}`
-                    }
-                    logoUrl={logoTecnasa}
-                    size={220}
-                  />
+                  <div style={{ width: 220, height: 220 }}>
+                    <StyledQR
+                      ref={qrRef}
+                      text={
+                        publicLink ||
+                        `${
+                          window.location.origin
+                        }/public/activos/${encodeURIComponent(activoQR.codigo)}`
+                      }
+                      logoUrl={logoTecnasa}
+                      size={220} // tamaño visible en pantalla
+                      exportScale={6} // 220*6 = 1320px al descargar PNG/JPEG
+                      format="svg" // render base como SVG (nítido)
+                    />
+                  </div>
 
                   {publicLink && (
                     <Typography level="body-sm" sx={{ mt: 1 }}>
@@ -671,6 +683,7 @@ export default function BodegaDetail() {
                   )}
                 </Stack>
               )}
+
               <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
                 <Button
                   variant="plain"
@@ -680,7 +693,14 @@ export default function BodegaDetail() {
                   }}>
                   Cerrar
                 </Button>
-                <Button onClick={descargarQR}>Descargar PNG</Button>
+
+                {/* PNG alta resolución */}
+                <Button onClick={descargarPNG}>Descargar PNG</Button>
+
+                {/* Vector para imprenta */}
+                {/* <Button variant="soft" onClick={descargarSVG}>
+                  SVG
+                </Button> */}
               </Stack>
             </ModalDialog>
           </Modal>

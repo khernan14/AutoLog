@@ -347,15 +347,17 @@ export default function PublicActivoPage() {
 }
 
 function OuterContainer({ children }) {
-  // ✅ Contenedor con scroll en móvil (100dvh + overflowY)
   return (
     <Box
       sx={{
-        minHeight: "100dvh",
+        position: "fixed",
+        inset: 0, // top:0, right:0, bottom:0, left:0
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        height: { xs: "100svh", sm: "100dvh" }, // svh = viewport “seguro” en móvil
+        bgcolor: "background.level1",
         py: { xs: 2, sm: 3 },
         px: { xs: 1.5, sm: 3 },
-        overflowY: "auto",
-        bgcolor: "background.level1",
       }}>
       {children}
     </Box>
