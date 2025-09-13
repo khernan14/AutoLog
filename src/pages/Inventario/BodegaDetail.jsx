@@ -14,6 +14,7 @@ import {
   Tooltip,
   Chip,
   CircularProgress,
+  Link as JoyLink,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -47,6 +48,9 @@ import { useToast } from "../../context/ToastContext";
 import useIsMobile from "../../hooks/useIsMobile";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
+// 🔹 NUEVO: servicio para obtener link público firmado
+import { getPublicLinkForActivo } from "../../services/PublicLinksService";
+
 export default function BodegaDetail() {
   const { id } = useParams();
   const isMobile = useIsMobile(768);
@@ -69,6 +73,7 @@ export default function BodegaDetail() {
 
   const [openQR, setOpenQR] = useState(false);
   const [activoQR, setActivoQR] = useState(null);
+  const [publicLink, setPublicLink] = useState(""); // 🔹 NUEVO
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
 
   // auth/perm
@@ -95,7 +100,7 @@ export default function BodegaDetail() {
       return;
     }
     if (!canViewDetail) {
-      setError(null); // dejar que el viewState muestre “sin permisos”
+      setError(null);
       setLoading(false);
       return;
     }
@@ -165,13 +170,31 @@ export default function BodegaDetail() {
     setOpenHist(true);
   };
 
-  const abrirQR = (a) => {
+  // 🔹 NUEVO: generar link público firmado para QR y abrir modal
+  const abrirQR = async (a) => {
     if (!canGenerateQR) {
       showToast("No tienes permiso para generar/ver QR.", "warning");
       return;
     }
     setActivoQR(a);
-    setOpenQR(true);
+    setPublicLink(""); // limpiar previo
+    try {
+      const { url } = await getPublicLinkForActivo(a.id);
+      setPublicLink(url);
+    } catch (e) {
+      showToast(
+        e?.message || "No se pudo generar el enlace público firmado",
+        "danger"
+      );
+      // fallback (sin token) por si quieres que al menos muestre algo
+      setPublicLink(
+        `${window.location.origin}/public/activos/${encodeURIComponent(
+          a.codigo
+        )}`
+      );
+    } finally {
+      setOpenQR(true);
+    }
   };
 
   const descargarQR = () => {
@@ -608,7 +631,12 @@ export default function BodegaDetail() {
 
         {/* Modal QR */}
         {openQR && (
-          <Modal open={openQR} onClose={() => setOpenQR(false)}>
+          <Modal
+            open={openQR}
+            onClose={() => {
+              setOpenQR(false);
+              setPublicLink("");
+            }}>
             <ModalDialog
               sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
               <Typography level="title-lg">QR del Activo</Typography>
@@ -618,18 +646,38 @@ export default function BodegaDetail() {
                   <Typography level="body-md">
                     {activoQR.nombre} ({activoQR.codigo})
                   </Typography>
+
                   <StyledQR
                     ref={qrRef}
-                    text={`${
-                      window.location.origin
-                    }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
+                    text={
+                      publicLink ||
+                      `${
+                        window.location.origin
+                      }/public/activos/${encodeURIComponent(activoQR.codigo)}`
+                    }
                     logoUrl={logoTecnasa}
                     size={220}
                   />
+
+                  {publicLink && (
+                    <Typography level="body-sm" sx={{ mt: 1 }}>
+                      <JoyLink
+                        href={publicLink}
+                        target="_blank"
+                        rel="noreferrer">
+                        Ver página del activo
+                      </JoyLink>
+                    </Typography>
+                  )}
                 </Stack>
               )}
               <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
-                <Button variant="plain" onClick={() => setOpenQR(false)}>
+                <Button
+                  variant="plain"
+                  onClick={() => {
+                    setOpenQR(false);
+                    setPublicLink("");
+                  }}>
                   Cerrar
                 </Button>
                 <Button onClick={descargarQR}>Descargar PNG</Button>

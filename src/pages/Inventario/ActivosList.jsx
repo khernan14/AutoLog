@@ -44,6 +44,7 @@ import { moverActivo } from "../../services/UbicacionesServices";
 import { getClientes } from "../../services/ClientesServices";
 import { getSitesByCliente } from "../../services/SitesServices";
 import { getBodegas } from "../../services/BodegasServices";
+import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
 import StyledQR from "../../components/QRCode/StyledQR";
@@ -126,6 +127,7 @@ export default function ActivosList() {
 
   // QR
   const [activoQR, setActivoQR] = useState(null);
+  const [publicLink, setPublicLink] = useState("");
 
   const loadActivos = useCallback(async () => {
     if (checkingSession) {
@@ -180,14 +182,33 @@ export default function ActivosList() {
   }, [tipoDestino, clienteDestino]);
 
   // acciones
-  function abrirQR(row) {
+  async function abrirQR(row) {
     if (!canQR) {
       showToast("No tienes permisos para ver el QR.", "warning");
       return;
     }
     setActivoQR(row);
-    setOpenQR(true);
+    setPublicLink(""); // limpia previo
+    try {
+      // pide al backend una URL firmada del tipo /public/activos/:codigo?t=TOKEN
+      const { url } = await getPublicLinkForActivo(row.id);
+      setPublicLink(url);
+    } catch (e) {
+      // fallback sin token (por si falla el endpoint)
+      showToast(
+        e?.message || "No se pudo generar el enlace público firmado",
+        "danger"
+      );
+      setPublicLink(
+        `${window.location.origin}/public/activos/${encodeURIComponent(
+          row.codigo
+        )}`
+      );
+    } finally {
+      setOpenQR(true);
+    }
   }
+
   function descargarQR() {
     if (!qrRef.current || !activoQR) return;
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
@@ -942,7 +963,12 @@ export default function ActivosList() {
         </Modal>
 
         {/* Modal QR */}
-        <Modal open={openQR} onClose={() => setOpenQR(false)}>
+        <Modal
+          open={openQR}
+          onClose={() => {
+            setOpenQR(false);
+            setPublicLink("");
+          }}>
           <ModalDialog
             sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
             <Typography level="title-lg">QR del Activo</Typography>
@@ -954,22 +980,22 @@ export default function ActivosList() {
                 </Typography>
                 <StyledQR
                   ref={qrRef}
-                  text={`${
-                    window.location.origin
-                  }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
+                  text={
+                    publicLink ||
+                    `${
+                      window.location.origin
+                    }/public/activos/${encodeURIComponent(activoQR.codigo)}`
+                  }
                   logoUrl={logoTecnasa}
                   size={220}
                 />
-                <Typography level="body-sm" sx={{ mt: 1 }}>
-                  <a
-                    href={`${
-                      window.location.origin
-                    }/public/activos/${encodeURIComponent(activoQR.codigo)}`}
-                    target="_blank"
-                    rel="noreferrer">
-                    Ver página del activo
-                  </a>
-                </Typography>
+                {publicLink && (
+                  <Typography level="body-sm" sx={{ mt: 1 }}>
+                    <a href={publicLink} target="_blank" rel="noreferrer">
+                      Ver página del activo
+                    </a>
+                  </Typography>
+                )}
               </Stack>
             )}
             <Stack direction="row" justifyContent="center" spacing={2} mt={2}>

@@ -1,6 +1,6 @@
 // src/pages/PublicActivoPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -12,11 +12,12 @@ import {
   LinearProgress,
   Sheet,
   Avatar,
-  Tooltip,
   Link as JoyLink,
+  Button,
 } from "@mui/joy";
 
 const API_BASE = "https://autologapi-production.up.railway.app";
+// const API_BASE = "http://localhost:3000";
 
 const StatusChip = ({ estatus }) => {
   const color = useMemo(() => {
@@ -40,7 +41,7 @@ const StatusChip = ({ estatus }) => {
 
 const UbicacionChip = ({ tipo }) => {
   if (!tipo) return null;
-  const color = tipo === "Cliente" ? "primary" : "neutral"; // azul vs gris
+  const color = tipo === "Cliente" ? "primary" : "neutral";
   return (
     <Chip size="sm" variant="solid" color={color}>
       {tipo}
@@ -50,15 +51,41 @@ const UbicacionChip = ({ tipo }) => {
 
 export default function PublicActivoPage() {
   const { codigo } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+
   const [data, setData] = useState(null);
   const [state, setState] = useState({ loading: true, error: null });
 
   useEffect(() => {
     let mounted = true;
     setState({ loading: true, error: null });
-    fetch(`${API_BASE}/public/activos/${encodeURIComponent(codigo)}`)
+
+    // ⚠️ Enforce token (seguridad): si no hay token, no mostramos datos
+    if (!token) {
+      setState({
+        loading: false,
+        error:
+          "Este enlace público no es válido. Vuelve a escanear el QR o abre el activo desde la aplicación.",
+      });
+      return () => {};
+    }
+
+    const url = new URL(
+      `${API_BASE}/public/activos/${encodeURIComponent(codigo)}`
+    );
+    url.searchParams.set("token", token);
+
+    fetch(url.toString())
       .then(async (r) => {
-        if (!r.ok) throw new Error(`(${r.status}) No se pudo cargar el activo`);
+        if (!r.ok) {
+          if (r.status === 401 || r.status === 403) {
+            throw new Error(
+              "Enlace inválido o expirado. Vuelve a escanear el QR o abre el activo desde la aplicación."
+            );
+          }
+          throw new Error(`(${r.status}) No se pudo cargar el activo`);
+        }
         return r.json();
       })
       .then((json) => mounted && setData(json))
@@ -67,38 +94,31 @@ export default function PublicActivoPage() {
     return () => {
       mounted = false;
     };
-  }, [codigo]);
-
-  const qrUrl = `${API_BASE}/public/activos/${encodeURIComponent(codigo)}/qr`;
+  }, [codigo, token]);
 
   if (state.loading) {
     return (
-      <Box
-        minHeight="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        p={2}>
-        <Card variant="outlined" sx={{ width: 520, p: 3 }}>
+      <OuterContainer>
+        <Card
+          variant="outlined"
+          sx={{ width: { xs: "100%", sm: 520 }, p: 3, mx: "auto" }}>
           <Typography level="title-lg">Cargando activo…</Typography>
           <LinearProgress sx={{ mt: 2 }} />
           <Typography level="body-sm" sx={{ mt: 1 }} color="neutral">
             Código: {codigo}
           </Typography>
         </Card>
-      </Box>
+      </OuterContainer>
     );
   }
 
   if (state.error || !data) {
     return (
-      <Box
-        minHeight="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        p={2}>
-        <Card variant="soft" color="danger" sx={{ width: 520, p: 3 }}>
+      <OuterContainer>
+        <Card
+          variant="soft"
+          color="danger"
+          sx={{ width: { xs: "100%", sm: 520 }, p: 3, mx: "auto" }}>
           <Typography level="title-lg">No se pudo mostrar el activo</Typography>
           <Typography level="body-sm" sx={{ mt: 0.5 }}>
             {state.error || "Activo no encontrado"}
@@ -106,8 +126,14 @@ export default function PublicActivoPage() {
           <Typography level="body-xs" sx={{ mt: 1 }} color="neutral">
             Código: {codigo}
           </Typography>
+          <Button
+            sx={{ mt: 2 }}
+            onClick={() => window.location.reload()}
+            variant="soft">
+            Reintentar
+          </Button>
         </Card>
-      </Box>
+      </OuterContainer>
     );
   }
 
@@ -123,31 +149,26 @@ export default function PublicActivoPage() {
   } = data;
 
   return (
-    <Box
-      minHeight="100vh"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      p={3}
-      bgcolor="background.level1">
+    <OuterContainer>
       <Card
         variant="outlined"
         sx={{
-          width: { xs: "100%", sm: 720 },
+          width: "100%",
+          maxWidth: 720,
           borderRadius: "2xl",
           boxShadow: "lg",
           p: { xs: 2, sm: 3 },
+          mx: "auto",
         }}>
         {/* Header */}
         <Stack
-          direction="row"
-          alignItems="center"
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
           justifyContent="space-between"
           spacing={2}>
-          {/* Izquierda: Tecnasa grande */}
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Avatar
-              sx={{ "--Avatar-size": "72px" }} // un poco más grande
+              sx={{ "--Avatar-size": "72px" }}
               src={data.tecnasa_logo_url || "/logo-tecnasa.png"}
               alt="Tecnasa Honduras"
               variant="soft"
@@ -160,7 +181,6 @@ export default function PublicActivoPage() {
             </Box>
           </Stack>
 
-          {/* Derecha: depende de la ubicación */}
           {data.meta?.isEnCliente && data.cliente_logo_url ? (
             <Sheet
               variant="outlined"
@@ -197,7 +217,7 @@ export default function PublicActivoPage() {
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Datos del activo */}
+        {/* Datos */}
         <CardContent sx={{ pt: 0 }}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Sheet variant="soft" sx={{ flex: 1, p: 2, borderRadius: "lg" }}>
@@ -304,10 +324,11 @@ export default function PublicActivoPage() {
           </Sheet>
 
           <Stack
-            direction="row"
+            direction={{ xs: "column", sm: "row" }}
             justifyContent="space-between"
-            alignItems="center"
-            mt={2}>
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            mt={2}
+            spacing={1}>
             <Typography level="body-xs" color="neutral">
               Si los datos no coinciden con el equipo físico, contacte al
               soporte.
@@ -321,6 +342,22 @@ export default function PublicActivoPage() {
           </Stack>
         </CardContent>
       </Card>
+    </OuterContainer>
+  );
+}
+
+function OuterContainer({ children }) {
+  // ✅ Contenedor con scroll en móvil (100dvh + overflowY)
+  return (
+    <Box
+      sx={{
+        minHeight: "100dvh",
+        py: { xs: 2, sm: 3 },
+        px: { xs: 1.5, sm: 3 },
+        overflowY: "auto",
+        bgcolor: "background.level1",
+      }}>
+      {children}
     </Box>
   );
 }
