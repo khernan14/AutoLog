@@ -1,10 +1,15 @@
 import React, { useState, useCallback } from "react";
-import { Box, Input, Button, Stack, IconButton } from "@mui/joy";
+import { Box, Input, Button, Stack, IconButton, Tooltip } from "@mui/joy";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import ClearIcon from "@mui/icons-material/Clear";
 
-export default function SearchBar({ onSearch, onAdd }) {
+export default function SearchBar({
+  onSearch,
+  onAdd,
+  canAdd = true,
+  inputMaxWidth = 360, // 👈 control externo del ancho
+}) {
   const [search, setSearch] = useState("");
 
   const handleSearch = useCallback(
@@ -15,51 +20,62 @@ export default function SearchBar({ onSearch, onAdd }) {
     [onSearch]
   );
 
-  const clearSearch = useCallback(() => {
-    setSearch("");
-    onSearch?.("");
-  }, [onSearch]);
+  const clear = () => handleSearch("");
 
   return (
     <Box
       sx={{
         display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: 2,
-        mb: 2,
+        gap: 1,
+        flexWrap: "wrap",
       }}>
       <Input
-        placeholder="Buscar vehículo..."
-        aria-label="Buscar vehículo"
+        placeholder="Buscar por placa, marca o modelo…"
         value={search}
         onChange={(e) => handleSearch(e.target.value)}
         startDecorator={<SearchRoundedIcon />}
         endDecorator={
-          search && (
+          search ? (
             <IconButton
               size="sm"
               variant="plain"
               color="neutral"
-              onClick={clearSearch}
+              onClick={clear}
               aria-label="Limpiar búsqueda">
               <ClearIcon />
             </IconButton>
-          )
+          ) : null
         }
-        sx={{ width: { xs: "100%", sm: "300px" } }}
+        sx={{
+          flex: "1 1 auto",
+          minWidth: 160,
+          maxWidth: { xs: "100%", sm: inputMaxWidth },
+        }}
       />
 
       <Stack direction="row" spacing={1} flexWrap="wrap">
-        <Button
-          variant="solid"
-          color="primary"
-          startDecorator={<NoteAddIcon />}
-          onClick={onAdd}
-          aria-label="Registrar uso de vehículo">
-          Registrar Uso
-        </Button>
+        <Tooltip
+          variant="soft"
+          title={
+            canAdd
+              ? "Registrar uso de vehículo"
+              : "No tienes permiso para registrar uso"
+          }
+          placement="bottom-end">
+          <span>
+            <Button
+              variant={canAdd ? "solid" : "soft"}
+              color={canAdd ? "primary" : "neutral"}
+              startDecorator={<NoteAddIcon />}
+              onClick={onAdd}
+              disabled={!canAdd}
+              aria-disabled={!canAdd}
+              aria-label="Registrar uso de vehículo">
+              Registrar Uso
+            </Button>
+          </span>
+        </Tooltip>
       </Stack>
     </Box>
   );

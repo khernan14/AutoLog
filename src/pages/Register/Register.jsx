@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Box, Button, Stack, Typography, CircularProgress } from "@mui/joy";
+import { Box, Typography, CircularProgress } from "@mui/joy";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -19,8 +19,12 @@ export default function Register() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const { user } = useAuth();
-  const esAdmin = user?.rol?.toLowerCase() === "admin";
+  // ✅ usar userData (no user) y hasPermiso del contexto real
+  const { userData, hasPermiso } = useAuth();
+  const esAdmin = (userData?.rol || "").toLowerCase() === "admin";
+  const puedeRegistrar =
+    esAdmin ||
+    (typeof hasPermiso === "function" && hasPermiso("registrar_uso"));
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
@@ -43,13 +47,11 @@ export default function Register() {
 
   const verificarReservas = useCallback(async () => {
     try {
-      const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER));
-      const idEmpleado = user?.id_empleado;
-
+      const userLS = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER));
+      const idEmpleado = userLS?.id_empleado;
       if (!idEmpleado) return;
 
       const reservas = await getReservasPorUsuario(idEmpleado);
-
       if (reservas && reservas.length > 0 && reservas[0].total > 0) {
         Swal.fire({
           title: "Reservas Pendientes",
@@ -69,11 +71,13 @@ export default function Register() {
     verificarReservas();
   }, [fetchVehicles, verificarReservas]);
 
-  const handleSearchChange = (value) => {
-    setSearch(value);
-  };
+  const handleSearchChange = (value) => setSearch(value);
 
   const handleRegisterClick = () => {
+    if (!puedeRegistrar) {
+      toast.warning("No tienes permiso para registrar uso de vehículos.");
+      return;
+    }
     if (vehicles.length === 0 && !esAdmin) {
       toast.error(
         "No puedes registrar vehículos porque no tienes permiso para ver los vehículos."
@@ -99,7 +103,13 @@ export default function Register() {
         Registro de uso de vehículos
       </Typography>
 
-      <SearchBar onSearch={handleSearchChange} onAdd={handleRegisterClick} />
+      {/* ✅ botón controlado por permiso y ancho del input más corto */}
+      <SearchBar
+        onSearch={handleSearchChange}
+        onAdd={handleRegisterClick}
+        canAdd={!!puedeRegistrar}
+        inputMaxWidth={320}
+      />
 
       <Box mt={3}>
         {loading ? (
