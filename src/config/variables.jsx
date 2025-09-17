@@ -1,4 +1,3 @@
-// src/js/config/api.js
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const endpoints = {
@@ -76,33 +75,25 @@ export const endpoints = {
   getVehiculosEnUso: `${API_BASE_URL}/reports/reportes/vehiculos-en-uso`,
   getVehiculosEnMantenimiento: `${API_BASE_URL}/reports/reportes/vehiculos-en-mantenimiento`,
 
-  // FAQs
-  getFAQs: `${API_BASE_URL}/help/faqs`,
-  addFAQ: `${API_BASE_URL}/help/faqs`,
-  updateFAQ: `${API_BASE_URL}/help/faqs`, // Se usará con ID en la URL
-  deleteFAQ: `${API_BASE_URL}/help/faqs`, // Se usará con ID en la URL
+  // HELP (PUBLIC)
+  helpFaqs: `${API_BASE_URL}/help/faqs`,
+  helpFaqBySlug: (slug) => `${API_BASE_URL}/help/faqs/${slug}`,
+  helpFaqHelpful: (id) => `${API_BASE_URL}/help/faqs/${id}/helpful`,
 
-  // Tutoriales
-  getTutorials: `${API_BASE_URL}/help/tutorials`,
-  addTutorial: `${API_BASE_URL}/help/tutorials`,
-  updateTutorial: `${API_BASE_URL}/help/tutorials`, // Se usará con ID en la URL
-  deleteTutorial: `${API_BASE_URL}/help/tutorials`, // Se usará con ID en la URL
+  helpTutorials: `${API_BASE_URL}/help/tutorials`,
+  helpTutorialBySlug: (s) => `${API_BASE_URL}/help/tutorials/${s}`,
 
-  // Changelogs (Novedades y Anuncios)
-  getChangelogs: `${API_BASE_URL}/help/changelogs`,
-  addChangelog: `${API_BASE_URL}/help/changelogs`,
-  updateChangelog: `${API_BASE_URL}/help/changelogs`, // Se usará con ID en la URL
-  deleteChangelog: `${API_BASE_URL}/help/changelogs`, // Se usará con ID en la URL
-
-  // System Services (Estado de Servicios)
-  getSystemServices: `${API_BASE_URL}/help/services`,
-  addSystemService: `${API_BASE_URL}/help/services`,
-  updateSystemServiceStatus: `${API_BASE_URL}/help/services`, // Se usará con ID en la URL
-  deleteSystemService: `${API_BASE_URL}/help/services`, // Se usará con ID en la URL
-
-  // System Overall Status Log (Historial de Estado General)
-  getOverallStatusHistory: `${API_BASE_URL}/help/status/history`,
-  addOverallStatusLog: `${API_BASE_URL}/help/status/log`,
+  // HELP (admin)
+  adminFaqs: `${API_BASE_URL}/admin/help/faqs`, // POST (crear), GET si quisieras un endpoint admin
+  adminFaqById: `${API_BASE_URL}/admin/help/faqs/`, // + :id  (PUT/DELETE)
+  adminTutorials: `${API_BASE_URL}/admin/help/tutorials`, // POST
+  adminTutorialById: `${API_BASE_URL}/admin/help/tutorials/`, // + :id (PUT/DELETE)
+  adminTutorialSteps: `${API_BASE_URL}/admin/help/tutorials/`, // + :id/steps (POST replace)
+  adminTutorialAttachments: `${API_BASE_URL}/admin/help/tutorials/`, // + :id/attachments (POST replace)
+  adminChangelogs: `${API_BASE_URL}/admin/help/changelogs`, // POST
+  adminChangelogById: `${API_BASE_URL}/admin/help/changelogs/`, // + :id (PUT/DELETE)
+  adminStatusOverall: `${API_BASE_URL}/admin/help/status/overall`, // POST
+  adminStatusServices: `${API_BASE_URL}/admin/help/status/services`, // POST
 
   // INVENTARIO
   getClientes: `${API_BASE_URL}/clientes/`,
@@ -130,11 +121,9 @@ export const endpoints = {
   // getActivosEnBodegas: `${API_BASE_URL}/inventario/activos/bodegas/all`,
   getActivosGlobal: `${API_BASE_URL}/inventario/activos/all`,
 
-
   // Ubicaciones
   moverActivo: `${API_BASE_URL}/inventario/ubicaciones/mover`,
   movimientosByActivo: `${API_BASE_URL}/inventario/ubicaciones/movimientos/`,
-
 };
 
 // src/js/config/variables.js
