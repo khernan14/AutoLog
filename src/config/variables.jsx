@@ -1,6 +1,8 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const endpoints = {
+  searchGlobal: `${API_BASE_URL}/search`,
+
   login: `${API_BASE_URL}/auth/login`,
   addVehiculo: `${API_BASE_URL}/vehiculos/`,
   getVehiculos: `${API_BASE_URL}/vehiculos/`,

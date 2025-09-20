@@ -5,20 +5,21 @@ import Avatar from "@mui/joy/Avatar";
 import Box from "@mui/joy/Box";
 import Divider from "@mui/joy/Divider";
 import IconButton from "@mui/joy/IconButton";
-import Input from "@mui/joy/Input";
+import Input, { inputClasses } from "@mui/joy/Input";
 import List from "@mui/joy/List";
 import ListItem from "@mui/joy/ListItem";
 import ListItemButton, { listItemButtonClasses } from "@mui/joy/ListItemButton";
 import ListItemContent from "@mui/joy/ListItemContent";
 import Typography from "@mui/joy/Typography";
 import Sheet from "@mui/joy/Sheet";
-
 import Dropdown from "@mui/joy/Dropdown";
 import Menu from "@mui/joy/Menu";
 import MenuItem from "@mui/joy/MenuItem";
 import MenuButton from "@mui/joy/MenuButton";
 import ListItemDecorator from "@mui/joy/ListItemDecorator";
 import ListDivider from "@mui/joy/ListDivider";
+import Tooltip from "@mui/joy/Tooltip";
+import { useColorScheme } from "@mui/joy/styles";
 
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
@@ -45,15 +46,23 @@ import AnnouncementRoundedIcon from "@mui/icons-material/AnnouncementRounded";
 import FactoryRoundedIcon from "@mui/icons-material/FactoryRounded";
 import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 import MoreVert from "@mui/icons-material/MoreVert";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
+import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
+import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
+import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
+import SummarizeRoundedIcon from "@mui/icons-material/SummarizeRounded";
+import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
+
+import { globalSearch } from "../services/search.api"; // API /api/search
 
 import { useAuth } from "./AuthContext";
-import { useColorScheme } from "@mui/joy/styles";
 import { closeSidebar } from "../utils/ToggleSidebar";
 import logoLight from "../assets/newLogoTecnasaBlack.png";
 import logoDark from "../assets/newLogoTecnasa.png";
-
 import Swal from "sweetalert2";
-import { Tooltip } from "@mui/joy";
 
 /* Helpers */
 function getInitials(name) {
@@ -128,14 +137,383 @@ function NavItem({
   );
 }
 
+function KindIcon({ kind }) {
+  const k = String(kind || "").toLowerCase();
+  if (k.includes("veh")) return <DirectionsCarRoundedIcon fontSize="small" />;
+  if (k.includes("activo")) return <Inventory2RoundedIcon fontSize="small" />;
+  if (k.includes("asset")) return <Inventory2RoundedIcon fontSize="small" />;
+  if (k.includes("cliente") || k.includes("compa") || k.includes("company"))
+    return <BusinessRoundedIcon fontSize="small" />;
+  if (k.includes("site")) return <PlaceRoundedIcon fontSize="small" />;
+  if (k.includes("city")) return <LocationCityIcon fontSize="small" />;
+  if (k.includes("country") || k.includes("pais"))
+    return <FlagRoundedIcon fontSize="small" />;
+  if (k.includes("parking") || k.includes("parkin"))
+    return <LocalParkingIcon fontSize="small" />;
+  if (k.includes("warehouse") || k.includes("bodega"))
+    return <FactoryRoundedIcon fontSize="small" />;
+  if (k.includes("reporte")) return <SummarizeRoundedIcon fontSize="small" />;
+  if (k.includes("registro") || k.includes("record"))
+    return <ArticleRoundedIcon fontSize="small" />;
+  return <StorageRoundedIcon fontSize="small" />;
+}
+
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
   const { mode } = useColorScheme();
+
   const userName = userData?.nombre || "Usuario";
   const userEmail = userData?.email || "usuario@test.com";
   const userRole = userData?.rol;
+
+  const checkPermission = (permiso) =>
+    userRole === "Admin" || (permiso ? hasPermiso(permiso) : true);
+
+  // =========================
+  // Secciones (con 'perm' para búsqueda local)
+  // =========================
+  const navItems = [
+    {
+      path: "/admin/home",
+      icon: <HomeRoundedIcon />,
+      label: "Inicio",
+      perm: null,
+      canView: true,
+      kind: "general",
+      group: "General",
+    },
+    {
+      path: "/admin/dashboard",
+      icon: <DashboardRoundedIcon />,
+      label: "Dashboard",
+      perm: "ver_dashboard",
+      canView: checkPermission("ver_dashboard"),
+      kind: "general",
+      group: "General",
+    },
+    {
+      path: "/admin/vehiculos",
+      icon: <LocalShippingIcon />,
+      label: "Vehículos",
+      perm: "gestionar_vehiculos",
+      canView: checkPermission("gestionar_vehiculos"),
+      kind: "vehicle",
+      group: "General",
+    },
+    {
+      path: "/admin/panel-vehiculos",
+      icon: <AppRegistrationIcon />,
+      label: "Registros",
+      perm: "registrar_uso",
+      canView: checkPermission("registrar_uso"),
+      kind: "record",
+      group: "General",
+    },
+    {
+      path: "/admin/reports",
+      icon: <AssessmentIcon />,
+      label: "Reportes",
+      perm: "ver_reportes",
+      canView: checkPermission("ver_reportes"),
+      kind: "reporte",
+      group: "General",
+    },
+  ];
+
+  const managementItems = [
+    {
+      path: "/admin/clientes",
+      icon: <GroupRoundedIcon />,
+      label: "Compañías",
+      perm: "gestionar_companias",
+      canView: checkPermission("gestionar_companias"),
+      kind: "company",
+      group: "Gestión",
+    },
+    {
+      path: "/admin/countries",
+      icon: <PublicIcon />,
+      label: "Países",
+      perm: "gestionar_paises",
+      canView: checkPermission("gestionar_paises"),
+      kind: "country",
+      group: "Gestión",
+    },
+    {
+      path: "/admin/cities",
+      icon: <LocationCityIcon />,
+      label: "Ciudades",
+      perm: "gestionar_ciudades",
+      canView: checkPermission("gestionar_ciudades"),
+      kind: "city",
+      group: "Gestión",
+    },
+    {
+      path: "/admin/parkings",
+      icon: <LocalParkingIcon />,
+      label: "Estacionamientos",
+      perm: "gestionar_estacionamientos",
+      canView: checkPermission("gestionar_estacionamientos"),
+      kind: "parking",
+      group: "Gestión",
+    },
+  ];
+
+  const inventoryItems = [
+    {
+      path: "/admin/inventario/bodegas",
+      icon: <FactoryRoundedIcon />,
+      label: "Bodegas",
+      perm: "gestionar_bodegas",
+      canView: checkPermission("gestionar_bodegas"),
+      kind: "warehouse",
+      group: "Inventario",
+    },
+    {
+      path: "/admin/inventario/activos",
+      icon: <DnsRoundedIcon />,
+      label: "Activos",
+      perm: "gestionar_activos",
+      canView: checkPermission("gestionar_activos"),
+      kind: "asset",
+      group: "Inventario",
+    },
+  ];
+
+  const systemItems = [
+    {
+      path: "/admin/usuarios",
+      icon: <SupervisorAccountIcon />,
+      label: "Gestionar Usuarios",
+      perm: "gestionar_usuarios",
+      canView: checkPermission("gestionar_usuarios"),
+      kind: "sistema",
+      group: "Sistema",
+    },
+    {
+      path: "/admin/permissions",
+      icon: <VpnKeyIcon />,
+      label: "Roles y Permisos",
+      perm: "asignar_permisos",
+      canView: checkPermission("asignar_permisos"),
+      kind: "sistema",
+      group: "Sistema",
+    },
+  ];
+
+  const supportAndHelpItems = [
+    {
+      path: "/admin/support/faqs",
+      icon: <QuestionAnswerRoundedIcon />,
+      label: "Gestionar FAQs",
+      perm: "help_manage",
+      canView: checkPermission("help_manage"),
+      kind: "soporte",
+      group: "Soporte y Ayuda",
+    },
+    {
+      path: "/admin/support/tutorials",
+      icon: <VideoLibraryRoundedIcon />,
+      label: "Gestionar Tutoriales",
+      perm: "help_manage",
+      canView: checkPermission("help_manage"),
+      kind: "soporte",
+      group: "Soporte y Ayuda",
+    },
+    {
+      path: "/admin/support/changelogs",
+      icon: <AnnouncementRoundedIcon />,
+      label: "Gestionar Novedades",
+      perm: "help_manage",
+      canView: checkPermission("help_manage"),
+      kind: "soporte",
+      group: "Soporte y Ayuda",
+    },
+    {
+      path: "/admin/support/services",
+      icon: <DnsRoundedIcon />,
+      label: "Estado de Servicios",
+      perm: "help_manage",
+      canView: checkPermission("help_manage"),
+      kind: "soporte",
+      group: "Soporte y Ayuda",
+    },
+  ];
+
+  // Index plano para fallback local
+  const routeIndex = React.useMemo(() => {
+    const pick = (arr) =>
+      arr.filter(Boolean).map((it) => ({
+        url: it.path,
+        title: it.label,
+        subtitle: it.group ? `Módulo • ${it.group}` : "Módulo",
+        kind: it.kind || "general",
+        perm: it.perm || null,
+        canView: it.canView,
+      }));
+    return [
+      ...pick(navItems),
+      ...pick(managementItems),
+      ...pick(inventoryItems),
+      ...pick(systemItems),
+      ...pick(supportAndHelpItems),
+    ];
+  }, [
+    navItems,
+    managementItems,
+    inventoryItems,
+    systemItems,
+    supportAndHelpItems,
+  ]);
+
+  // =========================
+  // Búsqueda universal (Joy-only)
+  // =========================
+  const [q, setQ] = React.useState("");
+  const [openSearch, setOpenSearch] = React.useState(false);
+  const [loadingSearch, setLoadingSearch] = React.useState(false);
+  const [results, setResults] = React.useState([]);
+  const [activeIndex, setActiveIndex] = React.useState(-1);
+  const containerRef = React.useRef(null);
+  const inputRootRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+  const abortRef = React.useRef(null);
+  const debounceRef = React.useRef(null);
+
+  const simpleLocalRouteSearch = React.useCallback(
+    (text) => {
+      const t = text.toLowerCase();
+      const items = routeIndex.filter(
+        (r) =>
+          r.canView &&
+          (r.title.toLowerCase().includes(t) ||
+            r.subtitle.toLowerCase().includes(t) ||
+            r.url.toLowerCase().includes(t))
+      );
+      const ranked = items
+        .map((r) => {
+          const ti = r.title.toLowerCase().indexOf(t);
+          const si = r.subtitle.toLowerCase().indexOf(t);
+          const pi = r.url.toLowerCase().indexOf(t);
+          const score =
+            (ti === 0 ? 80 : ti >= 0 ? 60 : 0) +
+            (si === 0 ? 20 : si >= 0 ? 12 : 0) +
+            (pi === 0 ? 10 : pi >= 0 ? 6 : 0);
+          return { ...r, score };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+      return ranked.map((r) => ({
+        id: r.url,
+        title: r.title,
+        subtitle: r.subtitle,
+        url: r.url,
+        kind: r.kind,
+        perm: r.perm,
+      }));
+    },
+    [routeIndex]
+  );
+
+  const searchAll = React.useCallback(
+    async (text) => {
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setLoadingSearch(true);
+      try {
+        const data = await globalSearch(text, {
+          limit: 10,
+          signal: controller.signal,
+        });
+        const normalized = Array.isArray(data) ? data : [];
+        setResults(normalized);
+        setOpenSearch(true);
+      } catch (_e) {
+        const local = simpleLocalRouteSearch(text);
+        setResults(local);
+        setOpenSearch(true);
+      } finally {
+        setLoadingSearch(false);
+      }
+    },
+    [simpleLocalRouteSearch]
+  );
+
+  const onChangeSearch = (e) => {
+    const value = e.target.value;
+    setQ(value);
+    setActiveIndex(-1);
+    clearTimeout(debounceRef.current);
+    if (!value || value.trim().length < 2) {
+      setOpenSearch(false);
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => searchAll(value.trim()), 250);
+  };
+
+  const handleNavigate = (path) => {
+    navigate(path);
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      closeSidebar();
+    }
+  };
+
+  const onKeyDownSearch = (e) => {
+    if (e.key === "Escape") {
+      setOpenSearch(false);
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const term = (q || "").trim();
+      if (!term) return;
+
+      // si quieres auto-abrir exacto y único:
+      const allowed = (r) =>
+        userRole === "Admin" || !r.perm || hasPermiso(r.perm);
+      const exacts = (results || []).filter((r) => r.exact && allowed(r));
+
+      if (exacts.length === 1) {
+        navigate(exacts[0].url);
+        setOpenSearch(false);
+        setQ("");
+        return;
+      }
+
+      // por defecto -> página de resultados
+      navigate(`/admin/search?q=${encodeURIComponent(term)}`);
+      setOpenSearch(false);
+    }
+
+    if (!openSearch || !results.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % results.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i - 1 + results.length) % results.length);
+    }
+  };
+
+  // Ctrl/⌘ + K → enfocar buscador
+  React.useEffect(() => {
+    const onGlobalKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setOpenSearch(
+          q.trim().length >= 2 && (results.length > 0 || loadingSearch)
+        );
+      }
+    };
+    window.addEventListener("keydown", onGlobalKey);
+    return () => window.removeEventListener("keydown", onGlobalKey);
+  }, [q, results.length, loadingSearch]);
 
   const logout = () => {
     closeSidebar();
@@ -156,133 +534,7 @@ export default function Sidebar() {
     });
   };
 
-  const handleNavigate = (path) => {
-    navigate(path);
-    if (window.matchMedia("(max-width: 768px)").matches) {
-      closeSidebar();
-    }
-  };
-
-  const checkPermission = (permiso) =>
-    userRole === "Admin" || hasPermiso(permiso);
-
-  /* Secciones */
-  const navItems = [
-    {
-      path: "/admin/home",
-      icon: <HomeRoundedIcon />,
-      label: "Inicio",
-      canView: true,
-    },
-    {
-      path: "/admin/dashboard",
-      icon: <DashboardRoundedIcon />,
-      label: "Dashboard",
-      canView: checkPermission("ver_dashboard"),
-    },
-    {
-      path: "/admin/vehiculos",
-      icon: <LocalShippingIcon />,
-      label: "Vehículos",
-      canView: checkPermission("gestionar_vehiculos"),
-    },
-    {
-      path: "/admin/panel-vehiculos",
-      icon: <AppRegistrationIcon />,
-      label: "Registros",
-      canView: checkPermission("registrar_uso"),
-    },
-    {
-      path: "/admin/reports",
-      icon: <AssessmentIcon />,
-      label: "Reportes",
-      canView: checkPermission("ver_reportes"),
-    },
-  ];
-
-  const managementItems = [
-    {
-      path: "/admin/clientes",
-      icon: <GroupRoundedIcon />,
-      label: "Compañías",
-      canView: checkPermission("gestionar_companias"),
-    },
-    {
-      path: "/admin/countries",
-      icon: <PublicIcon />,
-      label: "Países",
-      canView: checkPermission("gestionar_paises"),
-    },
-    {
-      path: "/admin/cities",
-      icon: <LocationCityIcon />,
-      label: "Ciudades",
-      canView: checkPermission("gestionar_ciudades"),
-    },
-    {
-      path: "/admin/parkings",
-      icon: <LocalParkingIcon />,
-      label: "Estacionamientos",
-      canView: checkPermission("gestionar_estacionamientos"),
-    },
-  ];
-
-  const inventoryItems = [
-    {
-      path: "/admin/inventario/bodegas",
-      icon: <FactoryRoundedIcon />,
-      label: "Bodegas",
-      canView: checkPermission("gestionar_bodegas"),
-    },
-    {
-      path: "/admin/inventario/activos",
-      icon: <DnsRoundedIcon />,
-      label: "Activos",
-      canView: checkPermission("gestionar_activos"),
-    },
-  ];
-
-  const systemItems = [
-    {
-      path: "/admin/usuarios",
-      icon: <SupervisorAccountIcon />,
-      label: "Gestionar Usuarios",
-      canView: checkPermission("gestionar_usuarios"),
-    },
-    {
-      path: "/admin/permissions",
-      icon: <VpnKeyIcon />,
-      label: "Roles y Permisos",
-      canView: checkPermission("asignar_permisos"),
-    },
-  ];
-
-  const supportAndHelpItems = [
-    {
-      path: "/admin/support/faqs",
-      icon: <QuestionAnswerRoundedIcon />,
-      label: "Gestionar FAQs",
-      canView: checkPermission("help_manage"),
-    },
-    {
-      path: "/admin/support/tutorials",
-      icon: <VideoLibraryRoundedIcon />,
-      label: "Gestionar Tutoriales",
-      canView: checkPermission("help_manage"),
-    },
-    {
-      path: "/admin/support/changelogs",
-      icon: <AnnouncementRoundedIcon />,
-      label: "Gestionar Novedades",
-      canView: checkPermission("help_manage"),
-    },
-    {
-      path: "/admin/support/services",
-      icon: <DnsRoundedIcon />,
-      label: "Estado de Servicios",
-      canView: checkPermission("help_manage"),
-    },
-  ];
+  const currentPath = location.pathname;
 
   return (
     <Sheet
@@ -326,13 +578,133 @@ export default function Sidebar() {
         />
       </Box>
 
-      {/* Búsqueda */}
-      <Input
-        size="sm"
-        startDecorator={<SearchRoundedIcon />}
-        placeholder="Buscar..."
-        sx={{ display: { xs: "none", sm: "flex" } }}
-      />
+      {/* Búsqueda (Joy-only, dropdown absoluto) */}
+      <Box
+        ref={containerRef}
+        sx={{
+          display: { xs: "none", sm: "block" },
+          position: "relative",
+        }}>
+        <Tooltip
+          title="Buscar módulos y datos… (Ctrl/⌘+K)"
+          variant="soft"
+          sx={{ zIndex: 13000 }}>
+          <Input
+            ref={inputRootRef}
+            value={q}
+            onChange={onChangeSearch}
+            onKeyDown={onKeyDownSearch}
+            onFocus={() =>
+              q.trim().length >= 2 && results.length && setOpenSearch(true)
+            }
+            onBlur={() => setTimeout(() => setOpenSearch(false), 120)}
+            startDecorator={<SearchRoundedIcon />}
+            placeholder="Buscar módulos y datos… (Ctrl/⌘+K)"
+            slotProps={{
+              input: { ref: inputRef },
+            }}
+            sx={{
+              [`& .${inputClasses.input}`]: { pr: 1 },
+            }}
+          />
+        </Tooltip>
+
+        {openSearch && (
+          <Sheet
+            variant="outlined"
+            sx={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: "calc(100% + 8px)",
+              borderRadius: "md",
+              p: 0.5,
+              bgcolor: "background.body",
+              boxShadow: "lg",
+              zIndex: 13000,
+              maxHeight: 360,
+              overflowY: "auto",
+            }}
+            onMouseDown={(e) => e.preventDefault()} // no cerrar por mousedown para permitir click
+          >
+            {loadingSearch ? (
+              <List sx={{ p: 0.5 }}>
+                {[...Array(4)].map((_, i) => (
+                  <ListItem key={i}>
+                    <Typography level="body-sm">Buscando…</Typography>
+                  </ListItem>
+                ))}
+              </List>
+            ) : results.length === 0 ? (
+              <Box sx={{ p: 1 }}>
+                <Typography level="body-sm" color="neutral">
+                  Sin resultados
+                </Typography>
+              </Box>
+            ) : (
+              <List sx={{ p: 0 }}>
+                {results.map((r, idx) => {
+                  const allowed =
+                    userRole === "Admin" || !r.perm || hasPermiso(r.perm);
+                  const content = (
+                    <ListItemButton
+                      key={r.id || r.url || idx}
+                      selected={idx === activeIndex}
+                      disabled={!allowed}
+                      onClick={() => {
+                        if (allowed && r.url) {
+                          handleNavigate(r.url);
+                          setOpenSearch(false);
+                          setQ("");
+                        }
+                      }}
+                      sx={{
+                        borderRadius: "sm",
+                        "&[aria-disabled='true']": {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                        },
+                      }}>
+                      <ListItemDecorator>
+                        {allowed ? (
+                          <KindIcon kind={r.kind} />
+                        ) : (
+                          <LockRoundedIcon fontSize="small" />
+                        )}
+                      </ListItemDecorator>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography level="title-sm" noWrap>
+                          {r.title}
+                        </Typography>
+                        {r.subtitle && (
+                          <Typography level="body-xs" color="neutral" noWrap>
+                            {r.subtitle}
+                          </Typography>
+                        )}
+                      </Box>
+                    </ListItemButton>
+                  );
+
+                  return allowed ? (
+                    <ListItem key={idx} sx={{ p: 0 }}>
+                      {content}
+                    </ListItem>
+                  ) : (
+                    <Tooltip
+                      key={idx}
+                      title="No tienes permiso para acceder"
+                      variant="soft"
+                      placement="left"
+                      sx={{ zIndex: 13000 }}>
+                      <ListItem sx={{ p: 0 }}>{content}</ListItem>
+                    </Tooltip>
+                  );
+                })}
+              </List>
+            )}
+          </Sheet>
+        )}
+      </Box>
 
       {/* Navegación */}
       <Box
@@ -458,8 +830,7 @@ export default function Sidebar() {
             </ListItem>
           )}
 
-          {(checkPermission("cambiar_password") ||
-            checkPermission("asignar_permisos") ||
+          {(checkPermission("asignar_permisos") ||
             checkPermission("gestionar_usuarios")) && (
             <ListItem nested>
               <Toggler
@@ -538,7 +909,7 @@ export default function Sidebar() {
         </List>
       </Box>
 
-      {/* Pie: tarjeta de usuario con menú contextual */}
+      {/* Pie: tarjeta de usuario */}
       <Divider />
       <Box
         sx={{
@@ -547,8 +918,8 @@ export default function Sidebar() {
           alignItems: "center",
           p: 1,
           borderRadius: "md",
-          position: "relative", // <-
-          overflow: "visible", // <-
+          position: "relative",
+          overflow: "visible",
         }}>
         <Avatar
           variant="soft"
@@ -567,15 +938,15 @@ export default function Sidebar() {
 
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Tooltip
-            sx={{ zIndex: 13000 }}
             title={userName}
             variant="soft"
-            placement="top">
+            placement="top"
+            sx={{ zIndex: 13000 }}>
             <Typography level="title-md" noWrap>
               {userName}
             </Typography>
           </Tooltip>
-          <Tooltip sx={{ zIndex: 13000 }} title={userEmail} variant="soft">
+          <Tooltip title={userEmail} variant="soft" sx={{ zIndex: 13000 }}>
             <Typography level="body-xs" sx={{ color: "text.secondary" }} noWrap>
               {userEmail}
             </Typography>
@@ -584,9 +955,9 @@ export default function Sidebar() {
 
         <Dropdown>
           <Tooltip
-            sx={{ zIndex: 13000 }}
             title="Menú contextual"
-            variant="soft">
+            variant="soft"
+            sx={{ zIndex: 13000 }}>
             <MenuButton
               slots={{ root: IconButton }}
               slotProps={{
@@ -600,14 +971,10 @@ export default function Sidebar() {
             </MenuButton>
           </Tooltip>
 
-          {/* Portal + z-index alto para quedar por encima del Sidebar */}
           <Menu
             placement="top-start"
-            disablePortal={false} // <- que salga en portal (document.body)
-            sx={{ zIndex: 13000 }} // <- mayor que el zIndex del Sidebar (10000)
-            slotProps={{
-              listbox: { sx: { zIndex: 13000 } }, // extra por si algún tema/skin lo sobrescribe
-            }}>
+            disablePortal={false}
+            sx={{ zIndex: 13000 }}>
             <MenuItem onClick={() => handleNavigate("/admin/mi-cuenta")}>
               <ListItemDecorator>
                 <AccountCircleIcon fontSize="small" />

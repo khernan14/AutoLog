@@ -1,6 +1,8 @@
 // src/routes/dashboard.routes.jsx
 import { Routes, Route } from "react-router-dom";
 import MainLayout from "@/layouts/MainLayout";
+import SearchResultsPage from "@/pages/Search/SearchResultsPage";
+import EntityPreviewPage from "@/pages/Search/EntityPreviewPage.jsx";
 import Dashboard from "@/pages/Dashboard/Dashboard";
 import Home from "@/pages/Dashboard/Home";
 import Usuarios from "@/pages/Users/Users";
@@ -59,6 +61,8 @@ export default function DashboardRoutes() {
       <Route element={<MainLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="home" element={<Home />} />
+        <Route path="search" element={<SearchResultsPage />} />
+        <Route path="preview/:kind/:id" element={<EntityPreviewPage />} />
 
         {/* Usuarios / Cuenta */}
         <Route path="usuarios" element={<Usuarios />} />
