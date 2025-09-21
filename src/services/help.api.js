@@ -3,10 +3,8 @@ const ORIGIN = (import.meta.env.VITE_API_URL || window.location.origin).replace(
   /\/+$/,
   ""
 );
-// Si ya termina en /api lo usamos tal cual, si no, se lo agregamos
 const API_ROOT = ORIGIN.endsWith("/api") ? ORIGIN : `${ORIGIN}/api`;
 
-// Helper: construye URL con query params
 function buildUrl(path, params = {}) {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(`${API_ROOT}${cleanPath}`);
@@ -17,20 +15,23 @@ function buildUrl(path, params = {}) {
   return url.toString();
 }
 
-// Helper: GET genérico con manejo de error
-async function apiGet(path, params, { cache = "no-store" } = {}) {
+// ✅ Acepta { cache, signal } y lo pasa a fetch
+async function apiGet(path, params, { cache = "no-store", signal } = {}) {
   const url = buildUrl(path, params);
   const r = await fetch(url, {
     method: "GET",
     headers: { Accept: "application/json" },
     cache,
+    signal,
   });
   if (!r.ok) {
     let msg = `Error ${r.status}`;
     try {
       const j = await r.json();
       if (j?.message) msg = j.message;
-    } catch {}
+    } catch (e) {
+      // respuesta vacía o no-JSON; dejamos msg por defecto
+    }
     throw new Error(msg);
   }
   return r.json();
@@ -68,7 +69,9 @@ export async function voteFaqHelpful(id, { up = true } = {}) {
     try {
       const j = await r.json();
       if (j?.message) msg = j.message;
-    } catch {}
+    } catch (e) {
+      // noop
+    }
     throw new Error(msg);
   }
   return r.json();
@@ -125,23 +128,25 @@ export function listChangelogs({
 export function getChangelogBySlug(slug) {
   return apiGet(`/help/changelogs/${encodeURIComponent(slug)}`);
 }
+export function getPinnedChangelogs(limit = 6, signal) {
+  return apiGet(
+    "/help/changelog/pinned",
+    { limit },
+    { cache: "no-store", signal }
+  );
+}
 
 /* =========================
    UI helpers
 ========================= */
-// src/services/help.api.js
 export function statusToJoyColor(status) {
   const s = String(status || "")
     .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "") // quita acentos
+    .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
 
-  // Verde
-  if (["ok", "operacional", "operational", "online", "up"].includes(s)) {
-    return "success"; // verde
-  }
-
-  // Amarillo
+  if (["ok", "operacional", "operational", "online", "up"].includes(s))
+    return "success";
   if (
     [
       "degradado",
@@ -153,11 +158,8 @@ export function statusToJoyColor(status) {
       "partial",
       "warning",
     ].includes(s)
-  ) {
-    return "warning"; // amarillo
-  }
-
-  // Rojo
+  )
+    return "warning";
   if (
     [
       "incidente",
@@ -171,10 +173,7 @@ export function statusToJoyColor(status) {
       "caido",
       "cortado",
     ].includes(s)
-  ) {
-    return "danger"; // rojo
-  }
-
-  // Desconocido → gris
+  )
+    return "danger";
   return "neutral";
 }

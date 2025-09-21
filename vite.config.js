@@ -1,6 +1,11 @@
+// vite.config.js
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
@@ -9,13 +14,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
       "@pages": path.resolve(__dirname, "src/pages"),
       "@components": path.resolve(__dirname, "src/components"),
-      // agrega más si lo necesitas
     },
   },
   server: {
     proxy: {
-      "/api": "http://localhost:3000", // ya lo tenías
-      "/uploads": "http://localhost:3000", // 👈 agrega esto
+      "/api": "http://localhost:3000",
+      "/uploads": "http://localhost:3000",
     },
   },
 });
