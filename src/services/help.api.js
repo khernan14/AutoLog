@@ -130,7 +130,7 @@ export function getChangelogBySlug(slug) {
 }
 export function getPinnedChangelogs(limit = 6, signal) {
   return apiGet(
-    "/help/changelog/pinned",
+    "/help/changelogs/pinned",
     { limit },
     { cache: "no-store", signal }
   );
