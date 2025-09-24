@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Dashboard/Home.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Typography,
@@ -12,28 +13,33 @@ import {
   IconButton,
   Divider,
   Table,
+  Chip,
+  Button,
 } from "@mui/joy";
-import WbSunnyIcon from "@mui/icons-material/WbSunny";
-import PeopleIcon from "@mui/icons-material/People"; // Icono para Total Empleados
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar"; // Icono para Total Vehículos
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn"; // Icono para Registros Completados
-import PendingActionsIcon from "@mui/icons-material/PendingActions"; // Icono para Registros Pendientes
-import BuildIcon from "@mui/icons-material/Build"; // Icono para En Mantenimiento
-import AccessTimeFilledIcon from "@mui/icons-material/AccessTimeFilled"; // Icono para Actividad Reciente
-
 import { motion } from "framer-motion";
 
-// Importa todas las funciones de servicio necesarias
+import WbSunnyIcon from "@mui/icons-material/WbSunny";
+import PeopleIcon from "@mui/icons-material/People";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import BuildIcon from "@mui/icons-material/Build";
+import AccessTimeFilledIcon from "@mui/icons-material/AccessTimeFilled";
+import PushPinRoundedIcon from "@mui/icons-material/PushPinRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
 import {
   getEmpleadosMasSalidasReport,
   getVehiculosMasUtilizadosReport,
-  getRegisterReport, // Para registros recientes y pendientes
-  // Asumiremos que estas funciones existen en ReportServices para las nuevas métricas
+  getRegisterReport,
   getTotalEmpleados,
   getTotalVehiculos,
   getVehiculosEnUso,
   getVehiculosEnMantenimiento,
-} from "../../services/ReportServices"; // Asegúrate de que la ruta sea correcta
+} from "@/services/ReportServices";
+
+import { getPinnedChangelogs, statusToJoyColor } from "@/services/help.api";
 
 const MotionCard = motion(Card);
 
@@ -49,7 +55,6 @@ const getUserName = () => {
 const getFormattedDate = () => {
   const now = new Date();
   return now.toLocaleDateString("es-HN", {
-    // Cambiado a 'es-HN' para Honduras
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -57,14 +62,26 @@ const getFormattedDate = () => {
   });
 };
 
+// util para elegir “destacado del día” estable
+function pickStableItem(arr) {
+  if (!arr?.length) return null;
+  const seed = new Date().toDateString(); // cambia 1 vez por día
+  const hash = [...seed].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
+  const idx = Math.abs(hash) % arr.length;
+  return arr[idx];
+}
+
 export default function Home() {
   const userName = getUserName();
   const today = getFormattedDate();
+
+  // ---- estado clima
   const [weather, setWeather] = useState(null);
+  const weatherKey = import.meta.env.VITE_OWM_KEY || "REEMPLAZA_TU_APIKEY";
+
+  // ---- estado métricas
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const apiKey = "7ccda530f97765376983de979173d465"; // Reemplaza con tu API Key
-
   const [dashboardMetrics, setDashboardMetrics] = useState({
     totalEmpleados: 0,
     totalVehiculos: 0,
@@ -76,39 +93,39 @@ export default function Home() {
     topVehiculosUsados: [],
   });
 
-  useEffect(() => {
-    // Carga de datos del clima
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${apiKey}`;
+  // ---- estado novedades (pinned)
+  const [pinned, setPinned] = useState([]);
+  const pinnedAbortRef = useRef();
 
+  useEffect(() => {
+    // === Cargar clima (opcional) ===
+    if (
+      weatherKey &&
+      weatherKey !== "REEMPLAZA_TU_APIKEY" &&
+      navigator.geolocation
+    ) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${weatherKey}`;
           fetch(url)
-            .then((response) => response.json())
+            .then((r) => r.json())
             .then((data) => {
-              if (data && data.main && data.weather) {
-                const temperatura = data.main.temp;
-                const descripcion = data.weather[0].description;
-                const icono = data.weather[0].icon;
-                setWeather({ temperatura, descripcion, icono });
-              } else {
-                console.warn("Datos de clima incompletos o inválidos:", data);
+              if (data?.main?.temp != null && data?.weather?.[0]) {
+                setWeather({
+                  temperatura: Math.round(data.main.temp),
+                  descripcion: data.weather[0].description,
+                  icono: data.weather[0].icon,
+                });
               }
             })
-            .catch((error) => {
-              console.error("Error al obtener el clima:", error);
-            });
+            .catch(() => {});
         },
-        (error) => {
-          console.error("Error al obtener la ubicación para el clima:", error);
-        }
+        () => {}
       );
-    } else {
-      console.error("Geolocalización no es soportada por este navegador.");
     }
 
-    // Carga de métricas del dashboard
+    // === Cargar métricas del dashboard ===
     const loadMetrics = async () => {
       try {
         setLoading(true);
@@ -119,35 +136,33 @@ export default function Home() {
           totalVehiculos,
           vehiculosEnUso,
           vehiculosEnMantenimiento,
-          allRegistros, // Obtener todos los registros para calcular pendientes y recientes
+          allRegistros,
           empleadosMasSalidas,
           vehiculosMasUtilizados,
         ] = await Promise.all([
-          getTotalEmpleados(), // Nueva función
-          getTotalVehiculos(), // Nueva función
-          getVehiculosEnUso(), // Nueva función
-          getVehiculosEnMantenimiento(), // Nueva función
-          getRegisterReport(), // Ya existente, para filtrar en frontend
-          getEmpleadosMasSalidasReport(), // Ya existente
-          getVehiculosMasUtilizadosReport(), // Ya existente
+          getTotalEmpleados(),
+          getTotalVehiculos(),
+          getVehiculosEnUso(),
+          getVehiculosEnMantenimiento(),
+          getRegisterReport(),
+          getEmpleadosMasSalidasReport(),
+          getVehiculosMasUtilizadosReport(),
         ]);
 
-        // Calcular registros pendientes y últimos registros desde allRegistros
-        const pendientes = allRegistros.filter((r) => !r.fecha_regreso);
-        const ultimos = allRegistros.slice(0, 5); // Últimos 5 registros
+        const pendientes = (allRegistros || []).filter((r) => !r.fecha_regreso);
+        const ultimos = (allRegistros || []).slice(0, 5);
 
         setDashboardMetrics({
-          totalEmpleados: totalEmpleados.total || 0, // Asumiendo que devuelve { total: X }
-          totalVehiculos: totalVehiculos.total || 0, // Asumiendo que devuelve { total: X }
-          vehiculosEnUso: vehiculosEnUso.total || 0, // Asumiendo que devuelve { total: X }
-          vehiculosEnMantenimiento: vehiculosEnMantenimiento.total || 0, // Asumiendo que devuelve { total: X }
+          totalEmpleados: totalEmpleados?.total || 0,
+          totalVehiculos: totalVehiculos?.total || 0,
+          vehiculosEnUso: vehiculosEnUso?.total || 0,
+          vehiculosEnMantenimiento: vehiculosEnMantenimiento?.total || 0,
           registrosPendientes: pendientes.length,
           ultimosRegistros: ultimos,
-          topEmpleadosActivos: empleadosMasSalidas.slice(0, 3), // Top 3 para la home
-          topVehiculosUsados: vehiculosMasUtilizados.slice(0, 3), // Top 3 para la home
+          topEmpleadosActivos: (empleadosMasSalidas || []).slice(0, 3),
+          topVehiculosUsados: (vehiculosMasUtilizados || []).slice(0, 3),
         });
       } catch (err) {
-        console.error("Error al cargar las métricas del dashboard:", err);
         setError(
           "No se pudieron cargar las métricas principales. Por favor, intente de nuevo."
         );
@@ -157,16 +172,38 @@ export default function Home() {
     };
 
     loadMetrics();
+  }, [weatherKey]);
+
+  // === Novedades/pinned ===
+  useEffect(() => {
+    const loadPinned = async () => {
+      try {
+        pinnedAbortRef.current?.abort();
+        const controller = new AbortController();
+        pinnedAbortRef.current = controller;
+        const data = await getPinnedChangelogs(6, controller.signal);
+        setPinned(Array.isArray(data) ? data : []);
+      } catch (e) {
+        if (e?.name !== "AbortError") {
+          // silencioso
+        }
+      }
+    };
+    loadPinned();
+    return () => pinnedAbortRef.current?.abort();
   }, []);
+
+  const highlight = useMemo(() => pickStableItem(pinned), [pinned]);
 
   if (loading) {
     return (
       <Box
         sx={{
+          p: { xs: 2, md: 4 },
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          height: "80vh",
+          height: "70vh",
         }}>
         <CircularProgress size="lg" />
         <Typography level="body-lg" sx={{ ml: 2 }}>
@@ -178,7 +215,7 @@ export default function Home() {
 
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
         <Alert color="danger" variant="soft">
           <Typography level="body-lg">{error}</Typography>
         </Alert>
@@ -188,27 +225,170 @@ export default function Home() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-      {/* Saludo y Fecha */}
+      {/* Saludo + fecha */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}>
+        transition={{ duration: 0.5 }}>
         <Typography level="h2" sx={{ mb: 1, fontWeight: "bold" }}>
           ¡Hola, {userName}! 👋
         </Typography>
-        <Typography level="body-lg" sx={{ mb: 3, color: "text.secondary" }}>
+        <Typography level="body-lg" sx={{ mb: 2, color: "text.secondary" }}>
           Hoy es {today}
         </Typography>
       </motion.div>
 
-      <Divider sx={{ my: 4 }} />
+      {/* Bloque: Novedades (pinned) */}
+      <MotionCard
+        whileHover={{ scale: 1.01 }}
+        variant="outlined"
+        sx={{
+          mb: 3,
+          borderRadius: "xl",
+          borderColor: "neutral.outlinedBorder",
+          boxShadow: "sm",
+          p: 2,
+        }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+          <PushPinRoundedIcon />
+          <Typography level="title-lg">Novedades destacadas</Typography>
+          <Chip size="sm" variant="soft" color="neutral">
+            {pinned.length} fijas
+          </Chip>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            size="sm"
+            variant="plain"
+            endDecorator={<ChevronRightRoundedIcon />}
+            onClick={() => (window.location.href = "/admin/help/changelog")}>
+            Ver todas
+          </Button>
+        </Stack>
 
-      {/* Métricas Clave */}
-      <Typography level="h3" sx={{ mb: 3, fontWeight: "medium" }}>
-        Resumen Rápido
+        {highlight ? (
+          <Sheet
+            variant="soft"
+            color="neutral"
+            sx={{
+              p: 2,
+              borderRadius: "lg",
+              mb: pinned.length > 1 ? 2 : 0,
+            }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip
+                size="sm"
+                variant="soft"
+                color={
+                  highlight.type
+                    ? {
+                        Added: "success",
+                        Changed: "warning",
+                        Fixed: "success",
+                        Removed: "danger",
+                        Deprecated: "warning",
+                        Security: "danger",
+                        Performance: "success",
+                      }[highlight.type] || "neutral"
+                    : "neutral"
+                }>
+                {highlight.type || "Update"}
+              </Chip>
+              {highlight.pinned ? (
+                <Chip size="sm" variant="soft" color="primary">
+                  Pinned
+                </Chip>
+              ) : null}
+              <Typography level="title-md" sx={{ ml: 0.5, flex: 1 }}>
+                {highlight.title}
+              </Typography>
+              <Button
+                size="sm"
+                variant="soft"
+                onClick={() =>
+                  (window.location.href = `/admin/help/changelog/${highlight.slug}`)
+                }>
+                Abrir
+              </Button>
+            </Stack>
+            {highlight.description ? (
+              <Typography level="body-sm" sx={{ mt: 0.75 }}>
+                {highlight.description}
+              </Typography>
+            ) : null}
+          </Sheet>
+        ) : (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1 }}>
+            <InfoOutlinedIcon />
+            <Typography level="body-sm">
+              No hay novedades destacadas por ahora.
+            </Typography>
+          </Stack>
+        )}
+
+        {pinned.length > 1 && (
+          <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+            {pinned
+              .filter((x) => x.slug !== highlight?.slug)
+              .map((item) => (
+                <Grid key={item.id} xs={12} sm={6} lg={4}>
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      borderRadius: "lg",
+                      height: "100%",
+                      cursor: "pointer",
+                    }}
+                    onClick={() =>
+                      (window.location.href = `/admin/help/changelog/${item.slug}`)
+                    }>
+                    <CardContent sx={{ gap: 0.75 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={
+                            item.type
+                              ? {
+                                  Added: "success",
+                                  Changed: "warning",
+                                  Fixed: "success",
+                                  Removed: "danger",
+                                  Deprecated: "warning",
+                                  Security: "danger",
+                                  Performance: "success",
+                                }[item.type] || "neutral"
+                              : "neutral"
+                          }>
+                          {item.type || "Update"}
+                        </Chip>
+                        <Typography level="title-sm" sx={{ flex: 1 }} noWrap>
+                          {item.title}
+                        </Typography>
+                      </Stack>
+                      {item.description ? (
+                        <Typography level="body-xs" color="neutral" noWrap>
+                          {item.description}
+                        </Typography>
+                      ) : null}
+                      {item.date ? (
+                        <Typography level="body-xs" sx={{ mt: 0.25 }}>
+                          {new Date(item.date).toLocaleDateString("es-HN")}
+                        </Typography>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+          </Grid>
+        )}
+      </MotionCard>
+
+      {/* Métricas clave */}
+      <Typography level="h3" sx={{ mb: 2, fontWeight: "medium" }}>
+        Resumen rápido
       </Typography>
+
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Total Empleados */}
         <Grid xs={12} sm={6} md={3}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
@@ -233,7 +413,7 @@ export default function Home() {
             </CardContent>
           </MotionCard>
         </Grid>
-        {/* Total Vehículos */}
+
         <Grid xs={12} sm={6} md={3}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
@@ -258,7 +438,7 @@ export default function Home() {
             </CardContent>
           </MotionCard>
         </Grid>
-        {/* Vehículos en Uso */}
+
         <Grid xs={12} sm={6} md={3}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
@@ -283,7 +463,7 @@ export default function Home() {
             </CardContent>
           </MotionCard>
         </Grid>
-        {/* Registros Pendientes */}
+
         <Grid xs={12} sm={6} md={3}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
@@ -310,20 +490,15 @@ export default function Home() {
         </Grid>
       </Grid>
 
-      <Divider sx={{ my: 4 }} />
+      <Divider sx={{ my: 2 }} />
 
-      {/* Secciones de Información Rápida (Quick Glance) */}
+      {/* Quick glance: clima, actividad, top empleados */}
       <Grid container spacing={3}>
-        {/* Clima Actual */}
+        {/* Clima (opcional) */}
         <Grid xs={12} md={4}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              minHeight: { xs: "auto", md: 200 },
-            }}>
+            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                 <WbSunnyIcon />
@@ -348,22 +523,19 @@ export default function Home() {
                   </Box>
                 </Stack>
               ) : (
-                <Typography level="body-md">Cargando clima...</Typography>
+                <Typography level="body-md" color="neutral">
+                  No disponible.
+                </Typography>
               )}
             </CardContent>
           </MotionCard>
         </Grid>
 
-        {/* Últimos 5 Registros de Uso */}
+        {/* Actividad reciente */}
         <Grid xs={12} md={4}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              minHeight: { xs: "auto", md: 200 },
-            }}>
+            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                 <AccessTimeFilledIcon />
@@ -373,24 +545,26 @@ export default function Home() {
                 <Sheet variant="soft" sx={{ borderRadius: "md", p: 1 }}>
                   <Table borderAxis="none" size="sm">
                     <tbody>
-                      {dashboardMetrics.ultimosRegistros.map((registro, i) => (
-                        <tr key={registro.id || i}>
+                      {dashboardMetrics.ultimosRegistros.map((r, i) => (
+                        <tr key={r.id || i}>
                           <td>
-                            <Typography level="body-sm" fontWeight="md">
-                              {registro.empleado?.nombre || "N/A"}
+                            <Typography level="body-sm" fontWeight="md" noWrap>
+                              {r.empleado?.nombre || "N/A"}
                             </Typography>
-                            <Typography level="body-xs">
-                              {registro.vehiculo?.marca || "N/A"} (
-                              {registro.vehiculo?.placa || "N/A"})
+                            <Typography level="body-xs" noWrap>
+                              {r.vehiculo?.marca || "N/A"} (
+                              {r.vehiculo?.placa || "N/A"})
                             </Typography>
                           </td>
                           <td>
                             <Typography
                               level="body-xs"
                               sx={{ whiteSpace: "nowrap" }}>
-                              {new Date(
-                                registro.fecha_salida
-                              ).toLocaleDateString("es-HN")}
+                              {r.fecha_salida
+                                ? new Date(r.fecha_salida).toLocaleDateString(
+                                    "es-HN"
+                                  )
+                                : "-"}
                             </Typography>
                           </td>
                         </tr>
@@ -407,16 +581,11 @@ export default function Home() {
           </MotionCard>
         </Grid>
 
-        {/* Top 3 Empleados Más Activos */}
+        {/* Top empleados activos */}
         <Grid xs={12} md={4}>
           <MotionCard
             whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              minHeight: { xs: "auto", md: 200 },
-            }}>
+            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                 <PeopleIcon />
@@ -428,26 +597,24 @@ export default function Home() {
                 <Sheet variant="soft" sx={{ borderRadius: "md", p: 1 }}>
                   <Table borderAxis="none" size="sm">
                     <tbody>
-                      {dashboardMetrics.topEmpleadosActivos.map(
-                        (empleado, i) => (
-                          <tr key={i}>
-                            <td>
-                              <Typography level="body-sm" fontWeight="md">
-                                {empleado.nombre_empleado}
-                              </Typography>
-                              <Typography level="body-xs">
-                                {empleado.puesto}
-                              </Typography>
-                            </td>
-                            <td>
-                              <Typography level="body-sm" fontWeight="bold">
-                                {empleado.total_salidas}
-                              </Typography>
-                              <Typography level="body-xs">salidas</Typography>
-                            </td>
-                          </tr>
-                        )
-                      )}
+                      {dashboardMetrics.topEmpleadosActivos.map((e, i) => (
+                        <tr key={i}>
+                          <td>
+                            <Typography level="body-sm" fontWeight="md" noWrap>
+                              {e.nombre_empleado}
+                            </Typography>
+                            <Typography level="body-xs" noWrap>
+                              {e.puesto}
+                            </Typography>
+                          </td>
+                          <td>
+                            <Typography level="body-sm" fontWeight="bold">
+                              {e.total_salidas}
+                            </Typography>
+                            <Typography level="body-xs">salidas</Typography>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </Table>
                 </Sheet>

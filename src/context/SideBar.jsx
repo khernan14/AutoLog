@@ -588,6 +588,7 @@ export default function Sidebar() {
         <Tooltip
           title="Buscar módulos y datos… (Ctrl/⌘+K)"
           variant="soft"
+          placement="top-end"
           sx={{ zIndex: 13000 }}>
           <Input
             ref={inputRootRef}
