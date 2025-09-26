@@ -1,5 +1,6 @@
 // src/pages/Dashboard/Home.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -74,6 +75,7 @@ function pickStableItem(arr) {
 export default function Home() {
   const userName = getUserName();
   const today = getFormattedDate();
+  const navigate = useNavigate();
 
   // ---- estado clima
   const [weather, setWeather] = useState(null);
@@ -223,6 +225,11 @@ export default function Home() {
     );
   }
 
+  const go = (to) => (e) => {
+    e?.preventDefault?.();
+    navigate(to);
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
       {/* Saludo + fecha */}
@@ -260,7 +267,7 @@ export default function Home() {
             size="sm"
             variant="plain"
             endDecorator={<ChevronRightRoundedIcon />}
-            onClick={() => (window.location.href = "/admin/help/changelog")}>
+            onClick={go("/admin/help/changelog")}>
             Ver todas
           </Button>
         </Stack>
@@ -304,9 +311,7 @@ export default function Home() {
               <Button
                 size="sm"
                 variant="soft"
-                onClick={() =>
-                  (window.location.href = `/admin/help/changelog/${highlight.slug}`)
-                }>
+                onClick={go(`/admin/help/changelog/${highlight.slug}`)}>
                 Abrir
               </Button>
             </Stack>
@@ -338,9 +343,7 @@ export default function Home() {
                       height: "100%",
                       cursor: "pointer",
                     }}
-                    onClick={() =>
-                      (window.location.href = `/admin/help/changelog/${item.slug}`)
-                    }>
+                    onClick={go(`/admin/help/changelog/${item.slug}`)}>
                     <CardContent sx={{ gap: 0.75 }}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Chip

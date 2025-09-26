@@ -1,35 +1,48 @@
 // src/pages/HelpPage/HelpFaqsList.jsx
-import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useSearchParams,
+  useNavigate,
+  Link as RouterLink,
+} from "react-router-dom";
 import {
   Box,
+  Sheet,
   Stack,
   Typography,
   Input,
   Button,
   Chip,
+  Grid,
   Card,
   CardContent,
-  Sheet,
   Skeleton,
+  Link as JoyLink,
 } from "@mui/joy";
-
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { listFaqs } from "../../services/help.api";
+import { listFaqs } from "@/services/help.api";
 import PaginationLite from "@/components/common/PaginationLite.jsx";
+
+/* utils */
+function stripHtml(s = "") {
+  const el = document.createElement("div");
+  el.innerHTML = s;
+  return (el.textContent || el.innerText || "").trim();
+}
 
 export default function HelpFaqsList() {
   const [sp, setSp] = useSearchParams();
+
+  const q = sp.get("q") || "";
+  const category = sp.get("category") || "";
+  const page = Math.max(1, Number(sp.get("page") || 1));
+  const limit = Math.min(48, Math.max(6, Number(sp.get("limit") || 12)));
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
-
-  const q = sp.get("q") || "";
-  const category = sp.get("category") || "";
-  const page = Number(sp.get("page") || 1);
-  const limit = Number(sp.get("limit") || 24);
-  const totalPages = Math.max(1, Math.ceil((total || 0) / limit));
 
   useEffect(() => {
     (async () => {
@@ -54,51 +67,131 @@ export default function HelpFaqsList() {
     })();
   }, [q, category, page, limit]);
 
+  const go = (to) => (e) => {
+    e?.preventDefault?.();
+    navigate(to);
+  };
+
+  const totalPages = Math.max(1, Math.ceil((total || 0) / limit));
+  const categories = useMemo(() => {
+    const set = new Set();
+    (items || []).forEach((f) => f.category && set.add(f.category));
+    return Array.from(set).slice(0, 10);
+  }, [items]);
+
   const setParam = (k, v) => {
     const next = new URLSearchParams(sp);
     if (!v) next.delete(k);
-    else next.set(k, v);
-    if (k !== "page") next.delete("page"); // reset page
+    else next.set(k, String(v));
+    if (k !== "page") next.delete("page");
     setSp(next, { replace: true });
   };
 
+  const onSearch = (e) => {
+    e.preventDefault();
+    const v = e.target.q.value.trim();
+    setParam("q", v);
+  };
+
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Typography level="h3">Preguntas frecuentes</Typography>
-
-      <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap" }}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setParam("q", e.target.q.value);
+    <Box sx={{ pb: 6 }}>
+      {/* HERO */}
+      <Sheet
+        variant="plain"
+        sx={{
+          borderBottom: "1px solid",
+          borderColor: "neutral.outlinedBorder",
+          bgcolor: "background.body",
+        }}>
+        <Box
+          sx={{
+            maxWidth: 1120,
+            mx: "auto",
+            px: { xs: 2, md: 3 },
+            py: { xs: 4, md: 5 },
           }}>
-          <Input
-            name="q"
-            placeholder="Buscar artículos…"
-            defaultValue={q}
-            startDecorator={<SearchRoundedIcon />}
-            sx={{ minWidth: 280 }}
-          />
-        </form>
-        {category && (
-          <Chip variant="soft" onDelete={() => setParam("category", "")}>
-            Categoría: {category}
-          </Chip>
-        )}
-      </Stack>
+          <Stack spacing={2}>
+            <Typography
+              level="h1"
+              sx={{ fontSize: { xs: 26, md: 32 }, fontWeight: 800 }}>
+              Preguntas frecuentes
+            </Typography>
 
-      <Box sx={{ mt: 2 }}>
-        {loading ? (
-          <Stack spacing={1}>
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} variant="outlined">
-                <CardContent>
-                  <Skeleton level="title-sm" />
-                  <Skeleton level="body-sm" />
-                </CardContent>
-              </Card>
-            ))}
+            <form
+              onSubmit={onSearch}
+              style={{ display: "flex", gap: 8, maxWidth: 720 }}>
+              <Input
+                name="q"
+                defaultValue={q}
+                placeholder="Busca artículos…"
+                startDecorator={<SearchRoundedIcon />}
+                size="lg"
+                sx={{
+                  "--Input-radius": "999px",
+                  "--Input-minHeight": "52px",
+                  flex: 1,
+                  bgcolor: "background.body",
+                }}
+              />
+              <Button
+                type="submit"
+                size="lg"
+                sx={{ borderRadius: "999px", minWidth: 56 }}>
+                <SearchRoundedIcon />
+              </Button>
+            </form>
+
+            {/* Chips de categorías (puedes quitar este bloque si no quieres filtros) */}
+            {/* <Stack
+              direction="row"
+              spacing={1}
+              sx={{ flexWrap: "wrap", mt: 0.5 }}>
+              {category && (
+                <Chip
+                  variant="soft"
+                  onDelete={() => setParam("category", "")}
+                  sx={{ borderRadius: "999px" }}>
+                  Categoría: {category}
+                </Chip>
+              )}
+              {categories.map((c) => (
+                <Chip
+                  key={c}
+                  variant="soft"
+                  onClick={() => setParam("category", c)}
+                  sx={{ borderRadius: "999px" }}>
+                  {c}
+                </Chip>
+              ))}
+            </Stack> */}
           </Stack>
+        </Box>
+      </Sheet>
+
+      {/* GRID de tarjetas sin icono ni subtítulo de categoría */}
+      <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 2, md: 3 }, mt: 3 }}>
+        {loading ? (
+          <Grid container spacing={2}>
+            {Array.from({ length: limit }).map((_, i) => (
+              <Grid key={i} xs={12} sm={6} md={4} lg={3}>
+                <Card
+                  variant="plain"
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "neutral.outlinedBorder",
+                    borderRadius: "xl",
+                    boxShadow: "xs",
+                    height: "100%",
+                  }}>
+                  <CardContent sx={{ p: 1.5 }}>
+                    <Skeleton level="title-sm" width="90%" />
+                    <Skeleton level="body-sm" width="100%" sx={{ mt: 0.75 }} />
+                    <Skeleton level="body-sm" width="75%" sx={{ mt: 0.5 }} />
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
         ) : error ? (
           <Sheet
             variant="soft"
@@ -110,39 +203,104 @@ export default function HelpFaqsList() {
           <Typography color="neutral">No hay resultados.</Typography>
         ) : (
           <>
-            <Stack spacing={1.25}>
+            <Grid container spacing={2}>
               {items.map((f) => (
-                <Card key={f.id} variant="outlined">
-                  <CardContent>
-                    <Typography
-                      component={Link}
-                      to={`/admin/help/faqs/${encodeURIComponent(
-                        f.slug || f.id
-                      )}`}
-                      level="title-sm">
-                      {f.question}
-                    </Typography>
-                    <Typography
-                      level="body-sm"
-                      color="neutral"
-                      sx={{ mt: 0.5 }}>
-                      {f.category || "General"}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
+                <Grid key={f.id} xs={12} sm={6} md={4} lg={3}>
+                  <Card
+                    variant="plain"
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "neutral.outlinedBorder",
+                      borderRadius: "xl",
+                      boxShadow: "xs",
+                      height: "100%",
+                      transition:
+                        "transform .15s ease, box-shadow .15s ease, border-color .15s ease",
+                      "&:hover": {
+                        transform: "translateY(-3px)",
+                        boxShadow: "md",
+                        borderColor: "neutral.outlinedHoverBorder",
+                      },
+                    }}>
+                    <CardContent
+                      sx={{
+                        p: 1.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}>
+                      <Typography
+                        level="title-sm"
+                        component={JoyLink}
+                        onClick={go(
+                          `/admin/help/faqs/${encodeURIComponent(
+                            f.slug || f.id
+                          )}`
+                        )}
+                        sx={{
+                          textDecoration: "none",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          "&:hover": { textDecoration: "underline" },
+                        }}>
+                        {f.question}
+                      </Typography>
 
-            <Box sx={{ display: "flex", justifyContent: "center", mt: 1.5 }}>
+                      {f.answer && (
+                        <Typography
+                          level="body-sm"
+                          color="neutral"
+                          sx={{
+                            mt: 0.75,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            minHeight: 60,
+                          }}>
+                          {stripHtml(f.answer)}
+                        </Typography>
+                      )}
+
+                      <Box sx={{ mt: "auto" }}>
+                        <JoyLink
+                          component="button"
+                          onClick={go(
+                            `/admin/help/faqs/${encodeURIComponent(
+                              f.slug || f.id
+                            )}`
+                          )}
+                          sx={{
+                            mt: 0.75,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}>
+                          Ver detalle
+                        </JoyLink>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* paginación */}
+            <Stack alignItems="center" sx={{ mt: 2 }}>
               <PaginationLite
                 page={page}
                 count={totalPages}
-                onChange={(p) => setParam("page", String(p))} // o setPage(p)
+                onChange={(p) => setParam("page", String(p))}
                 siblingCount={1}
                 boundaryCount={1}
-                showFirstLast={false} // en móvil queda más limpio
+                showFirstLast={false}
               />
-            </Box>
+              <Typography level="body-xs" color="neutral" sx={{ mt: 0.5 }}>
+                Página {page} de {totalPages}
+              </Typography>
+            </Stack>
           </>
         )}
       </Box>
