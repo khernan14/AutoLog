@@ -17,7 +17,8 @@ import Cities from "@/pages/Administration/Locations/Cities";
 import Parkings from "@/pages/Administration/Parkings/Parkings";
 import Permissions from "@/pages/Administration/Permissions/Permissions";
 import NotificationGroupsPage from "@/pages/Administration/NotificationGroups/NotificationGroupsPage";
-import Reports from "@/pages/Reports/ReportsPage.jsx";
+// import Reports from "@/pages/Reports/ReportsPage.jsx";
+import ReportsRouter from "@/pages/Reports/ReportsRouter.jsx";
 import ConfigPage from "@/pages/Configuraciones/ConfigPage.jsx";
 
 import ClientesList from "@/pages/Clientes/ClientesList.jsx";
@@ -84,7 +85,7 @@ export default function DashboardRoutes() {
           path="notificacion-grupos"
           element={<NotificationGroupsPage />}
         />
-        <Route path="reports" element={<Reports />} />
+        <Route path="reports" element={<ReportsRouter />} />
         <Route path="configuraciones" element={<ConfigPage />} />
 
         {/* Clientes */}
