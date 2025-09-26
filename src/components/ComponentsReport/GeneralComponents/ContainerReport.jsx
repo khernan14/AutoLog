@@ -52,13 +52,14 @@ export default function ContainerReport() {
       <Card
         variant="plain"
         sx={{
-          borderRadius: "xl",
-          border: "1px solid",
-          borderColor: "neutral.outlinedBorder",
-          boxShadow: "sm",
+          // borderRadius: "xl",
+          // border: "1px solid",
+          // borderColor: "neutral.outlinedBorder",
+          // boxShadow: "sm",
+          backgroundColor: "white",
         }}>
         <CardContent sx={{ p: 2 }}>
-          <ReportHeader title="Reporte" />
+          {/* <ReportHeader title="Reporte" /> */}
           {/* Puedes renderizar SearchAndDateFilter aquí si quieres una barra global
               o moverla dentro de cada reporte según tu UX */}
           {/* <SearchAndDateFilter ... /> */}
