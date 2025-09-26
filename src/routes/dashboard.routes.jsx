@@ -43,8 +43,8 @@ import FAQsAdminPage from "@/pages/SoporteAdmin/FAQsAdminPage.jsx";
 import TutorialsAdminPage from "@/pages/SoporteAdmin/TutorialsAdminPage.jsx";
 import ChangelogsAdminPage from "@/pages/SoporteAdmin/ChangelogsAdminPage.jsx";
 import StatusAdminPage from "@/pages/SoporteAdmin/StatusAdminPage.jsx";
-const HelpAdminHome = () => <div>Panel de Ayuda (elige sección)</div>;
 
+import HelpSearchResults from "@/pages/HelpPage/HelpSearchResults.jsx";
 // Wrapper de permiso
 // import { useAuth } from "@/context/AuthContext";
 // function RequirePermission({ children, permiso = "help_manage" }) {
@@ -63,6 +63,7 @@ export default function DashboardRoutes() {
         <Route path="home" element={<Home />} />
         <Route path="search" element={<SearchResultsPage />} />
         <Route path="preview/:kind/:id" element={<EntityPreviewPage />} />
+        <Route path="help/search" element={<HelpSearchResults />} />
 
         {/* Usuarios / Cuenta */}
         <Route path="usuarios" element={<Usuarios />} />
