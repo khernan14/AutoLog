@@ -44,6 +44,7 @@ import { moverActivo } from "../../services/UbicacionesServices";
 import { getClientes } from "../../services/ClientesServices";
 import { getSitesByCliente } from "../../services/SitesServices";
 import { getBodegas } from "../../services/BodegasServices";
+import { getEmpleados } from "../../services/AuthServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
@@ -62,14 +63,29 @@ const ESTATUS = [
   "En Mantenimiento",
   "Reciclado",
 ];
-const TIPOS = ["Impresora", "UPS", "ATM", "Silla", "Mueble", "Otro"];
+const TIPOS = [
+  "Impresora",
+  "ATM",
+  "UPS",
+  "Silla",
+  "Mueble",
+  "Laptop",
+  "Desktop",
+  "Mesa",
+  "Audifonos",
+  "Monitor",
+  "Mochila",
+  "Escritorio",
+  "Celular",
+  "Otro",
+];
 
 export default function ActivosList() {
   const isMobile = useIsMobile(768);
   const qrRef = useRef(null);
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const isAdmin = userData?.rol?.toLowerCase() === "admin";
+  const isAdmin = (userData?.rol || "").toLowerCase() === "admin";
 
   const can = useCallback(
     (p) => isAdmin || hasPermiso(p),
@@ -80,13 +96,14 @@ export default function ActivosList() {
   const canEdit = can("editar_activos");
   const canMove = can("mover_activos");
   const canViewHistory = can("ver_historial_activos");
-  const canQR = can("crear_QR"); // fallback para ver QR
+  const canQR = can("crear_QR");
 
   // data
   const [rows, setRows] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [sitesDestino, setSitesDestino] = useState([]);
   const [bodegas, setBodegas] = useState([]);
+  const [empleados, setEmpleados] = useState([]); // 👈 NUEVO
 
   // ui state
   const [loading, setLoading] = useState(true);
@@ -119,10 +136,11 @@ export default function ActivosList() {
   // mover
   const [savingMover, setSavingMover] = useState(false);
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
-  const [tipoDestino, setTipoDestino] = useState("Cliente");
+  const [tipoDestino, setTipoDestino] = useState("Cliente"); // Cliente | Bodega | Empleado
   const [clienteDestino, setClienteDestino] = useState("");
   const [siteDestino, setSiteDestino] = useState("");
   const [bodegaDestino, setBodegaDestino] = useState("");
+  const [empleadoDestino, setEmpleadoDestino] = useState(""); // 👈 NUEVO
   const [motivo, setMotivo] = useState("");
 
   // QR
@@ -136,7 +154,7 @@ export default function ActivosList() {
     }
 
     if (!canView) {
-      setError(null); // tarjeta “sin permisos”
+      setError(null);
       setLoading(false);
       return;
     }
@@ -151,8 +169,6 @@ export default function ActivosList() {
       ]);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
       setBodegas(Array.isArray(bodegasData) ? bodegasData : []);
-
-      // No marcar como error si no hay activos -> dejar que “empty” se encargue
       setRows(Array.isArray(activos) ? activos : []);
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
@@ -181,20 +197,27 @@ export default function ActivosList() {
     }
   }, [tipoDestino, clienteDestino]);
 
-  // acciones
+  // Cargar empleados (solo cuando se abre el modal y se elige Empleado)
+  useEffect(() => {
+    if (openMover && tipoDestino === "Empleado") {
+      getEmpleados()
+        .then((rows) => setEmpleados(Array.isArray(rows) ? rows : []))
+        .catch(() => setEmpleados([]));
+    }
+  }, [openMover, tipoDestino]);
+
+  // ---- Acciones
   async function abrirQR(row) {
     if (!canQR) {
       showToast("No tienes permisos para ver el QR.", "warning");
       return;
     }
     setActivoQR(row);
-    setPublicLink(""); // limpia previo
+    setPublicLink("");
     try {
-      // pide al backend una URL firmada del tipo /public/activos/:codigo?t=TOKEN
       const { url } = await getPublicLinkForActivo(row.id);
       setPublicLink(url);
     } catch (e) {
-      // fallback sin token (por si falla el endpoint)
       showToast(
         e?.message || "No se pudo generar el enlace público firmado",
         "danger"
@@ -283,12 +306,24 @@ export default function ActivosList() {
     setClienteDestino("");
     setSiteDestino("");
     setBodegaDestino("");
+    setEmpleadoDestino(""); // 👈
     setMotivo("");
     setOpenMover(true);
   }
 
   async function onMover(e) {
     e.preventDefault();
+
+    // Validación rápida en UI
+    if (
+      (tipoDestino === "Cliente" && (!clienteDestino || !siteDestino)) ||
+      (tipoDestino === "Bodega" && !bodegaDestino) ||
+      (tipoDestino === "Empleado" && !empleadoDestino)
+    ) {
+      showToast("Completa los campos requeridos para el destino", "warning");
+      return;
+    }
+
     setSavingMover(true);
     try {
       await moverActivo({
@@ -296,8 +331,10 @@ export default function ActivosList() {
         tipo_destino: tipoDestino,
         id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
         id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
+        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null, // 👈
         motivo,
-        usuario_responsable: userData?.id || null,
+        // Usa el mismo campo que espera tu backend (id_usuario)
+        usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
       });
       showToast("Activo movido correctamente", "success");
       setOpenMover(false);
@@ -318,7 +355,7 @@ export default function ActivosList() {
     setOpenHistorial(true);
   }
 
-  // filtro
+  // ---- Filtro
   const filtered = useMemo(() => {
     const s = (search || "").toLowerCase();
     return (rows || []).filter((r) => {
@@ -334,13 +371,14 @@ export default function ActivosList() {
         !ubicacionFilter ||
         (ubicacionFilter === "Cliente" && r.tipo_destino === "Cliente") ||
         (ubicacionFilter === "Bodega" && r.tipo_destino === "Bodega") ||
+        (ubicacionFilter === "Empleado" && r.tipo_destino === "Empleado") ||
         (ubicacionFilter === "SinUbicacion" && !r.tipo_destino);
 
       return matchSearch && matchStatus && matchType && matchUbicacion;
     });
   }, [rows, search, statusFilter, typeFilter, ubicacionFilter]);
 
-  // view state
+  // ---- View state
   const viewState = checkingSession
     ? "checking"
     : !canView
@@ -426,7 +464,7 @@ export default function ActivosList() {
     return null;
   };
 
-  // UI
+  // ---- UI
   return (
     <Sheet
       variant="plain"
@@ -511,10 +549,11 @@ export default function ActivosList() {
               placeholder="Ubicación"
               value={ubicacionFilter}
               onChange={(_, v) => setUbicacionFilter(v || "")}
-              sx={{ minWidth: 160 }}>
+              sx={{ minWidth: 180 }}>
               <Option value="">Todas</Option>
               <Option value="Cliente">Clientes</Option>
               <Option value="Bodega">Bodegas</Option>
+              <Option value="Empleado">Empleados</Option> {/* 👈 NUEVO */}
               <Option value="SinUbicacion">Sin ubicación</Option>
             </Select>
 
@@ -590,11 +629,13 @@ export default function ActivosList() {
                     </Chip>
 
                     <Typography level="body-xs" sx={{ mt: 0.5 }}>
-                      <strong>Ubicación:</strong>{" "}
+                      <strong>Destino:</strong>{" "}
                       {r.tipo_destino === "Cliente"
-                        ? `${r.cliente_nombre} / ${r.site_nombre}`
+                        ? `${r.cliente_nombre} / ${r.site_nombre || r.id}`
                         : r.tipo_destino === "Bodega"
                         ? r.bodega_nombre
+                        : r.tipo_destino === "Empleado"
+                        ? r.empleado_nombre || `Empleado #${r.id}`
                         : "—"}
                     </Typography>
 
@@ -676,7 +717,7 @@ export default function ActivosList() {
                   <th>Modelo</th>
                   <th>Serie</th>
                   <th>Estatus</th>
-                  <th>Ubicación</th>
+                  <th>Destino</th>
                   <th style={{ width: 180 }}></th>
                 </tr>
               </thead>
@@ -706,12 +747,19 @@ export default function ActivosList() {
                     </td>
                     <td>
                       {r.tipo_destino === "Cliente" ? (
-                        <Chip size="sm" variant="outlined" color="primary">
-                          {r.cliente_nombre} / {r.site_nombre}
-                        </Chip>
+                        <Tooltip
+                          title={`${r.cliente_nombre} / ${r.site_nombre}`}>
+                          <Chip size="sm" variant="outlined" color="primary">
+                            {r.cliente_nombre}/{r.site_nombre || r.id}
+                          </Chip>
+                        </Tooltip>
                       ) : r.tipo_destino === "Bodega" ? (
                         <Chip size="sm" variant="outlined" color="neutral">
                           {r.bodega_nombre}
+                        </Chip>
+                      ) : r.tipo_destino === "Empleado" ? (
+                        <Chip size="sm" variant="outlined" color="success">
+                          {r.empleado_nombre || `Empleado #${r.id_empleado}`}
                         </Chip>
                       ) : (
                         "—"
@@ -880,6 +928,7 @@ export default function ActivosList() {
                   disabled={savingMover}>
                   <Option value="Cliente">Cliente</Option>
                   <Option value="Bodega">Bodega</Option>
+                  <Option value="Empleado">Empleado</Option> {/* 👈 NUEVO */}
                 </Select>
               </FormControl>
 
@@ -936,6 +985,23 @@ export default function ActivosList() {
                 </FormControl>
               )}
 
+              {tipoDestino === "Empleado" && (
+                <FormControl required>
+                  <FormLabel>Empleado destino</FormLabel>
+                  <Select
+                    value={empleadoDestino}
+                    onChange={(_, v) => setEmpleadoDestino(v)}
+                    disabled={savingMover}>
+                    <Option value="">—</Option>
+                    {empleados.map((e) => (
+                      <Option key={e.id} value={e.id}>
+                        {e.nombre || e.usuario_nombre || `Empleado #${e.id}`}
+                      </Option>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
               <FormControl>
                 <FormLabel>Motivo</FormLabel>
                 <Input
@@ -955,7 +1021,13 @@ export default function ActivosList() {
               <Button
                 type="submit"
                 loading={savingMover}
-                disabled={savingMover}>
+                disabled={
+                  savingMover ||
+                  (tipoDestino === "Cliente" &&
+                    (!clienteDestino || !siteDestino)) ||
+                  (tipoDestino === "Bodega" && !bodegaDestino) ||
+                  (tipoDestino === "Empleado" && !empleadoDestino)
+                }>
                 Mover
               </Button>
             </Stack>
