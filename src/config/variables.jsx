@@ -126,6 +126,23 @@ export const endpoints = {
   // Ubicaciones
   moverActivo: `${API_BASE_URL}/inventario/ubicaciones/mover`,
   movimientosByActivo: `${API_BASE_URL}/inventario/ubicaciones/movimientos/`,
+
+  // Notificaciones
+  notifEventos: `${API_BASE_URL}/notificaciones/eventos/`, // lista, create, get/:id, put/:id, delete/:id
+  notifEventosEstado: `${API_BASE_URL}/notificaciones/eventos/`, // patch :id/estado
+  notifEventosGrupos: `${API_BASE_URL}/notificaciones/eventos/`, // get/put :id/grupos
+
+  notifGrupos: `${API_BASE_URL}/notificaciones/grupos/`, // lista, create, get/:id, put/:id, delete/:id
+  notifGruposUsuarios: `${API_BASE_URL}/notificaciones/grupos/`, // GET/POST :id/usuarios
+  notifGruposUsuarioDel: `${API_BASE_URL}/notificaciones/grupos/`, // DELETE :id/usuarios/:id_usuario
+  notifGruposCanales: `${API_BASE_URL}/notificaciones/grupos/`, // GET/PUT :id/canales
+
+  notifPlantillas: `${API_BASE_URL}/notificaciones/plantillas/`, // lista, create, get? (no usamos), put/:id, delete/:id
+  notifPlantillasPreview: `${API_BASE_URL}/notificaciones/plantillas/preview`, // POST
+  notifPlantillasPublish: `${API_BASE_URL}/notificaciones/plantillas/`, // POST :id/publicar
+  notifPlantillasTest: `${API_BASE_URL}/notificaciones/plantillas/`, // POST :id/test
+
+  notifConfig: `${API_BASE_URL}/notificaciones/config/`,
 };
 
 // src/js/config/variables.js

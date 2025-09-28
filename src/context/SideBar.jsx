@@ -55,6 +55,7 @@ import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import SummarizeRoundedIcon from "@mui/icons-material/SummarizeRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
+import MarkChatUnreadIcon from "@mui/icons-material/MarkChatUnread";
 
 import { globalSearch } from "../services/search.api"; // API /api/search
 
@@ -299,6 +300,15 @@ export default function Sidebar() {
       perm: "asignar_permisos",
       canView: checkPermission("asignar_permisos"),
       kind: "sistema",
+      group: "Sistema",
+    },
+    {
+      path: "/admin/notificaciones",
+      icon: <MarkChatUnreadIcon />,
+      label: "Notificaciones",
+      perm: "ver_configuraciones",
+      canView: checkPermission("ver_configuraciones"),
+      kind: "notificaciones",
       group: "Sistema",
     },
   ];

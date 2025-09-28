@@ -46,6 +46,7 @@ import ChangelogsAdminPage from "@/pages/SoporteAdmin/ChangelogsAdminPage.jsx";
 import StatusAdminPage from "@/pages/SoporteAdmin/StatusAdminPage.jsx";
 
 import HelpSearchResults from "@/pages/HelpPage/HelpSearchResults.jsx";
+import Notificaciones from "@/pages/Notificaciones/Notificaciones.jsx";
 // Wrapper de permiso
 // import { useAuth } from "@/context/AuthContext";
 // function RequirePermission({ children, permiso = "help_manage" }) {
@@ -65,6 +66,7 @@ export default function DashboardRoutes() {
         <Route path="search" element={<SearchResultsPage />} />
         <Route path="preview/:kind/:id" element={<EntityPreviewPage />} />
         <Route path="help/search" element={<HelpSearchResults />} />
+        <Route path="notificaciones" element={<Notificaciones />} />
 
         {/* Usuarios / Cuenta */}
         <Route path="usuarios" element={<Usuarios />} />
