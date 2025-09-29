@@ -56,7 +56,7 @@ export default function ContainerReport() {
           // border: "1px solid",
           // borderColor: "neutral.outlinedBorder",
           // boxShadow: "sm",
-          backgroundColor: "white",
+          backgroundColor: "Background.surface",
         }}>
         <CardContent sx={{ p: 2 }}>
           {/* <ReportHeader title="Reporte" /> */}

@@ -242,25 +242,36 @@ export default function BodegasList() {
             spacing={1}
             alignItems="center"
             sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Input
-              placeholder="Buscar por nombre, ciudad o descripción…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              startDecorator={<SearchRoundedIcon />}
-              endDecorator={
-                search && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    onClick={clearSearch}
-                    aria-label="Limpiar búsqueda">
-                    <ClearIcon />
-                  </IconButton>
-                )
-              }
-              sx={{ width: { xs: "100%", sm: 320 } }}
-            />
+            <Tooltip
+              title="Buscar por nombre, ciudad o descripción…"
+              variant="solid"
+              placement="top-end">
+              <Input
+                placeholder="Buscar por nombre, ciudad o descripción…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                startDecorator={<SearchRoundedIcon />}
+                endDecorator={
+                  search && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      onClick={clearSearch}
+                      aria-label="Limpiar búsqueda">
+                      <ClearIcon />
+                    </IconButton>
+                  )
+                }
+                sx={{
+                  width: {
+                    xs: "100%",
+                    sm: 320,
+                    backgroundColor: "Background.level1",
+                  },
+                }}
+              />
+            </Tooltip>
 
             <Tooltip
               title={
@@ -288,7 +299,11 @@ export default function BodegasList() {
         {/* Contenido principal */}
         <Card
           variant="plain"
-          sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+          sx={{
+            overflowX: "auto",
+            width: "100%",
+            background: "background.surface",
+          }}>
           {viewState !== "data" ? (
             <Box p={2}>{renderStatus()}</Box>
           ) : isMobile ? (
@@ -352,7 +367,21 @@ export default function BodegasList() {
             </Stack>
           ) : (
             // ====== ESCRITORIO: tabla ======
-            <Table size="sm" stickyHeader hoverRow sx={{ minWidth: 800 }}>
+            <Table
+              hoverRow
+              size="sm"
+              stickyHeader
+              sx={{
+                minWidth: 800,
+                "--TableCell-headBackground":
+                  "var(--joy-palette-background-level5)",
+                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
+                "--TableCell-headFontWeight": 600,
+                "--TableCell-headBorderBottom":
+                  "1px solid var(--joy-palette-divider)",
+                "--TableRow-hoverBackground":
+                  "var(--joy-palette-background-level1)",
+              }}>
               <thead>
                 <tr>
                   <th>Nombre</th>

@@ -2404,17 +2404,17 @@ export default function Notificaciones() {
   const [active, setActive] = useState("dashboard");
 
   return (
-    <Box
-      sx={{
-        minHeight: "100dvh",
-        color: "text.primary",
-        // toque sutil de profundidad
-        backgroundImage:
-          "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(255,255,255,0.02) 100%)",
-      }}>
+    <Box>
       <TopBar />
 
-      <Box sx={{ maxWidth: 1200, mx: "auto", px: 2, pt: 2 }}>
+      <Box
+        sx={{
+          maxWidth: 1200,
+          mx: "auto",
+          px: 2,
+          pt: 2,
+          borderRadius: "lg",
+        }}>
         <Tabs
           value={active}
           onChange={(_, v) => setActive(v)}
@@ -2422,7 +2422,8 @@ export default function Notificaciones() {
             "--Tabs-gap": "12px",
             "--Tab-minHeight": "40px",
             "--Tab-radius": "999px", // control del redondeado global
-            bgcolor: "white",
+            bgcolor: "Background.surface",
+            borderRadius: "lg",
           }}>
           <TabList
             disableUnderline

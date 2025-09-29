@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
-  Box, Card, Typography, Stack, Button, Sheet, CircularProgress,
+  Box,
+  Card,
+  Typography,
+  Stack,
+  Button,
+  Sheet,
+  CircularProgress,
 } from "@mui/joy";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
 import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
@@ -41,7 +47,10 @@ export default function Countries() {
   // ---- auth/perm ----
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
-  const can = useCallback((perm) => isAdmin || hasPermiso(perm), [isAdmin, hasPermiso]);
+  const can = useCallback(
+    (perm) => isAdmin || hasPermiso(perm),
+    [isAdmin, hasPermiso]
+  );
 
   // Fallbacks por ausencia de eliminar_paises en tu DB
   const canView = can("ver_paises");
@@ -54,10 +63,13 @@ export default function Countries() {
 
   // ---- load ----
   const loadCountries = useCallback(async () => {
-    if (checkingSession) { setLoading(true); return; }
+    if (checkingSession) {
+      setLoading(true);
+      return;
+    }
 
     if (!canView) {
-      setError(null);  // dejemos a la tarjeta de "sin permisos" encargarse del mensaje
+      setError(null); // dejemos a la tarjeta de "sin permisos" encargarse del mensaje
       setLoading(false);
       return;
     }
@@ -73,18 +85,27 @@ export default function Countries() {
       }
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
-      setError(/failed to fetch|network/i.test(msg) ? "No hay conexión con el servidor." : msg);
+      setError(
+        /failed to fetch|network/i.test(msg)
+          ? "No hay conexión con el servidor."
+          : msg
+      );
     } finally {
       setLoading(false);
     }
   }, [checkingSession, canView]);
 
-  useEffect(() => { loadCountries(); }, [loadCountries]);
+  useEffect(() => {
+    loadCountries();
+  }, [loadCountries]);
 
   // ---- actions ----
   const onNew = () => {
     if (!canCreate) {
-      showToast("No tienes permiso para crear países. Solicítalo al administrador.", "warning");
+      showToast(
+        "No tienes permiso para crear países. Solicítalo al administrador.",
+        "warning"
+      );
       return;
     }
     setEditCountry(null);
@@ -132,11 +153,13 @@ export default function Countries() {
 
   const onSubmitCountry = async (payload) => {
     const nombre = payload?.nombre?.trim();
-    if (!nombre) return showToast("El nombre del país es obligatorio", "warning");
+    if (!nombre)
+      return showToast("El nombre del país es obligatorio", "warning");
 
     // crear
     if (!payload?.id) {
-      if (!canCreate) return showToast("No tienes permiso para crear países.", "warning");
+      if (!canCreate)
+        return showToast("No tienes permiso para crear países.", "warning");
       try {
         const r = await addCountry({ nombre });
         if (r && !r.error) {
@@ -154,7 +177,8 @@ export default function Countries() {
     }
 
     // actualizar
-    if (!canEdit) return showToast("No tienes permiso para editar países.", "warning");
+    if (!canEdit)
+      return showToast("No tienes permiso para editar países.", "warning");
     try {
       const r = await updateCountry(payload.id, { id: payload.id, nombre });
       if (r && !r.error) {
@@ -179,18 +203,17 @@ export default function Countries() {
   }, [countries, search]);
 
   // ---- view state ----
-  const viewState =
-    checkingSession
-      ? "checking"
-      : !canView
-        ? "no-permission"
-        : error
-          ? "error"
-          : !loading && filtered.length === 0
-            ? "empty"
-            : loading
-              ? "loading"
-              : "data";
+  const viewState = checkingSession
+    ? "checking"
+    : !canView
+    ? "no-permission"
+    : error
+    ? "error"
+    : !loading && filtered.length === 0
+    ? "empty"
+    : loading
+    ? "loading"
+    : "data";
 
   const renderStatus = () => {
     if (viewState === "checking") {
@@ -224,11 +247,18 @@ export default function Countries() {
       return (
         <StatusCard
           color={isNetwork ? "warning" : "danger"}
-          icon={isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />}
-          title={isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"}
+          icon={
+            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
+          }
+          title={
+            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
+          }
           description={error}
           actions={
-            <Button startDecorator={<RestartAltRoundedIcon />} onClick={loadCountries} variant="soft">
+            <Button
+              startDecorator={<RestartAltRoundedIcon />}
+              onClick={loadCountries}
+              variant="soft">
               Reintentar
             </Button>
           }
@@ -274,8 +304,8 @@ export default function Countries() {
         overflow: "auto",
         minHeight: "100dvh",
         bgcolor: "background.body",
-      }}
-    >
+        borderRadius: 16,
+      }}>
       <Box sx={{ width: "100%" }}>
         {/* Header */}
         <CountriesToolBar
@@ -285,7 +315,13 @@ export default function Countries() {
         />
 
         {/* Contenedor principal */}
-        <Card variant="plain" sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+        <Card
+          variant="plain"
+          sx={{
+            overflowX: "auto",
+            width: "100%",
+            background: "background.surface",
+          }}>
           {viewState !== "data" ? (
             <Box p={2}>{renderStatus()}</Box>
           ) : (

@@ -583,7 +583,11 @@ export default function ActivosList() {
         {/* Contenedor principal */}
         <Card
           variant="plain"
-          sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+          sx={{
+            overflowX: "auto",
+            width: "100%",
+            background: "background.surface",
+          }}>
           {viewState !== "data" ? (
             <Box p={2}>{renderStatus()}</Box>
           ) : isMobile ? (
@@ -708,7 +712,21 @@ export default function ActivosList() {
             </Stack>
           ) : (
             // ====== Escritorio: tabla ======
-            <Table size="sm" stickyHeader hoverRow sx={{ minWidth: 980 }}>
+            <Table
+              hoverRow
+              size="sm"
+              stickyHeader
+              sx={{
+                minWidth: 980,
+                "--TableCell-headBackground":
+                  "var(--joy-palette-background-level5)",
+                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
+                "--TableCell-headFontWeight": 600,
+                "--TableCell-headBorderBottom":
+                  "1px solid var(--joy-palette-divider)",
+                "--TableRow-hoverBackground":
+                  "var(--joy-palette-background-level1)",
+              }}>
               <thead>
                 <tr>
                   <th>Código</th>

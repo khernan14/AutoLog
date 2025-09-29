@@ -35,11 +35,10 @@ export default function CountriesToolBar({
         justifyContent: "space-between",
         gap: 1.5,
         mb: 2,
-      }}
-    >
+      }}>
       {/* Search */}
       <Input
-        variant="soft"
+        variant="outlined"
         size="md"
         placeholder={placeholder}
         aria-label="Buscar países"
@@ -56,8 +55,7 @@ export default function CountriesToolBar({
               variant="plain"
               color="neutral"
               onClick={clearSearch}
-              aria-label="Limpiar búsqueda"
-            >
+              aria-label="Limpiar búsqueda">
               <ClearIcon />
             </IconButton>
           ) : null
@@ -70,7 +68,11 @@ export default function CountriesToolBar({
       />
 
       {/* Actions */}
-      <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+      <Stack
+        direction="row"
+        spacing={1}
+        flexWrap="wrap"
+        justifyContent="flex-end">
         <Tooltip
           title={
             canAdd
@@ -78,8 +80,7 @@ export default function CountriesToolBar({
               : "No tienes permiso para crear. Solicítalo al administrador."
           }
           variant="solid"
-          placement="bottom-end"
-        >
+          placement="bottom-end">
           {/* wrapper para tooltip con disabled */}
           <span>
             <Button
@@ -88,8 +89,7 @@ export default function CountriesToolBar({
               disabled={!canAdd}
               aria-disabled={!canAdd}
               variant={canAdd ? "solid" : "soft"}
-              color={canAdd ? "primary" : "neutral"}
-            >
+              color={canAdd ? "primary" : "neutral"}>
               {addLabel}
             </Button>
           </span>

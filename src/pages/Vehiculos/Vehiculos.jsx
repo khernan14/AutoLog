@@ -42,8 +42,15 @@ export default function Vehiculos() {
   const canRestore = canAny("gestionar_vehiculos");
 
   const loadVehiculos = useCallback(async () => {
-    if (checkingSession) { setLoading(true); return; }
-    if (!canView) { setLoading(false); setError(null); return; }
+    if (checkingSession) {
+      setLoading(true);
+      return;
+    }
+    if (!canView) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -56,14 +63,21 @@ export default function Vehiculos() {
       }
     } catch (err) {
       const msg = (err?.message || "").toLowerCase();
-      const isNetwork = msg.includes("failed to fetch") || msg.includes("networkerror");
-      setError(isNetwork ? "No hay conexión con el servidor." : (err?.message || "Error desconocido."));
+      const isNetwork =
+        msg.includes("failed to fetch") || msg.includes("networkerror");
+      setError(
+        isNetwork
+          ? "No hay conexión con el servidor."
+          : err?.message || "Error desconocido."
+      );
     } finally {
       setLoading(false);
     }
   }, [checkingSession, canView]);
 
-  useEffect(() => { loadVehiculos(); }, [loadVehiculos]);
+  useEffect(() => {
+    loadVehiculos();
+  }, [loadVehiculos]);
 
   // ---- handlers CRUD con showToast ----
   const handleAddVehiculo = () => {
@@ -80,7 +94,10 @@ export default function Vehiculos() {
       showToast("No tienes permiso para editar vehículos.", "warning");
       return;
     }
-    const vehiculoTransformado = { ...vehiculo, id_ubicacion_actual: vehiculo.LocationID };
+    const vehiculoTransformado = {
+      ...vehiculo,
+      id_ubicacion_actual: vehiculo.LocationID,
+    };
     setEditVehiculo(vehiculoTransformado);
     setOpenModal(true);
   };
@@ -104,13 +121,18 @@ export default function Vehiculos() {
       try {
         const resp = await deleteVehiculo(id);
         if (resp && !resp.error) {
-          setVehiculos(prev => prev.map(v => (v.id === id ? { ...v, estado: "Inactivo" } : v)));
+          setVehiculos((prev) =>
+            prev.map((v) => (v.id === id ? { ...v, estado: "Inactivo" } : v))
+          );
           showToast("Vehículo inactivado correctamente", "success");
         } else {
           showToast("Error al inactivar el vehículo.", "danger");
         }
       } catch (err) {
-        showToast("Error de conexión al intentar inactivar el vehículo.", "danger");
+        showToast(
+          "Error de conexión al intentar inactivar el vehículo.",
+          "danger"
+        );
       }
     }
   };
@@ -134,13 +156,18 @@ export default function Vehiculos() {
       try {
         const resp = await restoreVehiculo(id);
         if (resp && !resp.error) {
-          setVehiculos(prev => prev.map(v => (v.id === id ? { ...v, estado: "Disponible" } : v)));
+          setVehiculos((prev) =>
+            prev.map((v) => (v.id === id ? { ...v, estado: "Disponible" } : v))
+          );
           showToast("Vehículo restaurado correctamente", "success");
         } else {
           showToast("Error al restaurar el vehículo.", "danger");
         }
       } catch (err) {
-        showToast("Error de conexión al intentar restaurar el vehículo.", "danger");
+        showToast(
+          "Error de conexión al intentar restaurar el vehículo.",
+          "danger"
+        );
       }
     }
   };
@@ -153,11 +180,13 @@ export default function Vehiculos() {
     try {
       if (vehiculo.id) {
         const resp = await actualizarVehiculo(vehiculo.id, vehiculo);
-        if (resp && !resp.error) showToast("Vehículo actualizado correctamente", "success");
+        if (resp && !resp.error)
+          showToast("Vehículo actualizado correctamente", "success");
         else showToast("Error al actualizar el vehículo.", "danger");
       } else {
         const resp = await addVehiculos(vehiculo);
-        if (resp && !resp.error) showToast("Vehículo agregado correctamente", "success");
+        if (resp && !resp.error)
+          showToast("Vehículo agregado correctamente", "success");
         else showToast("Error al agregar el vehículo.", "danger");
       }
     } catch (err) {
@@ -174,7 +203,10 @@ export default function Vehiculos() {
     const search = searchText.toLowerCase();
     return (vehiculos || []).filter((u) => {
       const matchesStatus = showInactive ? true : u.estado === "Disponible";
-      const matchesSearch = `${u.placa} ${u.marca} ${u.modelo} ${u.nombre_ubicacion}`.toLowerCase().includes(search);
+      const matchesSearch =
+        `${u.placa} ${u.marca} ${u.modelo} ${u.nombre_ubicacion}`
+          .toLowerCase()
+          .includes(search);
       return matchesStatus && matchesSearch;
     });
   }, [vehiculos, showInactive, searchText]);
@@ -190,7 +222,9 @@ export default function Vehiculos() {
 
   return (
     <Box p={2}>
-      <Card variant="plain" sx={{ p: 2, backgroundColor: "white" }}>
+      <Card
+        variant="plain"
+        sx={{ p: 2, backgroundColor: "background.surface" }}>
         {viewState !== "data" ? (
           <ResourceState
             state={viewState}
@@ -209,7 +243,9 @@ export default function Vehiculos() {
               setShowInactive={setShowInactive}
               canAdd={canCreate}
               addDisabledReason={
-                !canCreate ? "No tienes permiso para crear. Solicítalo al administrador." : undefined
+                !canCreate
+                  ? "No tienes permiso para crear. Solicítalo al administrador."
+                  : undefined
               }
             />
 
@@ -217,7 +253,9 @@ export default function Vehiculos() {
               <Box sx={{ p: 2 }}>
                 <ResourceState
                   state="empty"
-                  emptyTitle={vehiculos.length ? "Sin coincidencias" : "Sin vehículos"}
+                  emptyTitle={
+                    vehiculos.length ? "Sin coincidencias" : "Sin vehículos"
+                  }
                   emptyDescription={
                     vehiculos.length
                       ? "No encontramos vehículos con los filtros actuales."
@@ -243,7 +281,10 @@ export default function Vehiculos() {
 
       <VehiculoModal
         open={openModal}
-        onClose={() => { setOpenModal(false); setEditVehiculo(null); }}
+        onClose={() => {
+          setOpenModal(false);
+          setEditVehiculo(null);
+        }}
         initialValues={editVehiculo || undefined}
         onSubmit={handleSubmitVehiculo}
       />

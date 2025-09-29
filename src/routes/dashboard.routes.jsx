@@ -19,7 +19,7 @@ import Permissions from "@/pages/Administration/Permissions/Permissions";
 import NotificationGroupsPage from "@/pages/Administration/NotificationGroups/NotificationGroupsPage";
 // import Reports from "@/pages/Reports/ReportsPage.jsx";
 import ReportsRouter from "@/pages/Reports/ReportsRouter.jsx";
-import ConfigPage from "@/pages/Configuraciones/ConfigPage.jsx";
+// import ConfigPage from "@/pages/Configuraciones/ConfigPage.jsx";
 
 import ClientesList from "@/pages/Clientes/ClientesList.jsx";
 import ClienteDetail from "@/pages/Clientes/ClienteDetail.jsx";
@@ -47,6 +47,7 @@ import StatusAdminPage from "@/pages/SoporteAdmin/StatusAdminPage.jsx";
 
 import HelpSearchResults from "@/pages/HelpPage/HelpSearchResults.jsx";
 import Notificaciones from "@/pages/Notificaciones/Notificaciones.jsx";
+import SettingsPage from "@/pages/Settings/SettingsPage";
 // Wrapper de permiso
 // import { useAuth } from "@/context/AuthContext";
 // function RequirePermission({ children, permiso = "help_manage" }) {
@@ -88,7 +89,7 @@ export default function DashboardRoutes() {
           element={<NotificationGroupsPage />}
         />
         <Route path="reports" element={<ReportsRouter />} />
-        <Route path="configuraciones" element={<ConfigPage />} />
+        <Route path="configuraciones" element={<SettingsPage />} />
 
         {/* Clientes */}
         <Route path="clientes" element={<ClientesList />} />

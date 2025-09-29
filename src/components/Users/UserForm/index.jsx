@@ -446,7 +446,11 @@ export default function Users() {
         {/* Contenedor principal */}
         <Card
           variant="plain"
-          sx={{ overflowX: "auto", width: "100%", background: "white" }}>
+          sx={{
+            overflowX: "auto",
+            width: "100%",
+            background: "background.surface",
+          }}>
           {viewState !== "data" ? (
             <Box p={2}>{renderStatus()}</Box>
           ) : (
