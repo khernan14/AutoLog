@@ -19,6 +19,10 @@ import {
   Chip,
   Tooltip,
   CircularProgress,
+  Dropdown,
+  MenuButton,
+  Menu,
+  MenuItem,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -34,6 +38,8 @@ import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 
 import {
   getActivosGlobal,
@@ -55,6 +61,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 const ESTATUS = [
   "Activo",
@@ -79,6 +86,43 @@ const TIPOS = [
   "Celular",
   "Otro",
 ];
+
+// columnas para exportar
+const EXPORT_COLS = [
+  { label: "Código", key: "codigo" },
+  { label: "Nombre", key: "nombre" },
+  { label: "Tipo", key: "tipo" },
+  { label: "Modelo", key: "modelo", get: (r) => r.modelo || "" },
+  { label: "Serie", key: "serial_number", get: (r) => r.serial_number || "" },
+  { label: "Estatus", key: "estatus" },
+  {
+    label: "Destino",
+    key: "tipo_destino",
+    get: (r) => {
+      if (r.tipo_destino === "Cliente")
+        return `${r.cliente_nombre || ""} / ${r.site_nombre || ""}`.trim();
+      if (r.tipo_destino === "Bodega") return r.bodega_nombre || "";
+      if (r.tipo_destino === "Empleado") return "Asigando a Empleado";
+      return "—";
+    },
+  },
+  {
+    label: "Cliente",
+    key: "cliente_nombre",
+    get: (r) => r.cliente_nombre || "",
+  },
+  { label: "Site", key: "site_nombre", get: (r) => r.site_nombre || "" },
+  { label: "Bodega", key: "bodega_nombre", get: (r) => r.bodega_nombre || "" },
+  {
+    label: "Empleado",
+    key: "empleado_nombre",
+    get: (r) => r.empleado_nombre || "",
+  },
+];
+
+const filenameBase = `todos_los_activos_${new Date()
+  .toISOString()
+  .slice(0, 10)}`;
 
 export default function ActivosList() {
   const isMobile = useIsMobile(768);
@@ -120,6 +164,8 @@ export default function ActivosList() {
   const [openMover, setOpenMover] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
+
+  const [openExport, setOpenExport] = useState(false);
 
   // form data
   const [editing, setEditing] = useState(null);
@@ -557,7 +603,7 @@ export default function ActivosList() {
               <Option value="SinUbicacion">Sin ubicación</Option>
             </Select>
 
-            <Tooltip
+            {/* <Tooltip
               title={
                 canCreate
                   ? "Crear activo"
@@ -576,7 +622,14 @@ export default function ActivosList() {
                   Nuevo
                 </Button>
               </span>
-            </Tooltip>
+            </Tooltip> */}
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -777,7 +830,7 @@ export default function ActivosList() {
                         </Chip>
                       ) : r.tipo_destino === "Empleado" ? (
                         <Chip size="sm" variant="outlined" color="success">
-                          {r.empleado_nombre || `Empleado #${r.id_empleado}`}
+                          {"Empleado"}
                         </Chip>
                       ) : (
                         "—"
@@ -1102,6 +1155,18 @@ export default function ActivosList() {
           open={openHistorial}
           onClose={() => setOpenHistorial(false)}
           activo={activoSeleccionado}
+        />
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          columns={EXPORT_COLS}
+          defaultTitle={`Activos`}
+          defaultSheetName="Activos"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          includeGeneratedStamp
+          logoUrl="/newLogoTecnasa.png"
         />
       </Box>
     </Sheet>

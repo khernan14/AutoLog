@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PaginationLite from "@/components/common/PaginationLite";
 import { getKilometrajePorEmpleadoReport } from "@/services/ReportServices";
 import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 /* === Helpers UI === */
 const debounced = (fn, ms = 250) => {
@@ -75,6 +76,8 @@ export default function KilometrajePorEmpleado() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+
+  const [openExport, setOpenExport] = useState(false);
 
   // Sincroniza parámetros en URL (si range === 'all', no setearlo para URL limpia)
   useEffect(() => {
@@ -162,11 +165,16 @@ export default function KilometrajePorEmpleado() {
 
   // Columnas export (para utils/exporters)
   const columnsExport = [
-    { label: "#", get: (_r, i) => i + 1 },
+    {
+      label: "#",
+      key: "__rownum",
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
+    },
     { label: "Empleado", key: "nombre_empleado" },
     { label: "Puesto", key: "puesto" },
     {
       label: "Kilometraje total (km)",
+      key: "kilometraje_total",
       get: (r) => {
         const v = Number(r.kilometraje_total_recorrido);
         return Number.isFinite(v) ? v.toFixed(2) : "";
@@ -174,34 +182,9 @@ export default function KilometrajePorEmpleado() {
     },
   ];
 
-  const filenameBase = `kilometraje_por_empleado_${from || "all"}_a_${
-    to || "all"
-  }`;
-
-  // Exportar usando utils
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Kilometraje",
-      filename: `${filenameBase}.xlsx`,
-    });
-
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Kilometraje total por empleado",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: true,
-    });
+  const filenameBase = `kilometraje_por_empleado_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
 
   if (loading) {
     return (
@@ -341,28 +324,13 @@ export default function KilometrajePorEmpleado() {
             />
 
             {/* Exportar */}
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -453,6 +421,19 @@ export default function KilometrajePorEmpleado() {
             showFirstLast
           />
         </Stack>
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          pageRows={pageItems} // página actual
+          columns={columnsExport}
+          defaultTitle="Kilometraje por Empleado"
+          defaultSheetName="Kilometraje"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          includeGeneratedStamp
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Sheet>
     </Box>
   );

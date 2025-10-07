@@ -15,6 +15,10 @@ import {
   Chip,
   CircularProgress,
   Link as JoyLink,
+  Dropdown,
+  MenuButton,
+  Menu,
+  MenuItem,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -30,6 +34,8 @@ import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 
 import { Modal, ModalDialog } from "@mui/joy";
 
@@ -47,9 +53,12 @@ import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import useIsMobile from "../../hooks/useIsMobile";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
+import logoTecnasaWhite from "../../assets/newLogoTecnasa.png";
 
 // 🔹 NUEVO: servicio para obtener link público firmado
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
+import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 export default function BodegaDetail() {
   const { id } = useParams();
@@ -76,6 +85,8 @@ export default function BodegaDetail() {
   const [publicLink, setPublicLink] = useState(""); // 🔹 NUEVO
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
 
+  const [openExport, setOpenExport] = useState(false);
+
   // auth/perm
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
@@ -83,6 +94,19 @@ export default function BodegaDetail() {
     (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
+
+  const EXPORT_COLS = [
+    { label: "Código", key: "codigo" },
+    { label: "Nombre", key: "nombre" },
+    { label: "Tipo", key: "tipo" },
+    { label: "Modelo", key: "modelo", get: (r) => r.modelo || "" },
+    { label: "Serie", key: "serial_number", get: (r) => r.serial_number || "" },
+    { label: "Estatus", key: "estatus" },
+  ];
+
+  const filenameBase = `kilometraje_por_empleado_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
 
   // permisos (ajusta si usas otros nombres)
   const canViewDetail = can("ver_bodegas");
@@ -201,12 +225,6 @@ export default function BodegaDetail() {
     if (!qrRef.current || !activoQR) return;
     // PNG a alta resolución (usa exportScale de StyledQR)
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
-  };
-
-  const descargarSVG = () => {
-    if (!qrRef.current || !activoQR) return;
-    // Vector perfecto para imprenta
-    qrRef.current.download("svg", `QR_${activoQR.codigo}`);
   };
 
   // filtro
@@ -387,6 +405,13 @@ export default function BodegaDetail() {
                 </Button>
               </span>
             </Tooltip>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -723,6 +748,18 @@ export default function BodegaDetail() {
             </ModalDialog>
           </Modal>
         )}
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          columns={EXPORT_COLS}
+          defaultTitle={`Activos de ${bodega?.nombre}`}
+          defaultSheetName="Consumo"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          includeGeneratedStamp
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Box>
     </Sheet>
   );

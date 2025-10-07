@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PaginationLite from "@/components/common/PaginationLite";
 import { getConsumoCombustibleVehiculoReport } from "@/services/ReportServices";
 import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 /* === Helpers === */
 const debounced = (fn, ms = 250) => {
@@ -75,6 +76,8 @@ export default function ConsumoCombustibleVehiculo() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+
+  const [openExport, setOpenExport] = useState(false);
 
   // sync URL (evita ensuciar con 'all')
   useEffect(() => {
@@ -161,44 +164,27 @@ export default function ConsumoCombustibleVehiculo() {
 
   // columnas para utils/exporters
   const columnsExport = [
-    { label: "#", get: (_r, i) => i + 1 },
+    {
+      label: "#",
+      key: "__rownum",
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
+    },
     { label: "Marca", key: "marca" },
     { label: "Modelo", key: "modelo" },
     { label: "Placa", key: "placa" },
     {
       label: "Consumo promedio (%)",
+      key: "promedio_consumo_porcentaje",
       get: (r) => {
         const v = Number(r.promedio_consumo_porcentaje);
         return Number.isFinite(v) ? v.toFixed(2) : "";
       },
     },
   ];
-  const filenameBase = `consumo_combustible_${from || "all"}_a_${to || "all"}`;
 
-  // exportar con utils
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Consumo",
-      filename: `${filenameBase}.xlsx`,
-    });
-
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Consumo promedio de combustible por vehículo",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: true,
-    });
+  const filenameBase = `kilometraje_por_empleado_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
 
   if (loading) {
     return (
@@ -338,28 +324,13 @@ export default function ConsumoCombustibleVehiculo() {
             />
 
             {/* Exportar */}
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -452,6 +423,19 @@ export default function ConsumoCombustibleVehiculo() {
             showFirstLast
           />
         </Stack>
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          pageRows={pageItems} // página actual
+          columns={columnsExport}
+          defaultTitle="Consumo promedio de combustible por vehículo"
+          defaultSheetName="Consumo"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          includeGeneratedStamp
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Sheet>
     </Box>
   );

@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PaginationLite from "@/components/common/PaginationLite";
 import { getEmpleadosMasSalidasReport } from "@/services/ReportServices";
 import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 /* === Helpers === */
 const debounced = (fn, ms = 250) => {
@@ -71,6 +72,8 @@ export default function EmpleadosMasSalidas() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+
+  const [openExport, setOpenExport] = useState(false);
 
   // sync URL (no escribimos 'all' para mantener limpia)
   useEffect(() => {
@@ -157,42 +160,21 @@ export default function EmpleadosMasSalidas() {
 
   // columnas export (para utils/exporters)
   const columnsExport = [
-    { label: "#", get: (_r, i) => i + 1 },
+    {
+      label: "#",
+      key: "__rownum",
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1, // o solo i+1 si quieres reiniciar
+    },
     { label: "Empleado", key: "nombre_empleado" },
     { label: "Puesto", key: "puesto" },
     {
       label: "Total de salidas",
-      get: (r) => Number(r.total_salidas ?? 0),
+      key: "total_salidas" /* type sugerido: number */,
     },
   ];
   const filenameBase = `empleados_mas_salidas_${from || "all"}_a_${
     to || "all"
   }`;
-
-  // exportaciones
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Empleados",
-      filename: `${filenameBase}.xlsx`,
-    });
-
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Empleados con más salidas",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: false,
-    });
 
   if (loading) {
     return (
@@ -332,28 +314,13 @@ export default function EmpleadosMasSalidas() {
             />
 
             {/* Exportar */}
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -444,6 +411,18 @@ export default function EmpleadosMasSalidas() {
             showFirstLast
           />
         </Stack>
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          pageRows={pageItems} // página actual
+          columns={columnsExport}
+          defaultTitle="Empleados con Más Salidas"
+          defaultSheetName="empleados_mas_salidas"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Sheet>
     </Box>
   );

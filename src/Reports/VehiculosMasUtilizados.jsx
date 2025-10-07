@@ -24,6 +24,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PaginationLite from "@/components/common/PaginationLite";
 import { getVehiculosMasUtilizadosReport } from "@/services/ReportServices";
 import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 /** Utils */
 const debounced = (fn, ms = 250) => {
@@ -46,6 +47,12 @@ export default function VehiculosMasUtilizados() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [openExport, setOpenExport] = useState(false);
+
+  const fileBase = `vehiculos_mas_utilizados`;
+  const pageTitle = "Vehículos más utilizados";
+  const sheetName = "Vehículos";
+  const logoUrl = "/newLogoTecnasa.png";
 
   // sincroniza q/p en URL (sin recargar)
   useEffect(() => {
@@ -112,41 +119,18 @@ export default function VehiculosMasUtilizados() {
   const columnsExport = [
     {
       label: "#",
-      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
+      key: "__rownum",
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1, // o solo i+1 si quieres reiniciar
     },
     { label: "Marca", key: "marca" },
     { label: "Modelo", key: "modelo" },
     { label: "Placa", key: "placa" },
-    { label: "Total de usos", key: "total_usos" },
+    { label: "Total de usos", key: "total_usos" /* type sugerido: number */ },
   ];
 
   const filenameBase = `vehiculos_mas_utilizados_${new Date()
     .toISOString()
     .slice(0, 10)}`;
-
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Vehículos",
-      filename: `${filenameBase}.xlsx`,
-    });
-
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Vehículos más utilizados",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: true,
-    });
 
   if (loading) {
     return (
@@ -221,28 +205,13 @@ export default function VehiculosMasUtilizados() {
               sx={{ minWidth: { xs: 220, sm: 280 } }}
             />
 
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -336,6 +305,18 @@ export default function VehiculosMasUtilizados() {
             showFirstLast
           />
         </Stack>
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          pageRows={pageItems} // página actual
+          columns={columnsExport}
+          defaultTitle="Vehículos más utilizados"
+          defaultSheetName="Vehículos"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="landscape"
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Sheet>
     </Box>
   );

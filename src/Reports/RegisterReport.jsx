@@ -9,16 +9,11 @@ import {
   Input,
   CircularProgress,
   Alert,
-  Dropdown,
-  Menu,
-  MenuButton,
-  MenuItem,
   Chip,
 } from "@mui/joy";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 
 import PaginationLite from "@/components/common/PaginationLite";
@@ -26,9 +21,11 @@ import ReportHeader from "@/components/ComponentsReport/GeneralComponents/Report
 import ReportCard from "@/components/ComponentsReport/RegisterReport/ReportCard.jsx";
 import ReportDetailModal from "@/components/ComponentsReport/RegisterReport/ReportDetailModal.jsx";
 import { getRegisterReport } from "@/services/ReportServices";
-import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
 
-/* === Helpers === */
+// ⬇️ Modal de exportación avanzado
+import ExportDialog from "@/components/Exports/ExportDialog";
+
+// ===== Helpers =====
 const debounced = (fn, ms = 250) => {
   let t;
   return (...args) => {
@@ -55,19 +52,14 @@ export default function RegisterReport() {
   const { search } = useLocation();
   const qs = useMemo(() => new URLSearchParams(search), [search]);
 
-  // Texto búsqueda (URL param: q)
+  // Estado de filtros
   const [query, setQuery] = useState(qs.get("q") || "");
-
-  // Rango de fechas (URL param: range)  'all' | 'today' | '7d' | 'month' | 'custom'
-  const [range, setRange] = useState(qs.get("range") || "all");
-  // Fechas visibles solo en 'custom' (URL params: from, to)
+  const [range, setRange] = useState(qs.get("range") || "all"); // 'all' | 'today' | '7d' | 'month' | 'custom'
   const [from, setFrom] = useState(qs.get("from") || "");
   const [to, setTo] = useState(qs.get("to") || "");
+  const [status, setStatus] = useState(qs.get("status") || "todos"); // 'todos' | 'activos' | 'finalizados'
 
-  // Filtro de estado (URL param: status) 'todos' | 'activos' | 'finalizados'
-  const [status, setStatus] = useState(qs.get("status") || "todos");
-
-  // Paginación (URL param: p)
+  // Paginación
   const [page, setPage] = useState(Number(qs.get("p") || 1));
   const [rowsPerPage] = useState(9);
 
@@ -76,11 +68,14 @@ export default function RegisterReport() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // Modal
+  // Modal detalle
   const [selectedRegistro, setSelectedRegistro] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Sync URL (no escribimos 'all' ni 'todos' para mantener limpia)
+  // ⬇️ Modal exportación
+  const [exportOpen, setExportOpen] = useState(false);
+
+  // Sync URL
   useEffect(() => {
     const params = new URLSearchParams(search);
     query ? params.set("q", query) : params.delete("q");
@@ -93,7 +88,7 @@ export default function RegisterReport() {
     window.history.replaceState(null, "", s ? `?${s}` : "");
   }, [query, page, range, from, to, status, search]);
 
-  // Presets de rango (al cambiar range que no sea 'custom', calculamos from/to)
+  // Presets de rango
   useEffect(() => {
     if (range === "custom") return;
     if (range === "all") {
@@ -145,7 +140,7 @@ export default function RegisterReport() {
     }, 250)
   ).current;
 
-  // Filtros front (texto + estado + fechas si el backend no filtrara)
+  // Filtrado front
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -153,7 +148,6 @@ export default function RegisterReport() {
     const toTs = to ? new Date(to + "T23:59:59").getTime() : null;
 
     return (raw || []).filter((r) => {
-      // texto
       const textOk =
         !q ||
         [
@@ -166,11 +160,9 @@ export default function RegisterReport() {
           .some((s) => s.includes(q));
       if (!textOk) return false;
 
-      // estado
       if (status === "activos" && r.fecha_regreso) return false;
       if (status === "finalizados" && !r.fecha_regreso) return false;
 
-      // rango
       if (!fromTs && !toTs) return true;
       const salidaTs = r.fecha_salida ? new Date(r.fecha_salida).getTime() : 0;
       if (fromTs && salidaTs < fromTs) return false;
@@ -180,7 +172,7 @@ export default function RegisterReport() {
     });
   }, [raw, query, status, from, to]);
 
-  // Paginación
+  // Paginación UI (las exportaciones usan "filtered" completo)
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const pageSafe = Math.min(Math.max(page, 1), totalPages);
   const pageItems = useMemo(() => {
@@ -188,11 +180,60 @@ export default function RegisterReport() {
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, pageSafe, rowsPerPage]);
 
-  // Handlers UI
-  const handleCardClick = (registro) => {
-    setSelectedRegistro(registro);
-    setModalOpen(true);
-  };
+  // Columnas para exportadores/dialog
+  const columnsExport = [
+    // El ExportDialog ya soporta columna de índice “#” por su opción includeIndex,
+    // así que NO es necesario añadir aquí una columna manual.
+    {
+      label: "Empleado",
+      key: "empleado.nombre",
+      get: (r) => r.empleado?.nombre || "",
+    },
+    {
+      label: "Vehículo",
+      key: `vehiculo.marca - vehicle.modelo`,
+      get: (r) => `${r.vehiculo?.marca || ""} ${r.vehiculo?.modelo || ""}`,
+    },
+    {
+      label: "Placa",
+      key: "vehiculo.placa",
+      get: (r) => r.vehiculo?.placa || "",
+    },
+    {
+      label: "F. Salida",
+      key: "fecha_salida",
+      get: (r) => fmtDateTime(r.fecha_salida),
+    },
+    {
+      label: "F. Regreso",
+      key: "fecha_regreso",
+      get: (r) => fmtDateTime(r.fecha_regreso),
+    },
+    { label: "Km Salida", key: "km_salida" },
+    { label: "Km Regreso", key: "km_regreso" },
+    {
+      label: "Comb. Salida",
+      key: "combustible_salida",
+      get: (r) =>
+        typeof r.combustible_salida === "number"
+          ? `${r.combustible_salida}%`
+          : "—",
+    },
+    {
+      label: "Comb. Regreso",
+      key: "combustible_regreso",
+      get: (r) =>
+        typeof r.combustible_regreso === "number"
+          ? `${r.combustible_regreso}%`
+          : "—",
+    },
+    { label: "Coment. Salida", key: "comentario_salida" },
+    { label: "Coment. Regreso", key: "comentario_regreso" },
+  ];
+
+  const filenameBase = `registros_uso_${from || "all"}_a_${to || "all"}_${
+    status || "todos"
+  }`;
 
   const clearFilters = () => {
     setQuery("");
@@ -203,62 +244,7 @@ export default function RegisterReport() {
     setPage(1);
   };
 
-  // Columnas para exportadores
-  const columnsExport = [
-    { label: "Empleado", get: (r) => r.empleado?.nombre || "" },
-    {
-      label: "Vehículo",
-      get: (r) => `${r.vehiculo?.marca || ""} ${r.vehiculo?.modelo || ""}`,
-    },
-    { label: "Placa", get: (r) => r.vehiculo?.placa || "" },
-    { label: "F. Salida", get: (r) => fmtDateTime(r.fecha_salida) },
-    { label: "F. Regreso", get: (r) => fmtDateTime(r.fecha_regreso) },
-    { label: "Km Salida", key: "km_salida" },
-    { label: "Km Regreso", key: "km_regreso" },
-    {
-      label: "Comb. Salida",
-      get: (r) =>
-        typeof r.combustible_salida === "number"
-          ? `${r.combustible_salida}%`
-          : "—",
-    },
-    {
-      label: "Comb. Regreso",
-      get: (r) =>
-        typeof r.combustible_regreso === "number"
-          ? `${r.combustible_regreso}%`
-          : "—",
-    },
-    { label: "Coment. Salida", key: "comentario_salida" },
-    { label: "Coment. Regreso", key: "comentario_regreso" },
-  ];
-  const filenameBase = `registros_uso_${from || "all"}_a_${to || "all"}_${
-    status || "todos"
-  }`;
-
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Registros",
-      filename: `${filenameBase}.xlsx`,
-    });
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Registro de uso de vehículos",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: true,
-    });
-
-  /* ============ UI ============ */
+  // ======= UI =======
   if (loading) {
     return (
       <Box
@@ -324,7 +310,7 @@ export default function RegisterReport() {
             direction={{ xs: "column", md: "row" }}
             spacing={1}
             alignItems="center">
-            {/* Presets de rango */}
+            {/* Chips de rango */}
             <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
               <Chip
                 variant={range === "all" ? "solid" : "soft"}
@@ -358,7 +344,7 @@ export default function RegisterReport() {
               </Chip>
             </Stack>
 
-            {/* Fechas solo en 'custom' */}
+            {/* Fechas custom */}
             {range === "custom" && (
               <Stack direction="row" spacing={0.75} alignItems="center">
                 <Input
@@ -385,7 +371,7 @@ export default function RegisterReport() {
               </Stack>
             )}
 
-            {/* Filtro de estado */}
+            {/* Estado */}
             <Stack direction="row" spacing={0.5}>
               <Chip
                 variant={status === "todos" ? "solid" : "soft"}
@@ -425,29 +411,14 @@ export default function RegisterReport() {
               sx={{ minWidth: { xs: 220, md: 260 } }}
             />
 
-            {/* Exportar */}
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            {/* Botón Exportar -> abre modal */}
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setExportOpen(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar…
+            </Button>
 
             <Button variant="plain" onClick={clearFilters}>
               Limpiar
@@ -498,7 +469,6 @@ export default function RegisterReport() {
             </b>{" "}
             registros
           </Typography>
-
           <PaginationLite
             page={pageSafe}
             count={totalPages}
@@ -514,6 +484,28 @@ export default function RegisterReport() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         registro={selectedRegistro}
+      />
+
+      {/* ====== Modal de exportación ====== */}
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        // datos completos (no paginados)
+        rows={filtered}
+        // columnas para selección/reorden (admite key o get)
+        columns={columnsExport}
+        // valores por defecto
+        defaultTitle="Registro de uso de vehículos"
+        defaultFilename={`${filenameBase}`}
+        defaultSheetName="Registros"
+        defaultFormat="xlsx" // "xlsx" | "pdf" | "csv"
+        defaultOrientation="landscape" // "portrait" | "landscape"
+        includeGeneratedStampDefault // muestra “Generado: …” en el pie
+        includeIndexDefault // muestra columna “#” en exportación
+        // opcional: deshabilitar formatos si no quieres mostrarlos
+        // disableCSV
+        // disablePDF
+        // disableXLSX
       />
     </Box>
   );

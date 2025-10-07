@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import PaginationLite from "@/components/common/PaginationLite";
 import { getRegistrosPorUbicacionReport } from "@/services/ReportServices";
 import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
+import ExportDialog from "@/components/Exports/ExportDialog";
 
 /* === Helpers UI === */
 const debounced = (fn, ms = 250) => {
@@ -73,6 +74,8 @@ export default function RegistrosPorUbicacion() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+
+  const [openExport, setOpenExport] = useState(false);
 
   // Sincroniza parámetros en URL (si range === 'all', no setearlo para URL limpia)
   useEffect(() => {
@@ -174,45 +177,32 @@ export default function RegistrosPorUbicacion() {
 
   // Columnas para export (formato de exporters.js)
   const columnsExport = [
-    { label: "#", get: (_r, i) => i + 1 },
+    {
+      label: "#",
+      key: "__rownum",
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
+    },
     { label: "Empleado", key: "nombre_empleado" },
     { label: "Vehículo", key: "vehiculo" },
     { label: "Ubicación salida", key: "ubicacion_salida" },
     { label: "Ubicación regreso", key: "ubicacion_regreso" },
-    { label: "F. salida", get: (r) => fmtDateTime(r.fecha_salida) },
-    { label: "F. regreso", get: (r) => fmtDateTime(r.fecha_regreso) },
+    {
+      label: "F. salida",
+      key: "fecha_salida",
+      get: (r) => fmtDateTime(r.fecha_salida),
+    },
+    {
+      label: "F. regreso",
+      key: "fecha_regreso",
+      get: (r) => fmtDateTime(r.fecha_regreso),
+    },
     { label: "Km salida", key: "km_salida" },
     { label: "Km regreso", key: "km_regreso" },
   ];
 
-  const filenameBase = `registros_por_ubicacion_${from || "all"}_a_${
-    to || "all"
-  }`;
-
-  // Exportar usando utils
-  const handleExportCSV = () =>
-    exportToCSV({
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.csv`,
-    });
-
-  const handleExportXLSX = () =>
-    exportToXLSX({
-      rows: filtered,
-      columns: columnsExport,
-      sheetName: "Registros",
-      filename: `${filenameBase}.xlsx`,
-    });
-
-  const handleExportPDF = () =>
-    exportToPDF({
-      title: "Registros por ubicación",
-      rows: filtered,
-      columns: columnsExport,
-      filename: `${filenameBase}.pdf`,
-      landscape: true,
-    });
+  const filenameBase = `kilometraje_por_empleado_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
 
   if (loading) {
     return (
@@ -356,28 +346,13 @@ export default function RegistrosPorUbicacion() {
             />
 
             {/* Exportar */}
-            <Dropdown>
-              <MenuButton
-                variant="soft"
-                endDecorator={<MoreHorizRoundedIcon />}
-                sx={{ borderRadius: "999px" }}>
-                Exportar
-              </MenuButton>
-              <Menu placement="bottom-end">
-                <MenuItem onClick={handleExportCSV}>
-                  <DownloadRoundedIcon />
-                  CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportXLSX}>
-                  <DownloadRoundedIcon />
-                  Excel (.xlsx)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                  <DownloadRoundedIcon />
-                  PDF
-                </MenuItem>
-              </Menu>
-            </Dropdown>
+            <Button
+              variant="soft"
+              startDecorator={<DownloadRoundedIcon />}
+              onClick={() => setOpenExport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Exportar
+            </Button>
           </Stack>
         </Stack>
 
@@ -476,6 +451,19 @@ export default function RegistrosPorUbicacion() {
             showFirstLast
           />
         </Stack>
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={filtered} // todo el filtro
+          pageRows={pageItems} // página actual
+          columns={columnsExport}
+          defaultTitle="Registros por ubicación"
+          defaultSheetName="Registros_Por_Ubicacion"
+          defaultFilenameBase={filenameBase}
+          defaultOrientation="portrait"
+          includeGeneratedStamp
+          logoUrl="/newLogoTecnasa.png"
+        />
       </Sheet>
     </Box>
   );
