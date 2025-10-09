@@ -218,8 +218,8 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
     formData.append("combustible_salida", parseInt(fuelActual));
     formData.append("comentario_salida", observations);
 
-    images.forEach((img) => {
-      formData.append("files", img.file); // nombre debe coincidir con el usado en multer
+    images.forEach((file) => {
+      formData.append("files", file);
     });
 
     try {
@@ -370,7 +370,7 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
             />
           </FormControl>
 
-          <UploadImages images={images} setImages={setImages} />
+          <UploadImages value={images} onChange={setImages} />
         </Stack>
 
         <CardOverflow

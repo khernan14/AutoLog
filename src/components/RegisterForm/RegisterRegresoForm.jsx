@@ -194,8 +194,8 @@ export default function RegisterRegresoForm({
     formData.append("combustible_regreso", parseInt(fuel));
     formData.append("comentario_regreso", observations);
 
-    images.forEach((img) => {
-      formData.append("files", img.file); // nombre debe coincidir con el usado en multer
+    images.forEach((file) => {
+      formData.append("files", file);
     });
 
     try {
@@ -400,7 +400,7 @@ export default function RegisterRegresoForm({
                   </FormControl>
                 </Stack>
                 {/* Otro campo */}
-                <UploadImages images={images} setImages={setImages} />
+                <UploadImages value={images} onChange={setImages} />
               </Stack>
             </Stack>
           </Stack>
