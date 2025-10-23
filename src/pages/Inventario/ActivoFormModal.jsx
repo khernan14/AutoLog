@@ -19,7 +19,7 @@ const ESTATUS = ["Activo", "Inactivo", "Arrendado", "En Mantenimiento"];
 const TIPOS = [
   "Impresora",
   "ATM",
-  "Escaner",
+  "Escáner",
   "UPS",
   "Silla",
   "Mueble",

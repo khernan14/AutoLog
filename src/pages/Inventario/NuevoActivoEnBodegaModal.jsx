@@ -27,7 +27,7 @@ const ESTATUS = [
 const TIPOS = [
   "Impresora",
   "ATM",
-  "Escaner",
+  "Escáner",
   "UPS",
   "Silla",
   "Mueble",
