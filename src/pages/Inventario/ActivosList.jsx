@@ -1,3 +1,4 @@
+// src/pages/Inventario/ActivosList.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   Box,
@@ -18,28 +19,16 @@ import {
   IconButton,
   Chip,
   Tooltip,
-  CircularProgress,
-  Dropdown,
-  MenuButton,
-  Menu,
-  MenuItem,
 } from "@mui/joy";
 
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import QrCodeRoundedIcon from "@mui/icons-material/QrCodeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
-import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
-import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
-import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 import {
   getActivosGlobal,
@@ -55,13 +44,17 @@ import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
 import StyledQR from "../../components/QRCode/StyledQR";
-import StatusCard from "../../components/common/StatusCard";
 import useIsMobile from "../../hooks/useIsMobile";
-
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 import ExportDialog from "@/components/Exports/ExportDialog";
+
+// ✅ Estado de vista unificado
+import ResourceState from "../../components/common/ResourceState";
+import { getViewState } from "../../utils/viewState";
+// ✅ Paginación ligera
+import PaginationLite from "@/components/common/PaginationLite";
 
 const ESTATUS = [
   "Activo",
@@ -147,7 +140,7 @@ export default function ActivosList() {
   const [clientes, setClientes] = useState([]);
   const [sitesDestino, setSitesDestino] = useState([]);
   const [bodegas, setBodegas] = useState([]);
-  const [empleados, setEmpleados] = useState([]); // 👈 NUEVO
+  const [empleados, setEmpleados] = useState([]);
 
   // ui state
   const [loading, setLoading] = useState(true);
@@ -164,7 +157,6 @@ export default function ActivosList() {
   const [openMover, setOpenMover] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
-
   const [openExport, setOpenExport] = useState(false);
 
   // form data
@@ -186,12 +178,18 @@ export default function ActivosList() {
   const [clienteDestino, setClienteDestino] = useState("");
   const [siteDestino, setSiteDestino] = useState("");
   const [bodegaDestino, setBodegaDestino] = useState("");
-  const [empleadoDestino, setEmpleadoDestino] = useState(""); // 👈 NUEVO
+  const [empleadoDestino, setEmpleadoDestino] = useState("");
   const [motivo, setMotivo] = useState("");
 
   // QR
   const [activoQR, setActivoQR] = useState(null);
   const [publicLink, setPublicLink] = useState("");
+
+  // --- ORDEN & PAGINACIÓN ---
+  const [sortKey, setSortKey] = useState("nombre");
+  const [sortDir, setSortDir] = useState("asc");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
 
   const loadActivos = useCallback(async () => {
     if (checkingSession) {
@@ -251,6 +249,74 @@ export default function ActivosList() {
         .catch(() => setEmpleados([]));
     }
   }, [openMover, tipoDestino]);
+
+  // resetear página si cambian filtros / búsqueda / dataset
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, typeFilter, ubicacionFilter, rows.length]);
+
+  // ---- Helpers de orden/filtrado/paginación ----
+  const filtered = useMemo(() => {
+    const s = (search || "").toLowerCase();
+    return (rows || []).filter((r) => {
+      const matchSearch =
+        (r.codigo || "").toLowerCase().includes(s) ||
+        (r.nombre || "").toLowerCase().includes(s) ||
+        (r.modelo || "").toLowerCase().includes(s) ||
+        (r.serial_number || "").toLowerCase().includes(s);
+
+      const matchStatus = !statusFilter || r.estatus === statusFilter;
+      const matchType = !typeFilter || r.tipo === typeFilter;
+      const matchUbicacion =
+        !ubicacionFilter ||
+        (ubicacionFilter === "Cliente" && r.tipo_destino === "Cliente") ||
+        (ubicacionFilter === "Bodega" && r.tipo_destino === "Bodega") ||
+        (ubicacionFilter === "Empleado" && r.tipo_destino === "Empleado") ||
+        (ubicacionFilter === "SinUbicacion" && !r.tipo_destino);
+
+      return matchSearch && matchStatus && matchType && matchUbicacion;
+    });
+  }, [rows, search, statusFilter, typeFilter, ubicacionFilter]);
+
+  function getDestinoText(r) {
+    if (r.tipo_destino === "Cliente") {
+      return `${r.cliente_nombre || ""} / ${r.site_nombre || ""}`.trim();
+    }
+    if (r.tipo_destino === "Bodega") return r.bodega_nombre || "";
+    if (r.tipo_destino === "Empleado") return r.empleado_nombre || "";
+    return "";
+  }
+
+  const sortedRows = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const va =
+        (sortKey === "_destino" ? getDestinoText(a) : a?.[sortKey]) ?? "";
+      const vb =
+        (sortKey === "_destino" ? getDestinoText(b) : b?.[sortKey]) ?? "";
+      const A = va.toString().toLowerCase();
+      const B = vb.toString().toLowerCase();
+      if (A < B) return sortDir === "asc" ? -1 : 1;
+      if (A > B) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / perPage));
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return sortedRows.slice(start, start + perPage);
+  }, [sortedRows, page, perPage]);
+
+  function handleSort(key) {
+    if (!key) return;
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   // ---- Acciones
   async function abrirQR(row) {
@@ -352,7 +418,7 @@ export default function ActivosList() {
     setClienteDestino("");
     setSiteDestino("");
     setBodegaDestino("");
-    setEmpleadoDestino(""); // 👈
+    setEmpleadoDestino("");
     setMotivo("");
     setOpenMover(true);
   }
@@ -360,7 +426,6 @@ export default function ActivosList() {
   async function onMover(e) {
     e.preventDefault();
 
-    // Validación rápida en UI
     if (
       (tipoDestino === "Cliente" && (!clienteDestino || !siteDestino)) ||
       (tipoDestino === "Bodega" && !bodegaDestino) ||
@@ -377,9 +442,8 @@ export default function ActivosList() {
         tipo_destino: tipoDestino,
         id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
         id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
-        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null, // 👈
+        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null,
         motivo,
-        // Usa el mismo campo que espera tu backend (id_usuario)
         usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
       });
       showToast("Activo movido correctamente", "success");
@@ -401,114 +465,14 @@ export default function ActivosList() {
     setOpenHistorial(true);
   }
 
-  // ---- Filtro
-  const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
-    return (rows || []).filter((r) => {
-      const matchSearch =
-        (r.codigo || "").toLowerCase().includes(s) ||
-        (r.nombre || "").toLowerCase().includes(s) ||
-        (r.modelo || "").toLowerCase().includes(s) ||
-        (r.serial_number || "").toLowerCase().includes(s);
-
-      const matchStatus = !statusFilter || r.estatus === statusFilter;
-      const matchType = !typeFilter || r.tipo === typeFilter;
-      const matchUbicacion =
-        !ubicacionFilter ||
-        (ubicacionFilter === "Cliente" && r.tipo_destino === "Cliente") ||
-        (ubicacionFilter === "Bodega" && r.tipo_destino === "Bodega") ||
-        (ubicacionFilter === "Empleado" && r.tipo_destino === "Empleado") ||
-        (ubicacionFilter === "SinUbicacion" && !r.tipo_destino);
-
-      return matchSearch && matchStatus && matchType && matchUbicacion;
-    });
-  }, [rows, search, statusFilter, typeFilter, ubicacionFilter]);
-
-  // ---- View state
-  const viewState = checkingSession
-    ? "checking"
-    : !canView
-    ? "no-permission"
-    : error
-    ? "error"
-    : !loading && filtered.length === 0
-    ? "empty"
-    : loading
-    ? "loading"
-    : "data";
-
-  const renderStatus = () => {
-    if (viewState === "checking") {
-      return (
-        <StatusCard
-          icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
-        />
-      );
-    }
-    if (viewState === "no-permission") {
-      return (
-        <StatusCard
-          color="danger"
-          icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver activos"
-          description="Consulta con un administrador para obtener acceso."
-        />
-      );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
-      return (
-        <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
-          }
-          description={error}
-          actions={
-            <Button
-              startDecorator={<RestartAltRoundedIcon />}
-              onClick={loadActivos}
-              variant="soft">
-              Reintentar
-            </Button>
-          }
-        />
-      );
-    }
-    if (viewState === "empty") {
-      return (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="No se encontraron activos"
-          description="Ajusta los filtros o crea un activo nuevo."
-        />
-      );
-    }
-    if (viewState === "loading") {
-      return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando…</Typography>
-          </Stack>
-        </Sheet>
-      );
-    }
-    return null;
-  };
+  // ---- Estado de vista unificado
+  const viewState = getViewState({
+    checkingSession,
+    canView,
+    error,
+    loading,
+    hasData: Array.isArray(sortedRows) && sortedRows.length > 0,
+  });
 
   // ---- UI
   return (
@@ -536,7 +500,7 @@ export default function ActivosList() {
           spacing={1.5}
           mb={2}>
           <Typography level="h4">
-            Inventario: Activos Globales ({rows.length})
+            Inventario: Activos Globales ({sortedRows.length})
           </Typography>
 
           <Stack
@@ -599,30 +563,10 @@ export default function ActivosList() {
               <Option value="">Todas</Option>
               <Option value="Cliente">Clientes</Option>
               <Option value="Bodega">Bodegas</Option>
-              <Option value="Empleado">Empleados</Option> {/* 👈 NUEVO */}
+              <Option value="Empleado">Empleados</Option>
               <Option value="SinUbicacion">Sin ubicación</Option>
             </Select>
 
-            {/* <Tooltip
-              title={
-                canCreate
-                  ? "Crear activo"
-                  : "No tienes permiso para crear. Solicítalo al administrador."
-              }
-              variant="solid"
-              placement="bottom-end">
-              <span>
-                <Button
-                  startDecorator={<AddRoundedIcon />}
-                  onClick={newActivo}
-                  disabled={!canCreate}
-                  aria-disabled={!canCreate}
-                  variant={canCreate ? "solid" : "soft"}
-                  color={canCreate ? "primary" : "neutral"}>
-                  Nuevo
-                </Button>
-              </span>
-            </Tooltip> */}
             <Button
               variant="soft"
               startDecorator={<DownloadRoundedIcon />}
@@ -633,20 +577,28 @@ export default function ActivosList() {
           </Stack>
         </Stack>
 
-        {/* Contenedor principal */}
         <Card
-          variant="plain"
+          variant="outlined"
           sx={{
             overflowX: "auto",
             width: "100%",
             background: "background.surface",
           }}>
+          {/* Estado de recurso reutilizable */}
           {viewState !== "data" ? (
-            <Box p={2}>{renderStatus()}</Box>
+            <Box p={2}>
+              <ResourceState
+                state={viewState}
+                error={error}
+                onRetry={loadActivos}
+                emptyTitle="Sin activos"
+                emptyDescription="Ajusta los filtros o crea un activo nuevo."
+              />
+            </Box>
           ) : isMobile ? (
             // ====== Móvil: tarjetas ======
             <Stack spacing={2} p={2}>
-              {filtered.map((r) => (
+              {pageRows.map((r) => (
                 <Sheet
                   key={r.id}
                   variant="outlined"
@@ -765,142 +717,209 @@ export default function ActivosList() {
             </Stack>
           ) : (
             // ====== Escritorio: tabla ======
-            <Table
-              hoverRow
-              size="sm"
-              stickyHeader
-              sx={{
-                minWidth: 980,
-                "--TableCell-headBackground":
-                  "var(--joy-palette-background-level5)",
-                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
-                "--TableCell-headFontWeight": 600,
-                "--TableCell-headBorderBottom":
-                  "1px solid var(--joy-palette-divider)",
-                "--TableRow-hoverBackground":
-                  "var(--joy-palette-background-level1)",
-              }}>
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Tipo</th>
-                  <th>Modelo</th>
-                  <th>Serie</th>
-                  <th>Estatus</th>
-                  <th>Destino</th>
-                  <th style={{ width: 180 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.codigo}</td>
-                    <td>{r.nombre}</td>
-                    <td>{r.tipo}</td>
-                    <td>{r.modelo || "—"}</td>
-                    <td>{r.serial_number || "—"}</td>
-                    <td>
-                      <Chip
-                        size="sm"
-                        variant="soft"
-                        color={
-                          r.estatus === "Activo"
-                            ? "success"
-                            : r.estatus === "Arrendado"
-                            ? "primary"
-                            : r.estatus === "En Mantenimiento"
-                            ? "warning"
-                            : "neutral"
-                        }>
-                        {r.estatus}
-                      </Chip>
-                    </td>
-                    <td>
-                      {r.tipo_destino === "Cliente" ? (
-                        <Tooltip
-                          title={`${r.cliente_nombre} / ${r.site_nombre}`}>
-                          <Chip size="sm" variant="outlined" color="primary">
-                            {r.cliente_nombre}/{r.site_nombre || r.id}
+            <>
+              <Table
+                hoverRow
+                size="sm"
+                stickyHeader
+                sx={{
+                  minWidth: 980,
+                  "--TableCell-headBackground":
+                    "var(--joy-palette-background-level5)",
+                  "--TableCell-headColor": "var(--joy-palette-text-secondary)",
+                  "--TableCell-headFontWeight": 600,
+                  "--TableCell-headBorderBottom":
+                    "1px solid var(--joy-palette-divider)",
+                  "--TableRow-hoverBackground":
+                    "var(--joy-palette-background-level1)",
+                }}>
+                <thead>
+                  <tr>
+                    {[
+                      { label: "Código", key: "codigo" },
+                      { label: "Nombre", key: "nombre" },
+                      { label: "Tipo", key: "tipo" },
+                      { label: "Modelo", key: "modelo" },
+                      { label: "Serie", key: "serial_number" },
+                      { label: "Estatus", key: "estatus" },
+                      { label: "Destino", key: "_destino" },
+                      { label: "", key: null }, // acciones
+                    ].map((col) => (
+                      <th key={col.label}>
+                        {col.key ? (
+                          <Button
+                            variant="plain"
+                            size="sm"
+                            onClick={() => handleSort(col.key)}
+                            endDecorator={
+                              <ArrowDropDownIcon
+                                sx={{
+                                  transform:
+                                    sortKey === col.key && sortDir === "desc"
+                                      ? "rotate(180deg)"
+                                      : "none",
+                                  transition: "0.15s",
+                                  opacity: sortKey === col.key ? 1 : 0.35,
+                                }}
+                              />
+                            }>
+                            {col.label}
+                          </Button>
+                        ) : (
+                          col.label
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.codigo}</td>
+                      <td>{r.nombre}</td>
+                      <td>{r.tipo}</td>
+                      <td>{r.modelo || "—"}</td>
+                      <td>{r.serial_number || "—"}</td>
+                      <td>
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={
+                            r.estatus === "Activo"
+                              ? "success"
+                              : r.estatus === "Arrendado"
+                              ? "primary"
+                              : r.estatus === "En Mantenimiento"
+                              ? "warning"
+                              : "neutral"
+                          }>
+                          {r.estatus}
+                        </Chip>
+                      </td>
+                      <td>
+                        <Tooltip title={getDestinoText(r) || "—"}>
+                          <Chip
+                            size="sm"
+                            variant="outlined"
+                            color={
+                              r.tipo_destino === "Cliente"
+                                ? "primary"
+                                : r.tipo_destino === "Bodega"
+                                ? "neutral"
+                                : r.tipo_destino === "Empleado"
+                                ? "success"
+                                : "neutral"
+                            }>
+                            {r.tipo_destino || "—"}
                           </Chip>
                         </Tooltip>
-                      ) : r.tipo_destino === "Bodega" ? (
-                        <Chip size="sm" variant="outlined" color="neutral">
-                          {r.bodega_nombre}
-                        </Chip>
-                      ) : r.tipo_destino === "Empleado" ? (
-                        <Chip size="sm" variant="outlined" color="success">
-                          {"Empleado"}
-                        </Chip>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <Stack direction="row" spacing={1}>
-                        <Tooltip
-                          title={canEdit ? "Editar" : "Sin permiso"}
-                          variant="soft">
-                          <span>
-                            <IconButton
-                              onClick={() => editActivo(r)}
-                              disabled={!canEdit}
-                              aria-disabled={!canEdit}
-                              variant={canEdit ? "soft" : "plain"}
-                              color={canEdit ? "primary" : "neutral"}>
-                              <EditRoundedIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                      </td>
+                      <td>
+                        <Stack direction="row" spacing={1}>
+                          <Tooltip
+                            title={canEdit ? "Editar" : "Sin permiso"}
+                            variant="soft">
+                            <span>
+                              <IconButton
+                                onClick={() => editActivo(r)}
+                                disabled={!canEdit}
+                                aria-disabled={!canEdit}
+                                variant={canEdit ? "soft" : "plain"}
+                                color={canEdit ? "primary" : "neutral"}>
+                                <EditRoundedIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
 
-                        <Tooltip
-                          title={canMove ? "Mover" : "Sin permiso"}
-                          variant="soft">
-                          <span>
-                            <IconButton
-                              onClick={() => abrirMover(r)}
-                              disabled={!canMove}
-                              aria-disabled={!canMove}
-                              variant={canMove ? "soft" : "plain"}
-                              color={canMove ? "primary" : "neutral"}>
-                              <SwapHorizRoundedIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                          <Tooltip
+                            title={canMove ? "Mover" : "Sin permiso"}
+                            variant="soft">
+                            <span>
+                              <IconButton
+                                onClick={() => abrirMover(r)}
+                                disabled={!canMove}
+                                aria-disabled={!canMove}
+                                variant={canMove ? "soft" : "plain"}
+                                color={canMove ? "primary" : "neutral"}>
+                                <SwapHorizRoundedIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
 
-                        <Tooltip title="Historial" variant="soft">
-                          <span>
-                            <IconButton
-                              onClick={() => abrirHistorial(r)}
-                              disabled={!canViewHistory}
-                              aria-disabled={!canViewHistory}
-                              variant={canViewHistory ? "soft" : "plain"}
-                              color={canViewHistory ? "primary" : "neutral"}>
-                              <HistoryRoundedIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                          <Tooltip title="Historial" variant="soft">
+                            <span>
+                              <IconButton
+                                onClick={() => abrirHistorial(r)}
+                                disabled={!canViewHistory}
+                                aria-disabled={!canViewHistory}
+                                variant={canViewHistory ? "soft" : "plain"}
+                                color={canViewHistory ? "primary" : "neutral"}>
+                                <HistoryRoundedIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
 
-                        <Tooltip
-                          title={canQR ? "Ver QR" : "Sin permiso"}
-                          variant="soft">
-                          <span>
-                            <IconButton
-                              onClick={() => abrirQR(r)}
-                              disabled={!canQR}
-                              aria-disabled={!canQR}
-                              variant={canQR ? "soft" : "plain"}
-                              color={canQR ? "primary" : "neutral"}>
-                              <QrCodeRoundedIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Stack>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+                          <Tooltip
+                            title={canQR ? "Ver QR" : "Sin permiso"}
+                            variant="soft">
+                            <span>
+                              <IconButton
+                                onClick={() => abrirQR(r)}
+                                disabled={!canQR}
+                                aria-disabled={!canQR}
+                                variant={canQR ? "soft" : "plain"}
+                                color={canQR ? "primary" : "neutral"}>
+                                <QrCodeRoundedIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+
+              {/* Footer de paginación */}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "stretch", sm: "center" }}
+                sx={{ p: 1.5, borderTop: "1px solid", borderColor: "divider" }}
+                spacing={1.5}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography level="body-sm">
+                    Mostrando {(page - 1) * perPage + 1}–
+                    {Math.min(page * perPage, sortedRows.length)} de{" "}
+                    {sortedRows.length}
+                  </Typography>
+                  <Select
+                    size="sm"
+                    value={perPage}
+                    onChange={(_, v) => {
+                      setPerPage(Number(v) || 25);
+                      setPage(1);
+                    }}
+                    sx={{ width: 140 }}>
+                    {[10, 25, 50, 100].map((n) => (
+                      <Option key={n} value={n}>
+                        {n} / página
+                      </Option>
+                    ))}
+                  </Select>
+                </Stack>
+
+                <PaginationLite
+                  page={page}
+                  count={totalPages}
+                  onChange={setPage}
+                  size="sm"
+                  siblingCount={1}
+                  boundaryCount={1}
+                  showFirstLast
+                />
+              </Stack>
+            </>
           )}
         </Card>
 
@@ -999,7 +1018,7 @@ export default function ActivosList() {
                   disabled={savingMover}>
                   <Option value="Cliente">Cliente</Option>
                   <Option value="Bodega">Bodega</Option>
-                  <Option value="Empleado">Empleado</Option> {/* 👈 NUEVO */}
+                  <Option value="Empleado">Empleado</Option>
                 </Select>
               </FormControl>
 
@@ -1156,10 +1175,12 @@ export default function ActivosList() {
           onClose={() => setOpenHistorial(false)}
           activo={activoSeleccionado}
         />
+
+        {/* Export */}
         <ExportDialog
           open={openExport}
           onClose={() => setOpenExport(false)}
-          rows={filtered} // todo el filtro
+          rows={sortedRows} // exporta el conjunto ordenado (o usa filtered si prefieres)
           columns={EXPORT_COLS}
           defaultTitle={`Activos`}
           defaultSheetName="Activos"
