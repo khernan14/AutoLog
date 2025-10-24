@@ -53,8 +53,30 @@ import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
-const ESTATUS = ["Activo", "Inactivo", "Arrendado", "En Mantenimiento"];
-const TIPOS = ["Impresora", "UPS", "ATM", "Silla", "Mueble", "Otro"];
+const ESTATUS = [
+  "Activo",
+  "Inactivo",
+  "Arrendado",
+  "En Mantenimiento",
+  "Reciclado",
+];
+const TIPOS = [
+  "Impresora",
+  "ATM",
+  "Escáner",
+  "UPS",
+  "Silla",
+  "Mueble",
+  "Laptop",
+  "Desktop",
+  "Mesa",
+  "Audifonos",
+  "Monitor",
+  "Mochila",
+  "Escritorio",
+  "Celular",
+  "Otro",
+];
 
 export default function ClienteActivos() {
   const { id } = useParams(); // id del cliente actual

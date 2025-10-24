@@ -15,7 +15,14 @@ import {
 } from "@mui/joy";
 import { useToast } from "../../context/ToastContext";
 
-const ESTATUS = ["Activo", "Inactivo", "Arrendado", "En Mantenimiento"];
+const ESTATUS = [
+  "Activo",
+  "Inactivo",
+  "Arrendado",
+  "En Mantenimiento",
+  "Reciclado",
+];
+
 const TIPOS = [
   "Impresora",
   "ATM",

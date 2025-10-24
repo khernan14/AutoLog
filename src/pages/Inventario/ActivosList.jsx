@@ -792,6 +792,8 @@ export default function ActivosList() {
                               ? "primary"
                               : r.estatus === "En Mantenimiento"
                               ? "warning"
+                              : r.estatus === "Inactivo"
+                              ? "danger"
                               : "neutral"
                           }>
                           {r.estatus}
