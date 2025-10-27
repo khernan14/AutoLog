@@ -39,6 +39,7 @@ import { moverActivo } from "../../services/UbicacionesServices";
 import { getClientes } from "../../services/ClientesServices";
 import { getSitesByCliente } from "../../services/SitesServices";
 import { getBodegas } from "../../services/BodegasServices";
+import { getNextActivoCode } from "../../services/ActivosBodegaServices";
 import { getEmpleados } from "../../services/AuthServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 
@@ -63,6 +64,7 @@ const ESTATUS = [
   "En Mantenimiento",
   "Reciclado",
 ];
+
 const TIPOS = [
   "Impresora",
   "ATM",
@@ -192,6 +194,22 @@ export default function ActivosList() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
+  // 🔹 Siguiente código (hint y para modal nuevo)
+  const [nextCodigo, setNextCodigo] = useState("");
+  const [loadingNext, setLoadingNext] = useState(false);
+
+  const refreshNextCodigo = useCallback(async () => {
+    try {
+      setLoadingNext(true);
+      const n = await getNextActivoCode();
+      setNextCodigo(String(n || ""));
+    } catch {
+      setNextCodigo("");
+    } finally {
+      setLoadingNext(false);
+    }
+  }, []);
+
   const loadActivos = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
@@ -229,7 +247,9 @@ export default function ActivosList() {
 
   useEffect(() => {
     loadActivos();
-  }, [loadActivos]);
+    // mostramos el hint del siguiente código en el header
+    refreshNextCodigo();
+  }, [loadActivos, refreshNextCodigo]);
 
   // Carga dinámica de sites según cliente
   useEffect(() => {
@@ -350,14 +370,26 @@ export default function ActivosList() {
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
   }
 
-  function newActivo() {
+  async function newActivo() {
     if (!canCreate) {
       showToast("No tienes permisos para crear activos.", "warning");
       return;
     }
+    // precargar próximo código
+    let codigoAuto = "";
+    try {
+      setLoadingNext(true);
+      codigoAuto = String(await getNextActivoCode());
+    } catch {
+      // si falla, dejamos vacío y avisamos visualmente
+      codigoAuto = "";
+    } finally {
+      setLoadingNext(false);
+    }
+
     setEditing(null);
     setForm({
-      codigo: "",
+      codigo: codigoAuto, // lo mandamos al crear
       nombre: "",
       modelo: "",
       serial_number: "",
@@ -374,7 +406,7 @@ export default function ActivosList() {
     }
     setEditing(row);
     setForm({
-      codigo: row.codigo,
+      codigo: row.codigo, // solo lectura (Chip)
       nombre: row.nombre,
       modelo: row.modelo || "",
       serial_number: row.serial_number || "",
@@ -386,22 +418,40 @@ export default function ActivosList() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (!form.codigo.trim())
-      return showToast("El código es requerido", "warning");
+
+    // En crear: usamos el código precargado (o pedimos otro si no está)
+    const codigoToSend = editing ? form.codigo : form.codigo || nextCodigo;
+
+    if (!codigoToSend) {
+      showToast(
+        "No se pudo obtener el siguiente código automáticamente.",
+        "danger"
+      );
+      return;
+    }
     if (!form.nombre.trim())
       return showToast("El nombre es requerido", "warning");
 
     setSaving(true);
     try {
       if (editing) {
-        await updateActivo(editing.id, form);
+        // En editar, respetamos el código original (no editable)
+        await updateActivo(editing.id, {
+          ...form,
+          codigo: editing.codigo,
+        });
         showToast("Activo actualizado correctamente", "success");
       } else {
-        await createActivo(form);
+        await createActivo({
+          ...form,
+          codigo: codigoToSend,
+        });
         showToast("Activo creado correctamente", "success");
       }
       setOpenForm(false);
-      loadActivos();
+      await loadActivos();
+      // refrescamos el hint del próximo código
+      refreshNextCodigo();
     } catch (err) {
       showToast(err?.message || "Error al guardar activo", "danger");
     } finally {
@@ -500,9 +550,11 @@ export default function ActivosList() {
           alignItems={{ xs: "stretch", sm: "center" }}
           spacing={1.5}
           mb={2}>
-          <Typography level="h4">
-            Inventario: Activos Globales ({sortedRows.length})
-          </Typography>
+          <Stack spacing={0.25}>
+            <Typography level="h4">
+              Inventario: Activos Globales ({sortedRows.length})
+            </Typography>
+          </Stack>
 
           <Stack
             direction="row"
@@ -937,13 +989,34 @@ export default function ActivosList() {
             </Typography>
             <Divider />
             <Stack spacing={1.5} mt={1}>
-              <FormControl required>
-                <FormLabel>Código</FormLabel>
-                <Input
-                  value={form.codigo}
-                  onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                />
+              {/* Código como Chip (no editable). En "Nuevo" se asigna automático */}
+              <FormControl>
+                <FormLabel>
+                  Código{" "}
+                  <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                    {editing ? "(no editable)" : "(asignado automáticamente)"}
+                  </Typography>
+                </FormLabel>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip size="sm" variant="soft" color="success">
+                    {editing
+                      ? form.codigo || "—"
+                      : form.codigo ||
+                        (loadingNext ? "cargando…" : nextCodigo) ||
+                        "—"}
+                  </Chip>
+                  {!editing && (
+                    <Button
+                      size="sm"
+                      variant="plain"
+                      onClick={refreshNextCodigo}
+                      disabled={loadingNext}>
+                      Recalcular
+                    </Button>
+                  )}
+                </Stack>
               </FormControl>
+
               <FormControl required>
                 <FormLabel>Nombre</FormLabel>
                 <Input
@@ -951,6 +1024,7 @@ export default function ActivosList() {
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                 />
               </FormControl>
+
               <FormControl>
                 <FormLabel>Modelo</FormLabel>
                 <Input
@@ -958,6 +1032,7 @@ export default function ActivosList() {
                   onChange={(e) => setForm({ ...form, modelo: e.target.value })}
                 />
               </FormControl>
+
               <FormControl>
                 <FormLabel>Serie</FormLabel>
                 <Input
@@ -967,6 +1042,7 @@ export default function ActivosList() {
                   }
                 />
               </FormControl>
+
               <FormControl>
                 <FormLabel>Tipo</FormLabel>
                 <Select
@@ -979,6 +1055,7 @@ export default function ActivosList() {
                   ))}
                 </Select>
               </FormControl>
+
               <FormControl>
                 <FormLabel>Estatus</FormLabel>
                 <Select
@@ -990,8 +1067,30 @@ export default function ActivosList() {
                     </Option>
                   ))}
                 </Select>
+                <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
+                  <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                    Estado actual:
+                  </Typography>
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={
+                      form.estatus === "Activo"
+                        ? "success"
+                        : form.estatus === "Arrendado"
+                        ? "primary"
+                        : form.estatus === "En Mantenimiento"
+                        ? "warning"
+                        : form.estatus === "Inactivo"
+                        ? "danger"
+                        : "neutral"
+                    }>
+                    {form.estatus}
+                  </Chip>
+                </Stack>
               </FormControl>
             </Stack>
+
             <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
               <Button variant="plain" onClick={() => setOpenForm(false)}>
                 Cancelar

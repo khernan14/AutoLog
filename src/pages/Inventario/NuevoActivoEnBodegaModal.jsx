@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { createActivoEnBodega } from "../../services/ActivosBodegaServices";
+// src/pages/Inventario/NuevoActivoEnBodega.jsx
+import { useState, useEffect } from "react";
+import {
+  createActivoEnBodega,
+  getNextActivoCode,
+} from "../../services/ActivosBodegaServices";
 import {
   Modal,
   ModalDialog,
@@ -12,6 +16,7 @@ import {
   Select,
   Option,
   Button,
+  Chip,
 } from "@mui/joy";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -52,33 +57,68 @@ export default function NuevoActivoEnBodegaModal({
   const { showToast } = useToast();
 
   const [form, setForm] = useState({
-    codigo: "",
+    // ⚠️ ya no pedimos "codigo"
     nombre: "",
     modelo: "",
     serial_number: "",
     tipo: "Otro",
     estatus: "Activo",
   });
+
   const [saving, setSaving] = useState(false);
+  const [nextCode, setNextCode] = useState(""); // 👈 mostrará el siguiente
+  const [loadingNext, setLoadingNext] = useState(false);
+  const [nextErr, setNextErr] = useState("");
+
+  // Al abrir el modal: traer el próximo código (solo para mostrar)
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      nombre: "",
+      modelo: "",
+      serial_number: "",
+      tipo: "Otro",
+      estatus: "Activo",
+    });
+    setNextErr("");
+    setNextCode("");
+    setLoadingNext(true);
+
+    getNextActivoCode()
+      .then((r) => setNextCode(r?.next ?? ""))
+      .catch((e) => {
+        setNextErr(e?.message || "No se pudo obtener el próximo código");
+        setNextCode("");
+      })
+      .finally(() => setLoadingNext(false));
+  }, [open]);
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (!form.codigo.trim() || !form.nombre.trim()) {
-      showToast("Código y nombre son requeridos", "warning");
+
+    if (!form.nombre.trim()) {
+      showToast("El nombre es requerido", "warning");
       return;
     }
+
     setSaving(true);
     try {
+      // 👇 No enviamos "codigo": el backend lo genera de forma segura
       await createActivoEnBodega({
-        ...form,
+        nombre: form.nombre.trim(),
+        modelo: form.modelo || null,
+        serial_number: form.serial_number || null,
+        tipo: form.tipo,
+        estatus: form.estatus,
         id_bodega: idBodega,
-        usuario_responsable: userData?.id_usuario,
+        usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
       });
+
       showToast("Activo creado en bodega", "success");
-      onClose();
-      onSaved();
+      onClose?.();
+      onSaved?.();
     } catch (err) {
-      showToast(err.message || "Error al crear activo", "danger");
+      showToast(err?.message || "Error al crear activo", "danger");
     } finally {
       setSaving(false);
     }
@@ -93,13 +133,23 @@ export default function NuevoActivoEnBodegaModal({
         <Typography level="title-lg">Nuevo Activo en Bodega</Typography>
         <Divider />
         <Stack spacing={1.5} mt={1}>
-          <FormControl required>
+          {/* Código (solo lectura / informativo) */}
+          <FormControl>
             <FormLabel>Código</FormLabel>
-            <Input
-              value={form.codigo}
-              onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip size="md" variant="soft" color="success">
+                {loadingNext
+                  ? "Calculando…"
+                  : nextCode || (nextErr ? "—" : "—")}
+              </Chip>
+            </Stack>
+            <Typography level="body-xs" sx={{ opacity: 0.8, mt: 0.5 }}>
+              {nextErr
+                ? "No se pudo previsualizar el próximo código. El sistema lo asignará al guardar."
+                : "Este es el próximo código estimado. Puede variar si alguien crea otro activo antes."}
+            </Typography>
           </FormControl>
+
           <FormControl required>
             <FormLabel>Nombre</FormLabel>
             <Input
@@ -107,6 +157,7 @@ export default function NuevoActivoEnBodegaModal({
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
             />
           </FormControl>
+
           <FormControl>
             <FormLabel>Modelo</FormLabel>
             <Input
@@ -114,6 +165,7 @@ export default function NuevoActivoEnBodegaModal({
               onChange={(e) => setForm({ ...form, modelo: e.target.value })}
             />
           </FormControl>
+
           <FormControl>
             <FormLabel>Serie</FormLabel>
             <Input
@@ -123,6 +175,7 @@ export default function NuevoActivoEnBodegaModal({
               }
             />
           </FormControl>
+
           <FormControl>
             <FormLabel>Tipo</FormLabel>
             <Select
@@ -135,6 +188,7 @@ export default function NuevoActivoEnBodegaModal({
               ))}
             </Select>
           </FormControl>
+
           <FormControl>
             <FormLabel>Estatus</FormLabel>
             <Select
@@ -148,6 +202,7 @@ export default function NuevoActivoEnBodegaModal({
             </Select>
           </FormControl>
         </Stack>
+
         <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
           <Button variant="plain" onClick={onClose} disabled={saving}>
             Cancelar
