@@ -134,7 +134,7 @@ export default function NuevoActivoEnBodegaModal({
         <Divider />
         <Stack spacing={1.5} mt={1}>
           {/* Código (solo lectura / informativo) */}
-          <FormControl>
+          {/* <FormControl>
             <FormLabel>Código</FormLabel>
             <Stack direction="row" spacing={1} alignItems="center">
               <Chip size="md" variant="soft" color="success">
@@ -148,7 +148,7 @@ export default function NuevoActivoEnBodegaModal({
                 ? "No se pudo previsualizar el próximo código. El sistema lo asignará al guardar."
                 : "Este es el próximo código estimado. Puede variar si alguien crea otro activo antes."}
             </Typography>
-          </FormControl>
+          </FormControl> */}
 
           <FormControl required>
             <FormLabel>Nombre</FormLabel>
