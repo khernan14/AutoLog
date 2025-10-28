@@ -146,7 +146,7 @@ export default function NuevoActivoEnBodegaModal({
             <Typography level="body-xs" sx={{ opacity: 0.8, mt: 0.5 }}>
               {nextErr
                 ? "No se pudo previsualizar el próximo código. El sistema lo asignará al guardar."
-                : "Este es el próximo código estimado. Puede variar si alguien crea otro activo antes."}
+                : "Este es el próximo código estimado. Puede variar si alguien crea otro registro antes."}
             </Typography>
           </FormControl>
 
