@@ -1,5 +1,6 @@
 // src/pages/Inventario/ActivosList.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -35,15 +36,11 @@ import {
   createActivo,
   updateActivo,
 } from "../../services/ActivosServices";
-import { moverActivo } from "../../services/UbicacionesServices";
-import { getClientes } from "../../services/ClientesServices";
-import { getSitesByCliente } from "../../services/SitesServices";
-import { getBodegas } from "../../services/BodegasServices";
 import { getNextActivoCode } from "../../services/ActivosBodegaServices";
-import { getEmpleados } from "../../services/AuthServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
+import MoverActivoModal from "../Inventario/MoverActivoModal";
 import StyledQR from "../../components/QRCode/StyledQR";
 import useIsMobile from "../../hooks/useIsMobile";
 import { useToast } from "../../context/ToastContext";
@@ -57,31 +54,9 @@ import { getViewState } from "../../utils/viewState";
 // ✅ Paginación ligera
 import PaginationLite from "@/components/common/PaginationLite";
 
-const ESTATUS = [
-  "Activo",
-  "Inactivo",
-  "Arrendado",
-  "En Mantenimiento",
-  "Reciclado",
-];
-
-const TIPOS = [
-  "Impresora",
-  "ATM",
-  "Escáner",
-  "UPS",
-  "Silla",
-  "Mueble",
-  "Laptop",
-  "Desktop",
-  "Mesa",
-  "Audifonos",
-  "Monitor",
-  "Mochila",
-  "Escritorio",
-  "Celular",
-  "Otro",
-];
+// 🔹 NUEVO: Select genérico de catálogos y colores centralizados
+import CatalogSelect from "@/components/forms/CatalogSelect";
+import { ESTATUS_COLOR } from "@/constants/inventario"; // mapea estatus -> color Joy
 
 // columnas para exportar
 const EXPORT_COLS = [
@@ -98,7 +73,7 @@ const EXPORT_COLS = [
       if (r.tipo_destino === "Cliente")
         return `${r.cliente_nombre || ""} / ${r.site_nombre || ""}`.trim();
       if (r.tipo_destino === "Bodega") return r.bodega_nombre || "";
-      if (r.tipo_destino === "Empleado") return "Asigando a Empleado";
+      if (r.tipo_destino === "Empleado") return r.empleado_nombre || "";
       return "—";
     },
   },
@@ -121,6 +96,7 @@ const filenameBase = `todos_los_activos_${new Date()
   .slice(0, 10)}`;
 
 export default function ActivosList() {
+  const { id } = useParams();
   const isMobile = useIsMobile(768);
   const qrRef = useRef(null);
   const { showToast } = useToast();
@@ -140,10 +116,6 @@ export default function ActivosList() {
 
   // data
   const [rows, setRows] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [sitesDestino, setSitesDestino] = useState([]);
-  const [bodegas, setBodegas] = useState([]);
-  const [empleados, setEmpleados] = useState([]);
 
   // ui state
   const [loading, setLoading] = useState(true);
@@ -174,15 +146,8 @@ export default function ActivosList() {
   });
   const [saving, setSaving] = useState(false);
 
-  // mover
-  const [savingMover, setSavingMover] = useState(false);
+  // mover (sólo selección y open/close; la lógica vive en el modal reutilizable)
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
-  const [tipoDestino, setTipoDestino] = useState("Cliente"); // Cliente | Bodega | Empleado
-  const [clienteDestino, setClienteDestino] = useState("");
-  const [siteDestino, setSiteDestino] = useState("");
-  const [bodegaDestino, setBodegaDestino] = useState("");
-  const [empleadoDestino, setEmpleadoDestino] = useState("");
-  const [motivo, setMotivo] = useState("");
 
   // QR
   const [activoQR, setActivoQR] = useState(null);
@@ -215,23 +180,15 @@ export default function ActivosList() {
       setLoading(true);
       return;
     }
-
     if (!canView) {
       setError(null);
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
-      const [activos, clientesData, bodegasData] = await Promise.all([
-        getActivosGlobal(),
-        getClientes(),
-        getBodegas(),
-      ]);
-      setClientes(Array.isArray(clientesData) ? clientesData : []);
-      setBodegas(Array.isArray(bodegasData) ? bodegasData : []);
+      const activos = await getActivosGlobal();
       setRows(Array.isArray(activos) ? activos : []);
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
@@ -247,29 +204,8 @@ export default function ActivosList() {
 
   useEffect(() => {
     loadActivos();
-    // mostramos el hint del siguiente código en el header
     refreshNextCodigo();
   }, [loadActivos, refreshNextCodigo]);
-
-  // Carga dinámica de sites según cliente
-  useEffect(() => {
-    if (tipoDestino === "Cliente" && clienteDestino) {
-      getSitesByCliente(clienteDestino)
-        .then((data) => setSitesDestino(Array.isArray(data) ? data : []))
-        .catch(() => setSitesDestino([]));
-    } else {
-      setSitesDestino([]);
-    }
-  }, [tipoDestino, clienteDestino]);
-
-  // Cargar empleados (solo cuando se abre el modal y se elige Empleado)
-  useEffect(() => {
-    if (openMover && tipoDestino === "Empleado") {
-      getEmpleados()
-        .then((rows) => setEmpleados(Array.isArray(rows) ? rows : []))
-        .catch(() => setEmpleados([]));
-    }
-  }, [openMover, tipoDestino]);
 
   // resetear página si cambian filtros / búsqueda / dataset
   useEffect(() => {
@@ -375,13 +311,11 @@ export default function ActivosList() {
       showToast("No tienes permisos para crear activos.", "warning");
       return;
     }
-    // precargar próximo código
     let codigoAuto = "";
     try {
       setLoadingNext(true);
       codigoAuto = String(await getNextActivoCode());
     } catch {
-      // si falla, dejamos vacío y avisamos visualmente
       codigoAuto = "";
     } finally {
       setLoadingNext(false);
@@ -389,7 +323,7 @@ export default function ActivosList() {
 
     setEditing(null);
     setForm({
-      codigo: codigoAuto, // lo mandamos al crear
+      codigo: codigoAuto, // chip
       nombre: "",
       modelo: "",
       serial_number: "",
@@ -406,7 +340,7 @@ export default function ActivosList() {
     }
     setEditing(row);
     setForm({
-      codigo: row.codigo, // solo lectura (Chip)
+      codigo: row.codigo, // chip no editable
       nombre: row.nombre,
       modelo: row.modelo || "",
       serial_number: row.serial_number || "",
@@ -419,7 +353,6 @@ export default function ActivosList() {
   async function onSubmit(e) {
     e.preventDefault();
 
-    // En crear: usamos el código precargado (o pedimos otro si no está)
     const codigoToSend = editing ? form.codigo : form.codigo || nextCodigo;
 
     if (!codigoToSend) {
@@ -435,22 +368,14 @@ export default function ActivosList() {
     setSaving(true);
     try {
       if (editing) {
-        // En editar, respetamos el código original (no editable)
-        await updateActivo(editing.id, {
-          ...form,
-          codigo: editing.codigo,
-        });
+        await updateActivo(editing.id, { ...form, codigo: editing.codigo });
         showToast("Activo actualizado correctamente", "success");
       } else {
-        await createActivo({
-          ...form,
-          codigo: codigoToSend,
-        });
+        await createActivo({ ...form, codigo: codigoToSend });
         showToast("Activo creado correctamente", "success");
       }
       setOpenForm(false);
       await loadActivos();
-      // refrescamos el hint del próximo código
       refreshNextCodigo();
     } catch (err) {
       showToast(err?.message || "Error al guardar activo", "danger");
@@ -465,46 +390,7 @@ export default function ActivosList() {
       return;
     }
     setActivoSeleccionado(row);
-    setTipoDestino("Cliente");
-    setClienteDestino("");
-    setSiteDestino("");
-    setBodegaDestino("");
-    setEmpleadoDestino("");
-    setMotivo("");
     setOpenMover(true);
-  }
-
-  async function onMover(e) {
-    e.preventDefault();
-
-    if (
-      (tipoDestino === "Cliente" && (!clienteDestino || !siteDestino)) ||
-      (tipoDestino === "Bodega" && !bodegaDestino) ||
-      (tipoDestino === "Empleado" && !empleadoDestino)
-    ) {
-      showToast("Completa los campos requeridos para el destino", "warning");
-      return;
-    }
-
-    setSavingMover(true);
-    try {
-      await moverActivo({
-        id_activo: activoSeleccionado.id,
-        tipo_destino: tipoDestino,
-        id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
-        id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
-        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null,
-        motivo,
-        usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
-      });
-      showToast("Activo movido correctamente", "success");
-      setOpenMover(false);
-      loadActivos();
-    } catch (err) {
-      showToast(err?.message || "Error al mover activo", "danger");
-    } finally {
-      setSavingMover(false);
-    }
   }
 
   function abrirHistorial(row) {
@@ -582,32 +468,26 @@ export default function ActivosList() {
               sx={{ width: { xs: "100%", sm: 280 } }}
             />
 
-            <Select
-              placeholder="Estatus"
+            {/* 🔹 Filtros con CatalogSelect */}
+            <CatalogSelect
+              catalog="estatusActivo"
               value={statusFilter}
               onChange={(_, v) => setStatusFilter(v || "")}
-              sx={{ minWidth: 140 }}>
-              <Option value="">Todos</Option>
-              {ESTATUS.map((s) => (
-                <Option key={s} value={s}>
-                  {s}
-                </Option>
-              ))}
-            </Select>
+              includeEmpty
+              emptyLabel="Todos"
+              sx={{ width: 200 }}
+            />
 
-            <Select
-              placeholder="Tipo"
+            <CatalogSelect
+              catalog="tiposActivo"
               value={typeFilter}
               onChange={(_, v) => setTypeFilter(v || "")}
-              sx={{ minWidth: 140 }}>
-              <Option value="">Todos</Option>
-              {TIPOS.map((t) => (
-                <Option key={t} value={t}>
-                  {t}
-                </Option>
-              ))}
-            </Select>
+              includeEmpty
+              emptyLabel="Todos"
+              sx={{ width: 200 }}
+            />
 
+            {/* Ubicación se queda como Select normal */}
             <Select
               placeholder="Ubicación"
               value={ubicacionFilter}
@@ -677,15 +557,7 @@ export default function ActivosList() {
                     <Chip
                       size="sm"
                       variant="soft"
-                      color={
-                        r.estatus === "Activo"
-                          ? "success"
-                          : r.estatus === "Arrendado"
-                          ? "primary"
-                          : r.estatus === "En Mantenimiento"
-                          ? "warning"
-                          : "neutral"
-                      }
+                      color={ESTATUS_COLOR[r.estatus] || "neutral"}
                       sx={{ alignSelf: "flex-start" }}>
                       {r.estatus}
                     </Chip>
@@ -837,17 +709,7 @@ export default function ActivosList() {
                         <Chip
                           size="sm"
                           variant="soft"
-                          color={
-                            r.estatus === "Activo"
-                              ? "success"
-                              : r.estatus === "Arrendado"
-                              ? "primary"
-                              : r.estatus === "En Mantenimiento"
-                              ? "warning"
-                              : r.estatus === "Inactivo"
-                              ? "danger"
-                              : "neutral"
-                          }>
+                          color={ESTATUS_COLOR[r.estatus] || "neutral"}>
                           {r.estatus}
                         </Chip>
                       </td>
@@ -1043,30 +905,24 @@ export default function ActivosList() {
                 />
               </FormControl>
 
+              {/* 🔹 Catálogo: Tipo */}
               <FormControl>
                 <FormLabel>Tipo</FormLabel>
-                <Select
+                <CatalogSelect
+                  catalog="tiposActivo"
                   value={form.tipo}
-                  onChange={(_, v) => setForm({ ...form, tipo: v })}>
-                  {TIPOS.map((t) => (
-                    <Option key={t} value={t}>
-                      {t}
-                    </Option>
-                  ))}
-                </Select>
+                  onChange={(_, v) => setForm({ ...form, tipo: v })}
+                />
               </FormControl>
 
+              {/* 🔹 Catálogo: Estatus */}
               <FormControl>
                 <FormLabel>Estatus</FormLabel>
-                <Select
+                <CatalogSelect
+                  catalog="estatusActivo"
                   value={form.estatus}
-                  onChange={(_, v) => setForm({ ...form, estatus: v })}>
-                  {ESTATUS.map((s) => (
-                    <Option key={s} value={s}>
-                      {s}
-                    </Option>
-                  ))}
-                </Select>
+                  onChange={(_, v) => setForm({ ...form, estatus: v })}
+                />
                 <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
                   <Typography level="body-xs" sx={{ opacity: 0.7 }}>
                     Estado actual:
@@ -1074,17 +930,7 @@ export default function ActivosList() {
                   <Chip
                     size="sm"
                     variant="soft"
-                    color={
-                      form.estatus === "Activo"
-                        ? "success"
-                        : form.estatus === "Arrendado"
-                        ? "primary"
-                        : form.estatus === "En Mantenimiento"
-                        ? "warning"
-                        : form.estatus === "Inactivo"
-                        ? "danger"
-                        : "neutral"
-                    }>
+                    color={ESTATUS_COLOR[form.estatus] || "neutral"}>
                     {form.estatus}
                   </Chip>
                 </Stack>
@@ -1097,130 +943,6 @@ export default function ActivosList() {
               </Button>
               <Button type="submit" loading={saving}>
                 Guardar
-              </Button>
-            </Stack>
-          </ModalDialog>
-        </Modal>
-
-        {/* Modal Mover */}
-        <Modal open={openMover} onClose={() => setOpenMover(false)}>
-          <ModalDialog
-            component="form"
-            onSubmit={onMover}
-            sx={{ width: { xs: "100%", sm: 520 } }}>
-            <Typography level="title-lg">Mover Activo</Typography>
-            <Divider />
-            <Stack spacing={1.5} mt={1}>
-              <FormControl required>
-                <FormLabel>Tipo destino</FormLabel>
-                <Select
-                  value={tipoDestino}
-                  onChange={(_, v) => setTipoDestino(v)}
-                  required
-                  disabled={savingMover}>
-                  <Option value="Cliente">Cliente</Option>
-                  <Option value="Bodega">Bodega</Option>
-                  <Option value="Empleado">Empleado</Option>
-                </Select>
-              </FormControl>
-
-              {tipoDestino === "Cliente" && (
-                <>
-                  <FormControl required>
-                    <FormLabel>Cliente destino</FormLabel>
-                    <Select
-                      value={clienteDestino}
-                      onChange={(_, v) => setClienteDestino(v)}
-                      disabled={savingMover}>
-                      <Option value="">—</Option>
-                      {clientes.map((c) => (
-                        <Option key={c.id} value={c.id}>
-                          {c.nombre}
-                        </Option>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  {clienteDestino && (
-                    <FormControl required>
-                      <FormLabel>Site destino</FormLabel>
-                      <Select
-                        value={siteDestino}
-                        onChange={(_, v) => setSiteDestino(v)}
-                        disabled={savingMover}>
-                        <Option value="">—</Option>
-                        {sitesDestino.map((s) => (
-                          <Option key={s.id} value={s.id}>
-                            {s.nombre}
-                          </Option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-                </>
-              )}
-
-              {tipoDestino === "Bodega" && (
-                <FormControl required>
-                  <FormLabel>Bodega destino</FormLabel>
-                  <Select
-                    value={bodegaDestino}
-                    onChange={(_, v) => setBodegaDestino(v)}
-                    disabled={savingMover}>
-                    <Option value="">—</Option>
-                    {bodegas.map((b) => (
-                      <Option key={b.id} value={b.id}>
-                        {b.nombre}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-
-              {tipoDestino === "Empleado" && (
-                <FormControl required>
-                  <FormLabel>Empleado destino</FormLabel>
-                  <Select
-                    value={empleadoDestino}
-                    onChange={(_, v) => setEmpleadoDestino(v)}
-                    disabled={savingMover}>
-                    <Option value="">—</Option>
-                    {empleados.map((e) => (
-                      <Option key={e.id} value={e.id}>
-                        {e.nombre || e.usuario_nombre || `Empleado #${e.id}`}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-
-              <FormControl>
-                <FormLabel>Motivo</FormLabel>
-                <Input
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  disabled={savingMover}
-                />
-              </FormControl>
-            </Stack>
-            <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
-              <Button
-                variant="plain"
-                onClick={() => setOpenMover(false)}
-                disabled={savingMover}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                loading={savingMover}
-                disabled={
-                  savingMover ||
-                  (tipoDestino === "Cliente" &&
-                    (!clienteDestino || !siteDestino)) ||
-                  (tipoDestino === "Bodega" && !bodegaDestino) ||
-                  (tipoDestino === "Empleado" && !empleadoDestino)
-                }>
-                Mover
               </Button>
             </Stack>
           </ModalDialog>
@@ -1278,11 +1000,24 @@ export default function ActivosList() {
           activo={activoSeleccionado}
         />
 
+        {/* Modal Mover (reutilizable con Autocomplete) */}
+        <MoverActivoModal
+          open={openMover}
+          onClose={() => setOpenMover(false)}
+          activo={activoSeleccionado}
+          onSaved={() => {
+            setOpenMover(false);
+            loadActivos();
+          }}
+          defaultTipo="Cliente"
+          defaultClienteId={Number(id)}
+        />
+
         {/* Export */}
         <ExportDialog
           open={openExport}
           onClose={() => setOpenExport(false)}
-          rows={sortedRows} // exporta el conjunto ordenado (o usa filtered si prefieres)
+          rows={sortedRows}
           columns={EXPORT_COLS}
           defaultTitle={`Activos`}
           defaultSheetName="Activos"

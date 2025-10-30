@@ -13,39 +13,15 @@ import {
   FormControl,
   FormLabel,
   Input,
-  Select,
-  Option,
   Button,
   Chip,
 } from "@mui/joy";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 
-const ESTATUS = [
-  "Activo",
-  "Inactivo",
-  "Arrendado",
-  "En Mantenimiento",
-  "Reciclado",
-];
-
-const TIPOS = [
-  "Impresora",
-  "ATM",
-  "Escáner",
-  "UPS",
-  "Silla",
-  "Mueble",
-  "Laptop",
-  "Desktop",
-  "Mesa",
-  "Audifonos",
-  "Monitor",
-  "Mochila",
-  "Escritorio",
-  "Celular",
-  "Otro",
-];
+// 🔹 usamos el select reutilizable y los colores
+import CatalogSelect from "@/components/forms/CatalogSelect";
+import { ESTATUS_COLOR } from "@/constants/inventario";
 
 export default function NuevoActivoEnBodegaModal({
   open,
@@ -57,7 +33,6 @@ export default function NuevoActivoEnBodegaModal({
   const { showToast } = useToast();
 
   const [form, setForm] = useState({
-    // ⚠️ ya no pedimos "codigo"
     nombre: "",
     modelo: "",
     serial_number: "",
@@ -73,6 +48,7 @@ export default function NuevoActivoEnBodegaModal({
   // Al abrir el modal: traer el próximo código (solo para mostrar)
   useEffect(() => {
     if (!open) return;
+    // reset al abrir
     setForm({
       nombre: "",
       modelo: "",
@@ -85,7 +61,11 @@ export default function NuevoActivoEnBodegaModal({
     setLoadingNext(true);
 
     getNextActivoCode()
-      .then((r) => setNextCode(r?.next ?? ""))
+      .then((r) => {
+        // depende de cómo lo devuelves en el backend: {next: "1209"} o solo "1209"
+        const n = typeof r === "string" ? r : r?.next;
+        setNextCode(n ?? "");
+      })
       .catch((e) => {
         setNextErr(e?.message || "No se pudo obtener el próximo código");
         setNextCode("");
@@ -96,7 +76,7 @@ export default function NuevoActivoEnBodegaModal({
   async function onSubmit(e) {
     e.preventDefault();
 
-    if (!form.nombre.trim()) {
+    if (!String(form.nombre || "").trim()) {
       showToast("El nombre es requerido", "warning");
       return;
     }
@@ -124,6 +104,8 @@ export default function NuevoActivoEnBodegaModal({
     }
   }
 
+  const chipColor = nextErr ? "neutral" : ESTATUS_COLOR[form.estatus];
+
   return (
     <Modal open={open} onClose={onClose}>
       <ModalDialog
@@ -137,7 +119,7 @@ export default function NuevoActivoEnBodegaModal({
           <FormControl>
             <FormLabel>Código</FormLabel>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Chip size="md" variant="soft" color="success">
+              <Chip size="md" variant="soft" color={chipColor}>
                 {loadingNext
                   ? "Calculando…"
                   : nextCode || (nextErr ? "—" : "—")}
@@ -146,7 +128,7 @@ export default function NuevoActivoEnBodegaModal({
             <Typography level="body-xs" sx={{ opacity: 0.8, mt: 0.5 }}>
               {nextErr
                 ? "No se pudo previsualizar el próximo código. El sistema lo asignará al guardar."
-                : "Este es el próximo código estimado. Puede variar si alguien crea otro registro antes."}
+                : "Este es el próximo código estimado. Puede cambiar si alguien crea otro activo antes que tú."}
             </Typography>
           </FormControl>
 
@@ -155,6 +137,7 @@ export default function NuevoActivoEnBodegaModal({
             <Input
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              disabled={saving}
             />
           </FormControl>
 
@@ -163,6 +146,7 @@ export default function NuevoActivoEnBodegaModal({
             <Input
               value={form.modelo}
               onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+              disabled={saving}
             />
           </FormControl>
 
@@ -173,33 +157,30 @@ export default function NuevoActivoEnBodegaModal({
               onChange={(e) =>
                 setForm({ ...form, serial_number: e.target.value })
               }
+              disabled={saving}
             />
           </FormControl>
 
+          {/* 🔹 Tipo desde catálogo */}
           <FormControl>
             <FormLabel>Tipo</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="tiposActivo"
               value={form.tipo}
-              onChange={(_, v) => setForm({ ...form, tipo: v })}>
-              {TIPOS.map((t) => (
-                <Option key={t} value={t}>
-                  {t}
-                </Option>
-              ))}
-            </Select>
+              onChange={(_, v) => setForm({ ...form, tipo: v })}
+              disabled={saving}
+            />
           </FormControl>
 
+          {/* 🔹 Estatus desde catálogo */}
           <FormControl>
             <FormLabel>Estatus</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="estatusActivo"
               value={form.estatus}
-              onChange={(_, v) => setForm({ ...form, estatus: v })}>
-              {ESTATUS.map((s) => (
-                <Option key={s} value={s}>
-                  {s}
-                </Option>
-              ))}
-            </Select>
+              onChange={(_, v) => setForm({ ...form, estatus: v })}
+              disabled={saving}
+            />
           </FormControl>
         </Stack>
 

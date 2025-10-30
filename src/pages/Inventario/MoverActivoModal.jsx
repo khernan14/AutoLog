@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Modal,
   ModalDialog,
@@ -7,88 +7,121 @@ import {
   Stack,
   FormControl,
   FormLabel,
-  Select,
-  Option,
   Input,
   Button,
+  Autocomplete, // 👈 Joy Autocomplete (type-ahead)
 } from "@mui/joy";
 import { moverActivo } from "../../services/UbicacionesServices";
 import { getBodegas } from "../../services/BodegasServices";
 import { getClientes } from "../../services/ClientesServices";
 import { getSitesByCliente } from "../../services/SitesServices";
-import { getEmpleados } from "../../services/AuthServices"; // 👈 nuevo
+import { getEmpleados } from "../../services/AuthServices";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 
-export default function MoverActivoModal({ open, onClose, activo, onSaved }) {
+// util para buscar sin acentos/diacríticos y sin mayúsculas
+const normalize = (s = "") =>
+  s
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+export default function MoverActivoModal({
+  open,
+  onClose,
+  activo,
+  onSaved,
+  defaultTipo = "Bodega",
+  defaultClienteId = null,
+}) {
   const { showToast } = useToast();
   const { userData } = useAuth();
 
-  const [tipoDestino, setTipoDestino] = useState("Bodega");
+  // const [tipoDestino, setTipoDestino] = useState("Bodega");
+  const [tipoDestino, setTipoDestino] = useState(defaultTipo);
+  const [clienteDestino, setClienteDestino] = useState(defaultClienteId || "");
+
   const [clientes, setClientes] = useState([]);
   const [sites, setSites] = useState([]);
   const [bodegas, setBodegas] = useState([]);
-  const [empleados, setEmpleados] = useState([]); // 👈 nuevo
+  const [empleados, setEmpleados] = useState([]);
 
-  const [clienteDestino, setClienteDestino] = useState("");
-  const [siteDestino, setSiteDestino] = useState("");
-  const [bodegaDestino, setBodegaDestino] = useState("");
-  const [empleadoDestino, setEmpleadoDestino] = useState(""); // 👈 nuevo
+  // const [clienteDestino, setClienteDestino] = useState("");
+  const [siteDestino, setSiteDestino] = useState(""); // guarda id
+  const [bodegaDestino, setBodegaDestino] = useState(""); // guarda id
+  const [empleadoDestino, setEmpleadoDestino] = useState(""); // guarda id
   const [motivo, setMotivo] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [loadingBodegas, setLoadingBodegas] = useState(false);
+  const [loadingSites, setLoadingSites] = useState(false);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(false);
 
-  // Cargar listas iniciales
   useEffect(() => {
     if (open) {
-      loadData();
-      resetForm();
+      loadBaseLists();
+      setTipoDestino(defaultTipo);
+      setClienteDestino(defaultClienteId || "");
+      setSiteDestino("");
+      setBodegaDestino("");
+      setEmpleadoDestino("");
+      setMotivo("");
     }
-  }, [open]);
+  }, [open, defaultTipo, defaultClienteId]);
 
-  async function loadData() {
+  async function loadBaseLists() {
     try {
+      setLoadingClientes(true);
+      setLoadingBodegas(true);
       const [cli, bod] = await Promise.all([getClientes(), getBodegas()]);
-      setClientes(cli || []);
-      setBodegas(bod || []);
+      setClientes(Array.isArray(cli) ? cli : []);
+      setBodegas(Array.isArray(bod) ? bod : []);
     } catch {
       showToast("Error al cargar clientes/bodegas", "danger");
+    } finally {
+      setLoadingClientes(false);
+      setLoadingBodegas(false);
     }
   }
 
-  // Cargar sites según cliente elegido
+  // Cargar sites al elegir cliente
   useEffect(() => {
     if (tipoDestino === "Cliente" && clienteDestino) {
+      setLoadingSites(true);
       getSitesByCliente(clienteDestino)
-        .then(setSites)
-        .catch(() => setSites([]));
+        .then((rows) => setSites(Array.isArray(rows) ? rows : []))
+        .catch(() => setSites([]))
+        .finally(() => setLoadingSites(false));
     } else {
       setSites([]);
     }
   }, [tipoDestino, clienteDestino]);
 
-  // Cargar empleados solo cuando se seleccione "Empleado" (evita llamadas innecesarias)
+  // Cargar empleados solo cuando se elige "Empleado"
   useEffect(() => {
-    if (tipoDestino === "Empleado" && open) {
-      getEmpleados()
-        .then((rows) => setEmpleados(rows || []))
-        .catch(() => {
-          setEmpleados([]);
-          showToast("Error al cargar empleados", "danger");
-        });
-    }
-  }, [tipoDestino, open]);
+    if (tipoDestino !== "Empleado" || !open) return;
+    setLoadingEmpleados(true);
+    getEmpleados()
+      .then((rows) => setEmpleados(Array.isArray(rows) ? rows : []))
+      .catch(() => {
+        setEmpleados([]);
+        showToast("Error al cargar empleados", "danger");
+      })
+      .finally(() => setLoadingEmpleados(false));
+  }, [tipoDestino, open, showToast]);
 
   function resetForm() {
     setTipoDestino("Bodega");
     setClienteDestino("");
     setSiteDestino("");
     setBodegaDestino("");
-    setEmpleadoDestino(""); // 👈 nuevo
+    setEmpleadoDestino("");
     setMotivo("");
   }
 
-  // Cuando cambie el tipo, limpia los campos de otros destinos
+  // limpiar campos al cambiar el tipo
   useEffect(() => {
     if (tipoDestino === "Bodega") {
       setClienteDestino("");
@@ -104,7 +137,31 @@ export default function MoverActivoModal({ open, onClose, activo, onSaved }) {
     }
   }, [tipoDestino]);
 
-  // Validación simple según destino
+  // helpers para encontrar el "value" del Autocomplete (obj completo desde el id)
+  const valueCliente = useMemo(
+    () => clientes.find((c) => c.id === clienteDestino) || null,
+    [clientes, clienteDestino]
+  );
+  const valueSite = useMemo(
+    () => sites.find((s) => s.id === siteDestino) || null,
+    [sites, siteDestino]
+  );
+  const valueBodega = useMemo(
+    () => bodegas.find((b) => b.id === bodegaDestino) || null,
+    [bodegas, bodegaDestino]
+  );
+  const valueEmpleado = useMemo(
+    () => empleados.find((e) => e.id === empleadoDestino) || null,
+    [empleados, empleadoDestino]
+  );
+
+  // filtros insensibles a acentos (Autocomplete ya filtra, pero esto mejora)
+  const filterByName = (optArray, inputValue, key = "nombre") => {
+    const q = normalize(inputValue);
+    if (!q) return optArray;
+    return optArray.filter((o) => normalize(o?.[key] || "").includes(q));
+  };
+
   function isValid() {
     if (tipoDestino === "Bodega") return !!bodegaDestino;
     if (tipoDestino === "Cliente") return !!clienteDestino && !!siteDestino;
@@ -125,15 +182,15 @@ export default function MoverActivoModal({ open, onClose, activo, onSaved }) {
         tipo_destino: tipoDestino,
         id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
         id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
-        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null, // 👈 nuevo
+        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null,
         motivo,
-        usuario_responsable: userData?.id_usuario || null,
+        usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
       });
       showToast("Activo movido correctamente", "success");
       onClose?.();
       onSaved?.();
     } catch (err) {
-      showToast(err.message || "Error al mover activo", "danger");
+      showToast(err?.message || "Error al mover activo", "danger");
     } finally {
       setSaving(false);
     }
@@ -144,91 +201,141 @@ export default function MoverActivoModal({ open, onClose, activo, onSaved }) {
       <ModalDialog
         component="form"
         onSubmit={onSubmit}
-        sx={{ width: { xs: "100%", sm: 520 } }}>
+        sx={{ width: { xs: "100%", sm: 560 } }}>
         <Typography level="title-lg">Mover Activo</Typography>
         <Divider />
         <Stack spacing={1.5} mt={1}>
+          {/* Tipo destino */}
           <FormControl required>
             <FormLabel>Tipo destino</FormLabel>
-            <Select
+            <Autocomplete
+              options={["Bodega", "Cliente", "Empleado"]}
               value={tipoDestino}
-              onChange={(_, v) => setTipoDestino(v)}
-              disabled={saving}>
-              <Option value="Bodega">Bodega</Option>
-              <Option value="Cliente">Cliente</Option>
-              <Option value="Empleado">Empleado</Option> {/* 👈 nuevo */}
-            </Select>
+              onChange={(_, v) => v && setTipoDestino(v)}
+              getOptionLabel={(v) => v}
+              isOptionEqualToValue={(a, b) => a === b}
+              disabled={saving}
+              disablePortal
+              slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+            />
           </FormControl>
 
+          {/* Bodega */}
           {tipoDestino === "Bodega" && (
             <FormControl required>
               <FormLabel>Bodega destino</FormLabel>
-              <Select
-                value={bodegaDestino}
-                onChange={(_, v) => setBodegaDestino(v)}
-                disabled={saving}>
-                <Option value="">—</Option>
-                {bodegas.map((b) => (
-                  <Option key={b.id} value={b.id}>
-                    {b.nombre}
-                  </Option>
-                ))}
-              </Select>
+              <Autocomplete
+                placeholder="Escribe para buscar bodega…"
+                options={bodegas}
+                loading={loadingBodegas}
+                value={valueBodega}
+                onChange={(_, v) => setBodegaDestino(v?.id || "")}
+                getOptionLabel={(o) => o?.nombre || ""}
+                isOptionEqualToValue={(o, v) => o.id === v.id}
+                filterOptions={(opts, state) =>
+                  filterByName(opts, state.inputValue, "nombre")
+                }
+                disabled={saving}
+                disablePortal
+                clearOnBlur={false}
+                autoHighlight
+                renderInput={(params) => <Input {...params} />}
+                slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+              />
             </FormControl>
           )}
 
+          {/* Cliente + Site */}
           {tipoDestino === "Cliente" && (
             <>
               <FormControl required>
                 <FormLabel>Cliente destino</FormLabel>
-                <Select
-                  value={clienteDestino}
-                  onChange={(_, v) => setClienteDestino(v)}
-                  disabled={saving}>
-                  <Option value="">—</Option>
-                  {clientes.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </Option>
-                  ))}
-                </Select>
+                <Autocomplete
+                  placeholder="Escribe para buscar cliente…"
+                  options={clientes}
+                  loading={loadingClientes}
+                  value={valueCliente}
+                  onChange={(_, v) => {
+                    setClienteDestino(v?.id || "");
+                    setSiteDestino("");
+                  }}
+                  getOptionLabel={(o) => o?.nombre || ""}
+                  isOptionEqualToValue={(o, v) => o.id === v.id}
+                  filterOptions={(opts, state) =>
+                    filterByName(opts, state.inputValue, "nombre")
+                  }
+                  disabled={saving}
+                  disablePortal
+                  clearOnBlur={false}
+                  autoHighlight
+                  renderInput={(params) => <Input {...params} />}
+                  slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+                />
               </FormControl>
 
-              {clienteDestino && (
-                <FormControl required>
-                  <FormLabel>Site destino</FormLabel>
-                  <Select
-                    value={siteDestino}
-                    onChange={(_, v) => setSiteDestino(v)}
-                    disabled={saving}>
-                    <Option value="">—</Option>
-                    {sites.map((s) => (
-                      <Option key={s.id} value={s.id}>
-                        {s.nombre}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
+              <FormControl required>
+                <FormLabel>Site destino</FormLabel>
+                <Autocomplete
+                  placeholder={
+                    clienteDestino
+                      ? "Escribe para buscar site…"
+                      : "Selecciona un cliente primero"
+                  }
+                  options={sites}
+                  loading={loadingSites}
+                  value={valueSite}
+                  onChange={(_, v) => setSiteDestino(v?.id || "")}
+                  getOptionLabel={(o) => o?.nombre || ""}
+                  isOptionEqualToValue={(o, v) => o.id === v.id}
+                  filterOptions={(opts, state) =>
+                    filterByName(opts, state.inputValue, "nombre")
+                  }
+                  disabled={!clienteDestino || saving}
+                  disablePortal
+                  clearOnBlur={false}
+                  autoHighlight
+                  renderInput={(params) => <Input {...params} />}
+                  slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+                />
+              </FormControl>
             </>
           )}
 
+          {/* Empleado */}
           {tipoDestino === "Empleado" && (
             <FormControl required>
               <FormLabel>Empleado destino</FormLabel>
-              <Select
-                value={empleadoDestino}
-                onChange={(_, v) => setEmpleadoDestino(v)}
-                disabled={saving}>
-                <Option value="">—</Option>
-                {empleados.map((e) => (
-                  <Option key={e.id} value={e.id}>
-                    {/* ajusta el label según tu API; si traes usuario: e.usuario_nombre */}
-                    {e.nombre}
-                    {e.puesto ? ` — ${e.puesto}` : ""}
-                  </Option>
-                ))}
-              </Select>
+              <Autocomplete
+                placeholder="Escribe para buscar empleado…"
+                options={empleados}
+                loading={loadingEmpleados}
+                value={valueEmpleado}
+                onChange={(_, v) => setEmpleadoDestino(v?.id || "")}
+                getOptionLabel={(o) =>
+                  [
+                    o?.nombre || o?.usuario_nombre || "",
+                    o?.puesto ? `— ${o.puesto}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+                }
+                isOptionEqualToValue={(o, v) => o.id === v.id}
+                filterOptions={(opts, state) => {
+                  const q = normalize(state.inputValue);
+                  return opts.filter((e) =>
+                    [e?.nombre, e?.usuario_nombre, e?.puesto]
+                      .filter(Boolean)
+                      .map(normalize)
+                      .some((t) => t.includes(q))
+                  );
+                }}
+                disabled={saving}
+                disablePortal
+                clearOnBlur={false}
+                autoHighlight
+                renderInput={(params) => <Input {...params} />}
+                slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+              />
             </FormControl>
           )}
 
@@ -238,6 +345,7 @@ export default function MoverActivoModal({ open, onClose, activo, onSaved }) {
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               disabled={saving}
+              placeholder="(Opcional)"
             />
           </FormControl>
         </Stack>

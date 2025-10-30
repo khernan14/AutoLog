@@ -10,44 +10,19 @@ import {
   FormControl,
   FormLabel,
   Input,
-  Select,
-  Option,
   Button,
   Chip,
 } from "@mui/joy";
 import { useToast } from "../../context/ToastContext";
 
-const ESTATUS = [
-  "Activo",
-  "Inactivo",
-  "Arrendado",
-  "En Mantenimiento",
-  "Reciclado",
-];
-
-const TIPOS = [
-  "Impresora",
-  "ATM",
-  "Escáner",
-  "UPS",
-  "Silla",
-  "Mueble",
-  "Laptop",
-  "Desktop",
-  "Mesa",
-  "Audifonos",
-  "Monitor",
-  "Mochila",
-  "Escritorio",
-  "Celular",
-  "Otro",
-];
+// 🔹 Nuevo: Select centralizado y mapa de colores por estatus
+import CatalogSelect from "@/components/forms/CatalogSelect";
+import { ESTATUS_COLOR } from "@/constants/inventario";
 
 export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
   const { showToast } = useToast();
 
   const [form, setForm] = useState({
-    // codigo vendrá de editing y no será editable
     codigo: "",
     nombre: "",
     modelo: "",
@@ -73,16 +48,16 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
   async function onSubmit(e) {
     e.preventDefault();
 
-    if (!form.nombre.trim()) {
+    if (!String(form.nombre || "").trim()) {
       showToast("El nombre es requerido", "warning");
       return;
     }
 
     setSaving(true);
     try {
-      // Enviamos el mismo código original (no editable)
       await updateActivo(editing.id, {
         ...form,
+        // código no editable: respeta el original
         codigo: editing.codigo,
       });
       showToast("Activo actualizado", "success");
@@ -95,17 +70,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
     }
   }
 
-  // colorcito para el chip del estatus (opcional, se ve nice)
-  const chipColorByStatus =
-    form.estatus === "Activo"
-      ? "success"
-      : form.estatus === "Arrendado"
-      ? "primary"
-      : form.estatus === "En Mantenimiento"
-      ? "warning"
-      : form.estatus === "Inactivo"
-      ? "danger"
-      : "neutral";
+  const chipColor = ESTATUS_COLOR[form.estatus] || "neutral";
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -126,11 +91,12 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
             </Stack>
           </FormControl>
 
-          <FormControl>
+          <FormControl required>
             <FormLabel>Nombre</FormLabel>
             <Input
               value={form.nombre}
               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              disabled={saving}
             />
           </FormControl>
 
@@ -139,6 +105,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
             <Input
               value={form.modelo}
               onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+              disabled={saving}
             />
           </FormControl>
 
@@ -149,38 +116,35 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
               onChange={(e) =>
                 setForm({ ...form, serial_number: e.target.value })
               }
+              disabled={saving}
             />
           </FormControl>
 
+          {/* 🔹 Tipo desde catálogo */}
           <FormControl>
             <FormLabel>Tipo</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="tiposActivo"
               value={form.tipo}
-              onChange={(_, v) => setForm({ ...form, tipo: v })}>
-              {TIPOS.map((t) => (
-                <Option key={t} value={t}>
-                  {t}
-                </Option>
-              ))}
-            </Select>
+              onChange={(_, v) => setForm({ ...form, tipo: v })}
+              disabled={saving}
+            />
           </FormControl>
 
+          {/* 🔹 Estatus desde catálogo + chip con color centralizado */}
           <FormControl>
             <FormLabel>Estatus</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="estatusActivo"
               value={form.estatus}
-              onChange={(_, v) => setForm({ ...form, estatus: v })}>
-              {ESTATUS.map((s) => (
-                <Option key={s} value={s}>
-                  {s}
-                </Option>
-              ))}
-            </Select>
+              onChange={(_, v) => setForm({ ...form, estatus: v })}
+              disabled={saving}
+            />
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
               <Typography level="body-xs" sx={{ opacity: 0.7 }}>
                 Estado actual:
               </Typography>
-              <Chip size="sm" variant="soft" color={chipColorByStatus}>
+              <Chip size="sm" variant="soft" color={chipColor}>
                 {form.estatus}
               </Chip>
             </Stack>

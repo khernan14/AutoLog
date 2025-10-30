@@ -143,6 +143,12 @@ export const endpoints = {
   notifPlantillasTest: `${API_BASE_URL}/notificaciones/plantillas/`, // POST :id/test
 
   notifConfig: `${API_BASE_URL}/notificaciones/config/`,
+
+  //viaticos
+  viaticos: `${API_BASE_URL}/viaticos`,
+  viaticosCiudades: `${API_BASE_URL}/viaticos/ciudades`,
+  viaticosLiquidaciones: `${API_BASE_URL}/viaticos/liquidaciones`,
+  viaticosComprobantes: `${API_BASE_URL}/viaticos/comprobantes`,
 };
 
 // src/js/config/variables.js

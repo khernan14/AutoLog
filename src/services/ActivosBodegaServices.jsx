@@ -25,9 +25,9 @@ export async function createActivoEnBodega(data) {
 
 // services/ActivosServices.js
 export async function getNextActivoCode() {
-  const r = await fetchConToken("/api/inventario/activos/next-code", {
-    credentials: "include",
-  });
-  if (!r.ok) throw new Error("No se pudo obtener el próximo código");
-  return r.json(); // { next: "1206" }
+  const r = await fetchConToken("/api/inventario/activos/next-code");
+  if (!r.ok) throw new Error("No se pudo obtener el siguiente código");
+  const data = await r.json();
+  // Soporta tanto { next: "1209" } como "1209"
+  return data?.next ?? data;
 }

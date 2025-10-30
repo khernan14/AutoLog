@@ -1,13 +1,7 @@
+// src/pages/Inventario/ClienteActivos.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import {
-  getActivosByCliente,
-  updateActivo,
-} from "../../services/ActivosServices";
-import { moverActivo } from "../../services/UbicacionesServices";
-import { getClientes } from "../../services/ClientesServices";
-import { getSitesByCliente } from "../../services/SitesServices";
-import { getBodegas } from "../../services/BodegasServices";
+import { getActivosByCliente } from "../../services/ActivosServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 import {
   Box,
@@ -17,18 +11,14 @@ import {
   Button,
   Table,
   Sheet,
-  Modal,
-  ModalDialog,
-  FormControl,
-  FormLabel,
   Input,
-  Select,
-  Option,
   Divider,
   IconButton,
   Chip,
   Tooltip,
   CircularProgress,
+  Modal,
+  ModalDialog,
 } from "@mui/joy";
 
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -45,38 +35,23 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
+import MoverActivoModal from "../Inventario/MoverActivoModal";
 import StyledQR from "../../components/QRCode/StyledQR";
-import StatusCard from "../../components/common/StatusCard"; // ajusta si es otro path
-import useIsMobile from "../../hooks/useIsMobile"; // ajusta si es otro path
+import StatusCard from "../../components/common/StatusCard";
+import useIsMobile from "../../hooks/useIsMobile";
 
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
-const ESTATUS = [
-  "Activo",
-  "Inactivo",
-  "Arrendado",
-  "En Mantenimiento",
-  "Reciclado",
-];
-const TIPOS = [
-  "Impresora",
-  "ATM",
-  "Escáner",
-  "UPS",
-  "Silla",
-  "Mueble",
-  "Laptop",
-  "Desktop",
-  "Mesa",
-  "Audifonos",
-  "Monitor",
-  "Mochila",
-  "Escritorio",
-  "Celular",
-  "Otro",
-];
+// 👇 catálogos y colores globales
+import { ESTATUS_ACTIVO, ESTATUS_COLOR } from "../../constants/inventario";
+
+// 👇 tu select de catálogos (para filtros)
+import CatalogSelect from "../../components/forms/CatalogSelect";
+
+// 👇 tu modal reutilizable de edición
+import ActivoFormModal from "@pages/Inventario/ActivoFormModal";
 
 export default function ClienteActivos() {
   const { id } = useParams(); // id del cliente actual
@@ -100,9 +75,6 @@ export default function ClienteActivos() {
 
   // data
   const [rows, setRows] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [sitesDestino, setSitesDestino] = useState([]);
-  const [bodegas, setBodegas] = useState([]);
 
   // ui state
   const [loading, setLoading] = useState(true);
@@ -119,45 +91,27 @@ export default function ClienteActivos() {
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
 
-  // form/selecciones
+  // selecciones
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [savingMover, setSavingMover] = useState(false);
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
   const [activoQR, setActivoQR] = useState(null);
   const [publicLink, setPublicLink] = useState("");
-
-  // mover
-  const [tipoDestino, setTipoDestino] = useState("Cliente");
-  const [clienteDestino, setClienteDestino] = useState("");
-  const [siteDestino, setSiteDestino] = useState("");
-  const [bodegaDestino, setBodegaDestino] = useState("");
-  const [motivo, setMotivo] = useState("");
 
   const load = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
       return;
     }
-
     if (!canView) {
-      setError(null); // deja que la tarjeta “sin permisos” se muestre
+      setError(null);
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
-      const [activos, clientesData, bodegasData] = await Promise.all([
-        getActivosByCliente(id),
-        getClientes(),
-        getBodegas(),
-      ]);
+      const activos = await getActivosByCliente(id);
       setRows(Array.isArray(activos) ? activos : []);
-      setClientes(Array.isArray(clientesData) ? clientesData : []);
-      setBodegas(Array.isArray(bodegasData) ? bodegasData : []);
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
       setError(
@@ -174,80 +128,19 @@ export default function ClienteActivos() {
     load();
   }, [load]);
 
-  // carga dinámica de sites cuando se elige cliente
-  useEffect(() => {
-    if (tipoDestino === "Cliente" && clienteDestino) {
-      getSitesByCliente(clienteDestino)
-        .then((d) => setSitesDestino(Array.isArray(d) ? d : []))
-        .catch(() => setSitesDestino([]));
-    } else {
-      setSitesDestino([]);
-    }
-  }, [tipoDestino, clienteDestino]);
-
   // acciones
   function editActivo(row) {
     if (!canEdit)
       return showToast("No tienes permisos para editar activos.", "warning");
     setEditing(row);
-    setForm({
-      codigo: row.codigo,
-      nombre: row.nombre,
-      modelo: row.modelo || "",
-      serial_number: row.serial_number || "",
-      tipo: row.tipo || "Otro",
-      estatus: row.estatus || "Activo",
-    });
     setOpenEdit(true);
-  }
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await updateActivo(editing.id, form);
-      showToast("Activo actualizado correctamente", "success");
-      setOpenEdit(false);
-      load();
-    } catch (err) {
-      showToast(err?.message || "Error al actualizar activo", "danger");
-    } finally {
-      setSaving(false);
-    }
   }
 
   function abrirMover(row) {
     if (!canMove)
       return showToast("No tienes permisos para mover activos.", "warning");
     setActivoSeleccionado(row);
-    setTipoDestino("Cliente");
-    setClienteDestino(id); // preselecciona el cliente actual para facilidad
-    setSiteDestino("");
-    setBodegaDestino("");
-    setMotivo("");
     setOpenMover(true);
-  }
-
-  async function onMover(e) {
-    e.preventDefault();
-    setSavingMover(true);
-    try {
-      await moverActivo({
-        id_activo: activoSeleccionado.id,
-        tipo_destino: tipoDestino,
-        id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
-        id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
-        motivo,
-        usuario_responsable: userData?.id || null,
-      });
-      showToast("Activo movido correctamente", "success");
-      setOpenMover(false);
-      load();
-    } catch (err) {
-      showToast(err?.message || "Error al mover activo", "danger");
-    } finally {
-      setSavingMover(false);
-    }
   }
 
   function abrirHistorial(row) {
@@ -265,13 +158,11 @@ export default function ClienteActivos() {
       return;
     }
     setActivoQR(row);
-    setPublicLink(""); // limpia previo
+    setPublicLink("");
     try {
-      // pide al backend una URL firmada del tipo /public/activos/:codigo?t=TOKEN
       const { url } = await getPublicLinkForActivo(row.id);
       setPublicLink(url);
     } catch (e) {
-      // fallback sin token (por si falla el endpoint)
       showToast(
         e?.message || "No se pudo generar el enlace público firmado",
         "danger"
@@ -429,31 +320,25 @@ export default function ClienteActivos() {
             sx={{ width: { xs: "100%", sm: 280 } }}
           />
 
-          <Select
-            placeholder="Estatus"
+          {/* Filtro de estatus desde catálogo */}
+          <CatalogSelect
+            catalog="estatusActivo"
             value={statusFilter}
             onChange={(_, v) => setStatusFilter(v || "")}
-            sx={{ minWidth: 140 }}>
-            <Option value="">Todos</Option>
-            {ESTATUS.map((s) => (
-              <Option key={s} value={s}>
-                {s}
-              </Option>
-            ))}
-          </Select>
+            placeholder="Estatus"
+            allowEmpty
+            sx={{ minWidth: 140 }}
+          />
 
-          <Select
-            placeholder="Tipo"
+          {/* Filtro de tipo desde catálogo */}
+          <CatalogSelect
+            catalog="tiposActivo"
             value={typeFilter}
             onChange={(_, v) => setTypeFilter(v || "")}
-            sx={{ minWidth: 140 }}>
-            <Option value="">Todos</Option>
-            {TIPOS.map((t) => (
-              <Option key={t} value={t}>
-                {t}
-              </Option>
-            ))}
-          </Select>
+            placeholder="Tipo"
+            allowEmpty
+            sx={{ minWidth: 140 }}
+          />
         </Stack>
       </Stack>
 
@@ -490,15 +375,7 @@ export default function ClienteActivos() {
                   <Chip
                     size="sm"
                     variant="soft"
-                    color={
-                      r.estatus === "Activo"
-                        ? "success"
-                        : r.estatus === "Arrendado"
-                        ? "primary"
-                        : r.estatus === "En Mantenimiento"
-                        ? "warning"
-                        : "neutral"
-                    }
+                    color={ESTATUS_COLOR[r.estatus] || "neutral"}
                     sx={{ alignSelf: "flex-start" }}>
                     {r.estatus}
                   </Chip>
@@ -596,15 +473,7 @@ export default function ClienteActivos() {
                     <Chip
                       size="sm"
                       variant="soft"
-                      color={
-                        r.estatus === "Activo"
-                          ? "success"
-                          : r.estatus === "Arrendado"
-                          ? "primary"
-                          : r.estatus === "En Mantenimiento"
-                          ? "warning"
-                          : "neutral"
-                      }>
+                      color={ESTATUS_COLOR[r.estatus] || "neutral"}>
                       {r.estatus}
                     </Chip>
                   </td>
@@ -676,178 +545,13 @@ export default function ClienteActivos() {
         )}
       </Card>
 
-      {/* Modal Editar */}
-      <Modal open={openEdit} onClose={() => setOpenEdit(false)}>
-        <ModalDialog
-          component="form"
-          onSubmit={onSubmit}
-          sx={{ width: { xs: "100%", sm: 520 } }}>
-          <Typography level="title-lg">Editar Activo</Typography>
-          <Divider />
-          <Stack spacing={1.5} mt={1}>
-            <FormControl required>
-              <FormLabel>Código</FormLabel>
-              <Input
-                value={form.codigo || ""}
-                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-              />
-            </FormControl>
-            <FormControl required>
-              <FormLabel>Nombre</FormLabel>
-              <Input
-                value={form.nombre || ""}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Modelo</FormLabel>
-              <Input
-                value={form.modelo || ""}
-                onChange={(e) => setForm({ ...form, modelo: e.target.value })}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Serie</FormLabel>
-              <Input
-                value={form.serial_number || ""}
-                onChange={(e) =>
-                  setForm({ ...form, serial_number: e.target.value })
-                }
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>Tipo</FormLabel>
-              <Select
-                value={form.tipo || "Otro"}
-                onChange={(_, v) => setForm({ ...form, tipo: v })}>
-                {TIPOS.map((t) => (
-                  <Option key={t} value={t}>
-                    {t}
-                  </Option>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl>
-              <FormLabel>Estatus</FormLabel>
-              <Select
-                value={form.estatus || "Activo"}
-                onChange={(_, v) => setForm({ ...form, estatus: v })}>
-                {ESTATUS.map((s) => (
-                  <Option key={s} value={s}>
-                    {s}
-                  </Option>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-          <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
-            <Button variant="plain" onClick={() => setOpenEdit(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" loading={saving}>
-              Guardar
-            </Button>
-          </Stack>
-        </ModalDialog>
-      </Modal>
-
-      {/* Modal Mover */}
-      <Modal open={openMover} onClose={() => setOpenMover(false)}>
-        <ModalDialog
-          component="form"
-          onSubmit={onMover}
-          sx={{ width: { xs: "100%", sm: 520 } }}>
-          <Typography level="title-lg">Mover Activo</Typography>
-          <Divider />
-          <Stack spacing={1.5} mt={1}>
-            <FormControl required>
-              <FormLabel>Tipo destino</FormLabel>
-              <Select
-                value={tipoDestino}
-                onChange={(_, v) => setTipoDestino(v)}
-                required
-                disabled={savingMover}>
-                <Option value="Cliente">Cliente</Option>
-                <Option value="Bodega">Bodega</Option>
-              </Select>
-            </FormControl>
-
-            {tipoDestino === "Cliente" && (
-              <>
-                <FormControl required>
-                  <FormLabel>Cliente destino</FormLabel>
-                  <Select
-                    value={clienteDestino}
-                    onChange={(_, v) => setClienteDestino(v)}
-                    disabled={savingMover}>
-                    <Option value="">—</Option>
-                    {clientes.map((c) => (
-                      <Option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                {clienteDestino && (
-                  <FormControl required>
-                    <FormLabel>Site destino</FormLabel>
-                    <Select
-                      value={siteDestino}
-                      onChange={(_, v) => setSiteDestino(v)}
-                      disabled={savingMover}>
-                      <Option value="">—</Option>
-                      {sitesDestino.map((s) => (
-                        <Option key={s.id} value={s.id}>
-                          {s.nombre}
-                        </Option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-              </>
-            )}
-
-            {tipoDestino === "Bodega" && (
-              <FormControl required>
-                <FormLabel>Bodega destino</FormLabel>
-                <Select
-                  value={bodegaDestino}
-                  onChange={(_, v) => setBodegaDestino(v)}
-                  disabled={savingMover}>
-                  <Option value="">—</Option>
-                  {bodegas.map((b) => (
-                    <Option key={b.id} value={b.id}>
-                      {b.nombre}
-                    </Option>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-
-            <FormControl>
-              <FormLabel>Motivo</FormLabel>
-              <Input
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                disabled={savingMover}
-              />
-            </FormControl>
-          </Stack>
-
-          <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
-            <Button
-              variant="plain"
-              onClick={() => setOpenMover(false)}
-              disabled={savingMover}>
-              Cancelar
-            </Button>
-            <Button type="submit" loading={savingMover} disabled={savingMover}>
-              Mover
-            </Button>
-          </Stack>
-        </ModalDialog>
-      </Modal>
+      {/* Modal Editar (reutilizable) */}
+      <ActivoFormModal
+        open={openEdit}
+        onClose={() => setOpenEdit(false)}
+        editing={editing}
+        onSaved={load}
+      />
 
       {/* Modal QR */}
       <Modal
@@ -899,6 +603,19 @@ export default function ClienteActivos() {
         open={openHistorial}
         onClose={() => setOpenHistorial(false)}
         activo={activoSeleccionado}
+      />
+
+      {/* Modal Mover */}
+      <MoverActivoModal
+        open={openMover}
+        onClose={() => setOpenMover(false)}
+        activo={activoSeleccionado}
+        onSaved={() => {
+          setOpenMover(false);
+          load();
+        }}
+        defaultTipo="Cliente"
+        defaultClienteId={Number(id)}
       />
     </Box>
   );
