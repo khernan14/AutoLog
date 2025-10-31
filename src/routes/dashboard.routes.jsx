@@ -48,6 +48,14 @@ import StatusAdminPage from "@/pages/SoporteAdmin/StatusAdminPage.jsx";
 import HelpSearchResults from "@/pages/HelpPage/HelpSearchResults.jsx";
 import Notificaciones from "@/pages/Notificaciones/Notificaciones.jsx";
 import SettingsPage from "@/pages/Settings/SettingsPage";
+
+// viaticos
+import ViaticosList from "../pages/Viaticos/ViaticosList";
+import ViaticoCreate from "../pages/Viaticos/ViaticosCreate";
+import ViaticoDetail from "../pages/Viaticos/ViaticoDetail";
+import LiquidacionDetail from "../pages/Viaticos/LiquidacionDetail";
+import LiquidacionesList from "../pages/Viaticos/LiquidacionesList";
+
 // Wrapper de permiso
 // import { useAuth } from "@/context/AuthContext";
 // function RequirePermission({ children, permiso = "help_manage" }) {
@@ -90,6 +98,19 @@ export default function DashboardRoutes() {
         />
         <Route path="reports" element={<ReportsRouter />} />
         <Route path="configuraciones" element={<SettingsPage />} />
+
+        {/* Viaticos */}
+        <Route path="/viaticos" element={<ViaticosList />} />
+        <Route path="/viaticos/nuevo" element={<ViaticoCreate />} />
+        <Route path="/viaticos/:id" element={<ViaticoDetail />} />
+        <Route
+          path="/admin/viaticos/liquidaciones"
+          element={<LiquidacionesList />}
+        />
+        <Route
+          path="/admin/viaticos/liquidaciones/:id"
+          element={<LiquidacionDetail />}
+        />
 
         {/* Clientes */}
         <Route path="clientes" element={<ClientesList />} />

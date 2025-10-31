@@ -57,8 +57,6 @@ import SummarizeRoundedIcon from "@mui/icons-material/SummarizeRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import MarkChatUnreadIcon from "@mui/icons-material/MarkChatUnread";
 
-import { globalSearch } from "../services/search.api"; // API /api/search
-
 import { useAuth } from "./AuthContext";
 import { closeSidebar } from "../utils/ToggleSidebar";
 import logoLight from "../assets/newLogoTecnasaBlack.png";
@@ -283,6 +281,37 @@ export default function Sidebar() {
     },
   ];
 
+  // ✅ Finanzas
+  const financeItems = [
+    {
+      path: "/admin/viaticos", // si usas prefijo /admin cambia a "/admin/viaticos"
+      icon: <SummarizeRoundedIcon />, // ya lo tienes importado arriba
+      label: "Viáticos",
+      perm: "ver_viaticos",
+      canView: checkPermission("ver_viaticos"),
+      kind: "reporte",
+      group: "Finanzas",
+    },
+    {
+      path: "/admin/viaticos/nuevo", // si usas prefijo /admin cambia a "/admin/viaticos/nuevo"
+      icon: <AppRegistrationIcon />, // ya lo tienes importado arriba
+      label: "Nueva Solicitud",
+      perm: "crear_viaticos",
+      canView: checkPermission("crear_viaticos"),
+      kind: "record",
+      group: "Finanzas",
+    },
+    {
+      path: "/admin/viaticos/liquidaciones/",
+      icon: <SummarizeRoundedIcon />, // ya lo tienes importado arriba
+      label: "Liquidaciones",
+      perm: "ver_liquidaciones",
+      canView: checkPermission("ver_liquidaciones"),
+      kind: "record",
+      group: "Finanzas",
+    },
+  ];
+
   const systemItems = [
     {
       path: "/admin/usuarios",
@@ -367,6 +396,7 @@ export default function Sidebar() {
       ...pick(navItems),
       ...pick(managementItems),
       ...pick(inventoryItems),
+      ...pick(financeItems),
       ...pick(systemItems),
       ...pick(supportAndHelpItems),
     ];
@@ -374,6 +404,7 @@ export default function Sidebar() {
     navItems,
     managementItems,
     inventoryItems,
+    financeItems,
     systemItems,
     supportAndHelpItems,
   ]);
@@ -827,6 +858,45 @@ export default function Sidebar() {
                   </ListItemButton>
                 )}>
                 {inventoryItems.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    path={item.path}
+                    icon={item.icon}
+                    label={item.label}
+                    currentPath={location.pathname}
+                    onNavigate={handleNavigate}
+                    canView={item.canView}
+                  />
+                ))}
+              </Toggler>
+            </ListItem>
+          )}
+
+          {(checkPermission("gestionar_viaticos") ||
+            checkPermission("gestionar_liquidaciones")) && (
+            <ListItem nested>
+              <Toggler
+                renderToggle={({ open, setOpen }) => (
+                  <ListItemButton
+                    onClick={() => setOpen(!open)}
+                    aria-expanded={open}
+                    sx={{
+                      fontWeight: "md",
+                      "&:hover": { backgroundColor: "neutral.softBg" },
+                    }}>
+                    <AdminPanelSettingsIcon />
+                    <ListItemContent>
+                      <Typography level="title-sm">Finanzas</Typography>
+                    </ListItemContent>
+                    <KeyboardArrowDownIcon
+                      sx={{
+                        transform: open ? "rotate(180deg)" : "none",
+                        transition: "0.2s",
+                      }}
+                    />
+                  </ListItemButton>
+                )}>
+                {financeItems.map((item) => (
                   <NavItem
                     key={item.path}
                     path={item.path}
