@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { CssVarsProvider, CssBaseline } from "@mui/joy";
 import { createAppTheme } from "../theme/createAppTheme";
+import TailwindDarkSync from "@/theme/TailwindDarkSync";
 
 // helpers persistentes
 const getLS = (k, d) => {
@@ -45,6 +46,7 @@ export function AppThemeProvider({ children }) {
         modeStorageKey="ui:mode" // evita interferencia de otros sitios/libs
         disableTransitionOnChange // sin parpadeo al cambiar
       >
+        <TailwindDarkSync />
         <CssBaseline />
         {children}
       </CssVarsProvider>
