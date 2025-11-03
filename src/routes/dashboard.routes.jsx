@@ -48,7 +48,6 @@ import StatusAdminPage from "@/pages/SoporteAdmin/StatusAdminPage.jsx";
 import HelpSearchResults from "@/pages/HelpPage/HelpSearchResults.jsx";
 import Notificaciones from "@/pages/Notificaciones/Notificaciones.jsx";
 import SettingsPage from "@/pages/Settings/SettingsPage";
-import ActivosClientes from "../pages/Clientes/ActivosClientes";
 // Wrapper de permiso
 // import { useAuth } from "@/context/AuthContext";
 // function RequirePermission({ children, permiso = "help_manage" }) {
@@ -94,7 +93,7 @@ export default function DashboardRoutes() {
 
         {/* Clientes */}
         <Route path="clientes" element={<ClientesList />} />
-        <Route path="clientes/:id/*" element={<ActivosClientes />} />
+        <Route path="clientes/:id/*" element={<ClienteDetail />} />
         <Route path="sites" element={<SitesList />} />
 
         {/* Inventario */}
