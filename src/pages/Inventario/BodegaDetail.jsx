@@ -38,6 +38,7 @@ import ActivoFormModal from "./ActivoFormModal";
 import MoverActivoModal from "./MoverActivoModal";
 import HistorialActivoModal from "./HistorialActivoModal";
 import StyledQR from "../../components/QRCode/StyledQR";
+import ModalImportarActivos from "./ModalImportarActivos";
 
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -76,6 +77,7 @@ export default function BodegaDetail() {
   const [openEdit, setOpenEdit] = useState(false);
   const [openMover, setOpenMover] = useState(false);
   const [openHist, setOpenHist] = useState(false);
+  const [openImport, setOpenImport] = useState(false);
 
   const [openQR, setOpenQR] = useState(false);
   const [activoQR, setActivoQR] = useState(null);
@@ -354,6 +356,12 @@ export default function BodegaDetail() {
               onClick={() => setOpenExport(true)}
               sx={{ borderRadius: "999px" }}>
               Exportar
+            </Button>
+            <Button
+              variant="soft"
+              onClick={() => setOpenImport(true)}
+              sx={{ borderRadius: "999px" }}>
+              Importar
             </Button>
           </Stack>
         </Stack>
@@ -780,6 +788,15 @@ export default function BodegaDetail() {
           includeGeneratedStamp
           logoUrl="/newLogoTecnasa.png"
         />
+
+        {openImport && (
+          <ModalImportarActivos
+            open={openImport}
+            onClose={() => setOpenImport(false)}
+            idBodega={id}
+            onSaved={load}
+          />
+        )}
       </Box>
     </Sheet>
   );

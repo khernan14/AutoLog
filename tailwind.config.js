@@ -1,15 +1,12 @@
-/** @type {import('tailwindcss').Config} */
-
+// tailwind.config.js
 import { fontFamily } from "tailwindcss/defaultTheme";
-import { theme } from "./src/constants/theme.jsx";
+import { theme } from "./src/constants/theme.js";
 
+/** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ["Poppins", ...fontFamily.sans],
-      },
+      fontFamily: { sans: ["Poppins", ...fontFamily.sans] },
       colors: {
         background: theme.colors.background,
         text: theme.colors.text,
@@ -22,5 +19,4 @@ export default {
       },
     },
   },
-  plugins: [],
 };
