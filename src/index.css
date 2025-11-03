@@ -1,11 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../tailwind.config.js";
+@import "@heroui/styles";
+@import "tailwindcss";
 
-
-html, body {
-    font-family: 'Poppins', sans-serif;
-    overflow: hidden; 
-  }
-
+/* tu CSS… */
+html, body { font-family: 'Poppins', sans-serif; overflow: hidden; }
 .btn-brand { background: var(--twc-primary); color: #fff; }
