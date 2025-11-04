@@ -56,6 +56,23 @@ import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import SummarizeRoundedIcon from "@mui/icons-material/SummarizeRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import MarkChatUnreadIcon from "@mui/icons-material/MarkChatUnread";
+import { MoreHorizontalIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { globalSearch } from "../services/search.api"; // API /api/search
 
@@ -510,21 +527,6 @@ export default function Sidebar() {
     }
   };
 
-  // Ctrl/⌘ + K → enfocar buscador
-  React.useEffect(() => {
-    const onGlobalKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        inputRef.current?.focus();
-        setOpenSearch(
-          q.trim().length >= 2 && (results.length > 0 || loadingSearch)
-        );
-      }
-    };
-    window.addEventListener("keydown", onGlobalKey);
-    return () => window.removeEventListener("keydown", onGlobalKey);
-  }, [q, results.length, loadingSearch]);
-
   const logout = () => {
     closeSidebar();
     Swal.fire({
@@ -543,6 +545,65 @@ export default function Sidebar() {
       }
     });
   };
+
+  // Ctrl/⌘ + K → enfocar buscador
+  React.useEffect(() => {
+    const onGlobalKey = (e) => {
+      const tag = (document.activeElement?.tagName || "").toLowerCase();
+      const isTyping =
+        tag === "input" ||
+        tag === "textarea" ||
+        document.activeElement?.isContentEditable;
+
+      if (isTyping) return;
+
+      const ctrlOrCmd = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // ya tenías Ctrl/⌘ + K
+      if (ctrlOrCmd && key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setOpenSearch(
+          q.trim().length >= 2 && (results.length > 0 || loadingSearch)
+        );
+        return;
+      }
+
+      // Perfil: Ctrl/⌘ + P
+      // if (ctrlOrCmd && key === "p") {
+      //   e.preventDefault();
+      //   navigate("/admin/mi-cuenta");
+      //   return;
+      // }
+
+      // Configuraciones: Ctrl/⌘ + ,
+      if (ctrlOrCmd && e.key === ",") {
+        e.preventDefault();
+        if (checkPermission("ver_configuraciones")) {
+          navigate("/admin/configuraciones");
+        }
+        return;
+      }
+
+      // Ayuda: Ctrl/⌘ + H
+      if (ctrlOrCmd && key === "h") {
+        e.preventDefault();
+        navigate("/admin/help");
+        return;
+      }
+
+      // Cerrar sesión: Ctrl/⌘ + Shift + Q
+      if ((e.ctrlKey || e.metaKey) && key === "q") {
+        e.preventDefault();
+        logout();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onGlobalKey);
+    return () => window.removeEventListener("keydown", onGlobalKey);
+  }, [q, results.length, loadingSearch, navigate, checkPermission, logout]);
 
   const currentPath = location.pathname;
 
@@ -964,7 +1025,7 @@ export default function Sidebar() {
           </Tooltip>
         </Box>
 
-        <Dropdown>
+        {/* <Dropdown>
           <Tooltip
             title="Menú contextual"
             variant="soft"
@@ -1015,7 +1076,64 @@ export default function Sidebar() {
               Cerrar sesión
             </MenuItem>
           </Menu>
-        </Dropdown>
+        </Dropdown> */}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" aria-label="Open menu" size="icon">
+              <MoreHorizontalIcon />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuPortal>
+            <DropdownMenuContent align="start" className="w-56 z-[15000]">
+              <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  onSelect={() => navigate("/admin/mi-cuenta")}
+                  className="gap-2">
+                  <AccountCircleIcon className="h-4 w-4" fontSize="small" />
+                  <span>Mi perfil</span>
+                </DropdownMenuItem>
+
+                {checkPermission("ver_configuraciones") && (
+                  <DropdownMenuItem
+                    onSelect={() => navigate("/admin/configuraciones")}
+                    className="gap-2">
+                    <SettingsRoundedIcon className="h-4 w-4" fontSize="small" />
+                    <span>Configuraciones</span>
+                    <DropdownMenuShortcut>Ctrl+,</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem
+                  onSelect={() => navigate("/admin/help")}
+                  className="gap-2">
+                  <HelpCenterIcon className="h-4 w-4" fontSize="small" />
+                  <span>Centro de ayuda</span>
+                  <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+
+              <DropdownMenuSeparator />
+
+              {/* Destructive */}
+              <DropdownMenuItem
+                onSelect={logout}
+                className="
+          gap-2
+          text-red-600 dark:text-red-400
+          focus:text-red-700 dark:focus:text-red-300
+          focus:bg-red-50 dark:focus:bg-red-950
+        ">
+                <LogoutRoundedIcon className="h-4 w-4" fontSize="small" />
+                <span>Cerrar sesión</span>
+                <DropdownMenuShortcut>Ctrl+Q</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenuPortal>
+        </DropdownMenu>
       </Box>
     </Sheet>
   );
