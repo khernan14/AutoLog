@@ -302,7 +302,7 @@ export default function ClientesList() {
                         size="sm"
                         variant="plain"
                         component={Link}
-                        to={`/admin/clientes/${r.id}/info`}>
+                        to={`/admin/clientes/${r.id}/informacion`}>
                         Ver detalle
                       </Button>
                     </Stack>
@@ -344,7 +344,7 @@ export default function ClientesList() {
                     <td>
                       <Typography
                         component={Link}
-                        to={`/admin/clientes/${r.id}/info`}
+                        to={`/admin/clientes/${r.id}/informacion`}
                         sx={{
                           textDecoration: "none",
                           color: "primary.plainColor",
@@ -356,7 +356,7 @@ export default function ClientesList() {
                     <td>
                       <Typography
                         component={Link}
-                        to={`/admin/clientes/${r.id}/info`}
+                        to={`/admin/clientes/${r.id}/informacion`}
                         sx={{
                           textDecoration: "none",
                           color: "primary.plainColor",

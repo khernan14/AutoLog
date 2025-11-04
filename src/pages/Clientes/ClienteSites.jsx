@@ -43,7 +43,7 @@ import StatusCard from "../../components/common/StatusCard";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 
-export default function ClienteSites({ onCountChange }) {
+export default function ClienteSites() {
   const { id } = useParams(); // id del cliente
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
@@ -102,8 +102,6 @@ export default function ClienteSites({ onCountChange }) {
       ]);
       setRows(Array.isArray(sitesData) ? sitesData : []);
       setCiudades(Array.isArray(ciudadesData) ? ciudadesData : []);
-
-      if (onCountChange) onCountChange(sitesData?.length || 0);
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
       setError(
@@ -111,11 +109,10 @@ export default function ClienteSites({ onCountChange }) {
           ? "No hay conexión con el servidor."
           : "No se pudieron cargar los sites."
       );
-      if (onCountChange) onCountChange(0);
     } finally {
       setLoading(false);
     }
-  }, [id, checkingSession, canView, onCountChange]);
+  }, [id, checkingSession, canView]);
 
   useEffect(() => {
     load();
