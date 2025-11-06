@@ -1,40 +1,41 @@
 Param(
-  [string]$Version = "",       # Ej: "1.0.0" (tiene prioridad)
+  [string]$Version = "",
   [ValidateSet("major","minor","patch")]
-  [string]$Bump = ""           # Alternativa: "major" | "minor" | "patch"
+  [string]$Bump = ""
 )
 
 function Fail($msg) { Write-Error $msg; exit 1 }
-function Run($cmd, $err) {
-  Write-Host "-> $cmd"
-  iex $cmd
-  if ($LASTEXITCODE -ne 0) { Fail $err }
+function Run($cmd, $err) { Write-Host "-> $cmd"; iex $cmd; if ($LASTEXITCODE -ne 0) { Fail $err } }
+
+function Get-RepoSlug {
+  # khernan14/AutoLog a partir de 'git remote get-url origin'
+  $url = (git remote get-url origin).Trim()
+  if ($url -match 'github\.com[:/](.+?)(\.git)?$') { return $Matches[1] }
+  return ""
 }
 
-# 0) Pre-chequeos
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail "git no está en PATH" }
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Fail "npm no está en PATH" }
+# --- Pre-checks ---
+if (-not (Get-Command git -EA SilentlyContinue)) { Fail "git no está en PATH" }
+if (-not (Get-Command npm -EA SilentlyContinue)) { Fail "npm no está en PATH" }
 if (-not (Test-Path package.json)) { Fail "No se encontró package.json" }
-
-$gitStatus = git status --porcelain
-if ($gitStatus) { Fail "Working tree no está limpio. Haz commit/stash antes de continuar." }
-
-$currentBranch = git rev-parse --abbrev-ref HEAD
-if ($currentBranch -ne "main") { Fail "No estás en 'main' (actual: $currentBranch)." }
+if (git status --porcelain) { Fail "Working tree sucio. Haz commit/stash antes." }
+$branch = git rev-parse --abbrev-ref HEAD
+if ($branch -ne "main") { Fail "No estás en 'main' (actual: $branch)." }
 
 Run "git pull --rebase origin main" "git pull --rebase falló"
 
-# 1) Detectar scripts y correr QA previo
-$pkg = Get-Content package.json | ConvertFrom-Json
-$hasTest  = $pkg.PSObject.Properties.Name -contains "scripts" -and `
-            $pkg.scripts.PSObject.Properties.Name -contains "test"
-$hasBuild = $pkg.PSObject.Properties.Name -contains "scripts" -and `
-            $pkg.scripts.PSObject.Properties.Name -contains "build"
+# --- Capturar tag anterior ANTES de versionar ---
+$prevTag = ""
+try { $prevTag = (git describe --tags --abbrev=0 2>$null) } catch {}
 
+# --- QA previo ---
+$pkg = Get-Content package.json | ConvertFrom-Json
+$hasTest  = $pkg.PSObject.Properties.Name -contains "scripts" -and $pkg.scripts.PSObject.Properties.Name -contains "test"
+$hasBuild = $pkg.PSObject.Properties.Name -contains "scripts" -and $pkg.scripts.PSObject.Properties.Name -contains "build"
 if ($hasTest)  { Run "npm test" "Tests fallaron" }
 if ($hasBuild) { Run "npm run build" "Build falló (pre-version)" }
 
-# 2) Determinar versión objetivo (npm version crea commit y tag)
+# --- Versionar (crea commit + tag vX.Y.Z) ---
 if ([string]::IsNullOrWhiteSpace($Version)) {
   if ([string]::IsNullOrWhiteSpace($Bump)) { Fail "Pasa -Version 1.0.0 o -Bump major|minor|patch" }
   Run "npm version $Bump -m 'chore(release): v%s'" "npm version $Bump falló"
@@ -44,12 +45,17 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
   if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?$') { Fail "Versión inválida: $Version (SemVer)" }
   Run "npm version $Version -m 'chore(release): v$Version'" "npm version $Version falló"
 }
+$newTag = "v$Version"
 
-# 3) Re-build rápido en el estado ya versionado (asegura reproducibilidad)
+# --- Re-build post-version (consistencia) ---
 if ($hasBuild) { Run "npm run build" "Build falló (post-version)" }
 
-# 4) CHANGELOG
+# --- Changelog (con compare link automático) ---
 Write-Host "-> Actualizando CHANGELOG.md..."
+$repoSlug = Get-RepoSlug
+$compareUrl = ""
+if ($repoSlug -and $prevTag) { $compareUrl = "https://github.com/$repoSlug/compare/$prevTag...$newTag" }
+
 $hasConventional = $false
 try {
   & npx --yes conventional-changelog -p angular -i CHANGELOG.md -s -r 0 *> $null
@@ -57,53 +63,49 @@ try {
 } catch { $hasConventional = $false }
 
 if (-not $hasConventional) {
-  $lastTag = ""
-  try { $lastTag = (git describe --tags --abbrev=0 2>$null) } catch {}
-  $logRange = if ($lastTag) { "$lastTag..HEAD" } else { "" }
-
-  $header = "## v$Version - $(Get-Date -Format 'yyyy-MM-dd')"
-  $commits = if ($logRange -ne "") {
-    git log $logRange --pretty="* %s (%h)"
-  } else {
-    git log --pretty="* %s (%h)"
-  }
+  $header = "## $newTag - $(Get-Date -Format 'yyyy-MM-dd')"
+  $range = if ($prevTag) { "$prevTag..HEAD" } else { "" }
+  $commits = if ($range) { git log $range --pretty="* %s (%h)" } else { git log --pretty="* %s (%h)" }
 
   if (-not (Test-Path CHANGELOG.md)) { "" | Out-File -Encoding UTF8 CHANGELOG.md }
   $content = Get-Content CHANGELOG.md -Raw
-  $newSection = ($header + "`r`n" + ($commits -join "`r`n") + "`r`n`r`n")
+
+  $linkBlock = if ($compareUrl) { "`r`n`r`n🔗 **Comparación:** $compareUrl" } else { "" }
+  $newSection = ($header + "`r`n`r`n" + ($commits -join "`r`n") + $linkBlock + "`r`n`r`n")
   $newSection + $content | Out-File -Encoding UTF8 CHANGELOG.md
 
   git add CHANGELOG.md
-  Run "git commit -m 'docs(changelog): v$Version'" "commit de CHANGELOG falló"
+  Run "git commit -m 'docs(changelog): $newTag'" "commit de CHANGELOG falló"
 }
 
-# 5) Push de main + tags
+# --- Push rama + tags ---
 Run "git push origin main --follow-tags" "git push falló"
 
-# 6) (Opcional) Crear Release en GitHub con gh si está disponible
-if (Get-Command gh -ErrorAction SilentlyContinue) {
+# --- Crear Release (si tienes gh) con body extra que incluye compare ---
+if (Get-Command gh -EA SilentlyContinue) {
   try {
     $releaseBody = ""
     if (Test-Path CHANGELOG.md) {
       $cl = Get-Content CHANGELOG.md -Raw
-      $pattern = "## v$([regex]::Escape($Version)).*?(?:(?=\r?\n## v)|\Z)"
-      $match = [regex]::Match($cl, $pattern, "Singleline")
-      if ($match.Success) { $releaseBody = $match.Value.Trim() }
+      $pattern = "## $([regex]::Escape($newTag)).*?(?:(?=\r?\n## )|\Z)"
+      $m = [regex]::Match($cl, $pattern, "Singleline")
+      if ($m.Success) { $releaseBody = $m.Value.Trim() }
     }
-    Write-Host "-> Creando Release v$Version (gh)..."
+    if ($compareUrl -and ($releaseBody -notmatch [regex]::Escape($compareUrl))) {
+      $releaseBody += "`r`n`r`n🔗 **Comparación:** $compareUrl"
+    }
+    Write-Host "-> Creando Release $newTag (gh)..."
     if ([string]::IsNullOrWhiteSpace($releaseBody)) {
-      Run "gh release create 'v$Version' -t 'v$Version' -n 'Release v$Version'" "gh release falló"
+      Run "gh release create '$newTag' -t '$newTag' -n 'Release $newTag'" "gh release falló"
     } else {
-      $tmp = New-TemporaryFile
-      $releaseBody | Out-File -Encoding UTF8 $tmp
-      Run "gh release create 'v$Version' -t 'v$Version' -F $tmp" "gh release falló"
+      $tmp = New-TemporaryFile; $releaseBody | Out-File -Encoding UTF8 $tmp
+      Run "gh release create '$newTag' -t '$newTag' -F $tmp" "gh release falló"
       Remove-Item $tmp -Force
     }
-  } catch {
-    Write-Warning "No se pudo crear el Release con gh: $($_.Exception.Message)"
-  }
+  } catch { Write-Warning "No se pudo crear el Release con gh: $($_.Exception.Message)" }
 } else {
-  Write-Host "✔ Tag v$Version creado y pusheado. Para Release en GitHub: gh release create v$Version -F CHANGELOG.md -t 'v$Version'"
+  if ($compareUrl) { Write-Host "🔗 Compare: $compareUrl" }
+  Write-Host "✔ Si quieres Release en GitHub: gh release create $newTag -F CHANGELOG.md -t '$newTag'"
 }
 
-Write-Host "✅ Release listo: v$Version"
+Write-Host "✅ Release listo: $newTag"
