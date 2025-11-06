@@ -1,0 +1,40 @@
+# type(scope): subject — máx. ~72 chars
+# Ejemplos:
+# feat(inventario): nuevo tab de detalles de clientes
+# fix(tailwind): corregir plugin en Vite que rompía el build
+
+type(scope): subject
+
+# BODY (opcional) — qué cambió y por qué (envuelve a ~72 cols)
+# - Contexto/motivación:
+# - Cambio realizado:
+# - Impacto/riesgos:
+# - Notas de migración (si aplica):
+
+# FOOTERS (opcional)
+# Closes #123
+# Refs #456
+# BREAKING CHANGE: describe el cambio incompatible y cómo migrar
+
+# ─────────────────────────────────────────────────────────
+# TIPOS comunes (Conventional Commits):
+# feat     → nueva funcionalidad
+# fix      → corrección de bug
+# docs     → solo documentación
+# style    → cambios de formato (sin lógica)
+# refactor → refactor sin feature/fix
+# perf     → rendimiento
+# test     → pruebas
+# build    → build/deps/scripts
+# ci       → pipelines/CI
+# chore    → tareas varias
+# revert   → revertir un commit
+
+# SCOPES sugeridos para este repo:
+# inventario, activos, clientes, viaticos, ui, tailwind, vite, build, deps, auth
+
+# BREAKING CHANGES
+# - Puedes marcar incompatibles con "!" tras el type:
+#   feat(ui)!: renombrar CustomerCard a ClientCard
+# - O usar el footer:
+#   BREAKING CHANGE: se renombró CustomerCard a ClientCard
