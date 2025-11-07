@@ -1,3 +1,16 @@
+## v1.0.1 - 2025-11-07
+
+* chore(release): v1.0.1 (ccd4c85)
+* Merge pull request #7 from khernan14/fix/logo-login (2f49b12)
+* fix(ui): actualizar logo y ajustar textos en login y index.html (d62b381)
+* Plantilla de Commits (7058969)
+* modificando el release (356ab68)
+* Update CHANGELOG for version 1.0.0 (4c6e768)
+* Document release process and versioning in README (d9c94ba)
+* docs(changelog): v1.0.0 (83f939a)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.0.0...v1.0.1
+
 ## v1.0.0 - 2025-11-06
 
 ✨ **Novedades**
@@ -25,3 +38,4 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
