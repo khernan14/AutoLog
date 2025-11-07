@@ -14,7 +14,7 @@ import Visibility from "@mui/icons-material/Visibility"; // Icono de ojo visible
 import VisibilityOff from "@mui/icons-material/VisibilityOff"; // Icono de ojo tachado
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded"; // Icono para el email
 import LockRoundedIcon from "@mui/icons-material/LockRounded"; // Icono para la contraseña
-import loginBg from "../../assets/fondo-login.svg"; // Asegúrate de que la ruta sea correcta
+import loginBg from "../../assets/tecnasa_core.png"; // Asegúrate de que la ruta sea correcta
 
 export default function LoginForm({
   credentials,
@@ -88,15 +88,14 @@ export default function LoginForm({
           level="h3"
           textAlign="center"
           sx={{ fontWeight: "lg", color: "text.primary" }}>
-          ¡Bienvenido a AutoLog!
+          ¡Bienvenido a Tecnasa Core!
         </Typography>
         <Typography
           level="body-lg"
           textAlign="center"
           mt={1}
           sx={{ color: "text.secondary", maxWidth: "400px" }}>
-          Gestione y optimice el uso de los vehículos de su empresa de forma
-          eficiente.
+          Entra para ver tu operación en una sola vista.
         </Typography>
         <Typography
           level="body-sm"
