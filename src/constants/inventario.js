@@ -12,6 +12,7 @@ export const TIPOS_ACTIVO = [
   "Impresora",
   "ATM",
   "Escáner",
+  "Ploter",
   "UPS",
   "Silla",
   "Mueble",
@@ -34,6 +35,10 @@ export const ESTATUS_COLOR = {
   Inactivo: "danger",
   Reciclado: "neutral",
 };
+
+// -------- Productos (por cantidad) --------
+export const PRODUCTO_UNIDADES = ["pieza", "unidad", "paquete", "caja"];
+export const PRODUCTO_TIPOS = ["Equipo", "Parte", "Consumible"];
 
 // Helper para Select/Autocomplete
 export const toOptions = (arr) => arr.map((v) => ({ label: v, value: v }));
