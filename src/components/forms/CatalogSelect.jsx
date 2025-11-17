@@ -1,19 +1,22 @@
-// src/components/forms/CatalogSelect.jsx
 import { Autocomplete } from "@mui/joy";
 import {
   ESTATUS_ACTIVO,
   TIPOS_ACTIVO,
+  PRODUCTO_UNIDADES,
+  PRODUCTO_TIPOS,
   toOptions,
 } from "@/constants/inventario";
 
-// mapeamos el nombre a tu array real
+// mapeamos el nombre al array real
 const MAP = {
   estatusActivo: ESTATUS_ACTIVO,
   tiposActivo: TIPOS_ACTIVO,
+  unidadesProducto: PRODUCTO_UNIDADES,
+  tiposProducto: PRODUCTO_TIPOS,
 };
 
 export default function CatalogSelect({
-  catalog, // "estatusActivo" | "tiposActivo"
+  catalog, // "estatusActivo" | "tiposActivo" | "unidadesProducto" | "tiposProducto"
   value,
   onChange,
   label,
@@ -32,12 +35,12 @@ export default function CatalogSelect({
       options={options}
       value={value ? { label: value, value } : null}
       onChange={(_, opt) => {
-        // si se permite vacío
-        if (allowEmpty && !opt) return onChange?.(null, "");
-        onChange?.(null, opt?.value || "");
+        if (allowEmpty && !opt) return onChange?.("");
+        onChange?.(opt?.value || "");
       }}
       clearOnBlur={false}
       isOptionEqualToValue={(o, v) => o.value === v.value}
+      disabled={disabled}
       {...props}
     />
   );

@@ -285,7 +285,17 @@ export default function MoverActivoModal({
                   loading={loadingSites}
                   value={valueSite}
                   onChange={(_, v) => setSiteDestino(v?.id || "")}
-                  getOptionLabel={(o) => o?.nombre || ""}
+                  getOptionLabel={(o) => {
+                    if (!o) return "";
+                    const desc = (o.descripcion || "").trim();
+
+                    // Si la descripción está vacía o es solo "-"
+                    if (!desc || desc === "-") {
+                      return o.nombre || "";
+                    }
+
+                    return `${o.nombre} - ${desc}`;
+                  }}
                   isOptionEqualToValue={(o, v) => o.id === v.id}
                   filterOptions={(opts, state) =>
                     filterByName(opts, state.inputValue, "nombre")
