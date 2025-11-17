@@ -921,7 +921,7 @@ export default function ActivosList() {
                 <CatalogSelect
                   catalog="estatusActivo"
                   value={form.estatus}
-                  onChange={(_, v) => setForm({ ...form, estatus: v })}
+                  onChange={(v) => setForm({ ...form, estatus: v })}
                 />
                 <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
                   <Typography level="body-xs" sx={{ opacity: 0.7 }}>
