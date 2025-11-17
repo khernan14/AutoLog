@@ -126,7 +126,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
             <CatalogSelect
               catalog="tiposActivo"
               value={form.tipo}
-              onChange={(_, v) => setForm({ ...form, tipo: v })}
+              onChange={(v) => setForm({ ...form, tipo: v })}
               disabled={saving}
             />
           </FormControl>
