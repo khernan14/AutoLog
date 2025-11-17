@@ -472,7 +472,7 @@ export default function ActivosList() {
             <CatalogSelect
               catalog="estatusActivo"
               value={statusFilter}
-              onChange={(_, v) => setStatusFilter(v || "")}
+              onChange={(v) => setStatusFilter(v || "")}
               includeEmpty
               emptyLabel="Todos"
               sx={{ width: 200 }}
@@ -481,7 +481,7 @@ export default function ActivosList() {
             <CatalogSelect
               catalog="tiposActivo"
               value={typeFilter}
-              onChange={(_, v) => setTypeFilter(v || "")}
+              onChange={(v) => setTypeFilter(v || "")}
               includeEmpty
               emptyLabel="Todos"
               sx={{ width: 200 }}
@@ -911,7 +911,7 @@ export default function ActivosList() {
                 <CatalogSelect
                   catalog="tiposActivo"
                   value={form.tipo}
-                  onChange={(_, v) => setForm({ ...form, tipo: v })}
+                  onChange={(v) => setForm({ ...form, tipo: v })}
                 />
               </FormControl>
 
