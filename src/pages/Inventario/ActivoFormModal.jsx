@@ -137,7 +137,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
             <CatalogSelect
               catalog="estatusActivo"
               value={form.estatus}
-              onChange={(_, v) => setForm({ ...form, estatus: v })}
+              onChange={(v) => setForm({ ...form, estatus: v })}
               disabled={saving}
             />
             <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
