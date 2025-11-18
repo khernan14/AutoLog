@@ -324,7 +324,7 @@ export default function ClienteActivos() {
           <CatalogSelect
             catalog="estatusActivo"
             value={statusFilter}
-            onChange={(_, v) => setStatusFilter(v || "")}
+            onChange={(v) => setStatusFilter(v || "")}
             placeholder="Estatus"
             allowEmpty
             sx={{ minWidth: 140 }}
@@ -334,7 +334,7 @@ export default function ClienteActivos() {
           <CatalogSelect
             catalog="tiposActivo"
             value={typeFilter}
-            onChange={(_, v) => setTypeFilter(v || "")}
+            onChange={(v) => setTypeFilter(v || "")}
             placeholder="Tipo"
             allowEmpty
             sx={{ minWidth: 140 }}
