@@ -1,3 +1,24 @@
+## v1.1.0 - 2025-11-18
+
+* chore(release): v1.1.0 (62a8716)
+* Merge pull request #14 from khernan14/feat/clientes-sites-ubicaciones (4f4a675)
+* feat(ui): actualizar vistas de sites/activos/clientes/historial para nuevos campos (977c1d9)
+* Merge pull request #13 from khernan14/feat/inventario-kardex (c9fdaf9)
+* fix(ui): se arregla bug de filtros en activos (1fe3133)
+* Merge pull request #12 from khernan14/feat/inventario-kardex (7115891)
+* fix(ui): se arregla bug de filtros en activos (c7c34a5)
+* Merge pull request #11 from khernan14/feat/inventario-kardex (69c27b9)
+* fix(ui): se arregla bug de filtros en activos (4334a5b)
+* Merge pull request #10 from khernan14/feat/inventario-kardex (d6ab4c2)
+* fix/correccion en la parte de autocomplete (e36a788)
+* Merge pull request #9 from khernan14/feat/inventario-kardex (0b0316f)
+* fix/correccion en la parte de autocomplete (5a5c22e)
+* Merge pull request #8 from khernan14/feat/inventario-kardex (1de0e57)
+* refactor/Se agrega al select una opcion nueva y se modifica Modal para mostrar select de site y descripcion (71d5a1b)
+* docs(changelog): v1.0.1 (d1500b6)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.0.1...v1.1.0
+
 ## v1.0.1 - 2025-11-07
 
 * chore(release): v1.0.1 (ccd4c85)
@@ -38,4 +59,5 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
