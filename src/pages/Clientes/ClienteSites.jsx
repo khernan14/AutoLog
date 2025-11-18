@@ -1,3 +1,4 @@
+// src/pages/Clientes/ClienteSites.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -13,7 +14,6 @@ import {
   Stack,
   Button,
   Table,
-  Sheet,
   Modal,
   ModalDialog,
   FormControl,
@@ -26,6 +26,7 @@ import {
   Chip,
   Tooltip,
   CircularProgress,
+  Checkbox,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -38,6 +39,8 @@ import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import ToggleOnRoundedIcon from "@mui/icons-material/ToggleOnRounded";
+import ToggleOffRoundedIcon from "@mui/icons-material/ToggleOffRounded";
 
 import StatusCard from "../../components/common/StatusCard";
 import { useToast } from "../../context/ToastContext";
@@ -49,7 +52,7 @@ export default function ClienteSites() {
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
 
-  // permisos (ajusta los nombres si en tu backend difieren)
+  // permisos
   const can = useCallback(
     (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
@@ -70,6 +73,12 @@ export default function ClienteSites() {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
 
+  const [statusFilter, setStatusFilter] = useState("activos"); // "activos" | "inactivos" | "todos"
+
+  // selección múltiple
+  const [selectedIds, setSelectedIds] = useState([]);
+  const hasSelection = selectedIds.length > 0;
+
   // modal
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -77,8 +86,10 @@ export default function ClienteSites() {
     nombre: "",
     descripcion: "",
     id_ciudad: "",
+    activo: "1", // "1" = activo, "0" = inactivo
   });
   const [saving, setSaving] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (checkingSession) {
@@ -87,7 +98,7 @@ export default function ClienteSites() {
     }
 
     if (!canView) {
-      setError(null); // deja a la tarjeta de "sin permisos" manejar el mensaje
+      setError(null); // dejar que la tarjeta de "sin permisos" maneje el mensaje
       setLoading(false);
       return;
     }
@@ -102,6 +113,7 @@ export default function ClienteSites() {
       ]);
       setRows(Array.isArray(sitesData) ? sitesData : []);
       setCiudades(Array.isArray(ciudadesData) ? ciudadesData : []);
+      setSelectedIds([]); // limpiar selección al recargar
     } catch (err) {
       const msg = err?.message || "Error desconocido.";
       setError(
@@ -128,7 +140,7 @@ export default function ClienteSites() {
       return;
     }
     setEditing(null);
-    setForm({ nombre: "", descripcion: "", id_ciudad: "" });
+    setForm({ nombre: "", descripcion: "", id_ciudad: "", activo: "1" });
     setOpen(true);
   }
 
@@ -142,6 +154,7 @@ export default function ClienteSites() {
       nombre: row.nombre,
       descripcion: row.descripcion || "",
       id_ciudad: row.id_ciudad ? String(row.id_ciudad) : "",
+      activo: row.activo ? "1" : "0",
     });
     setOpen(true);
   }
@@ -156,13 +169,21 @@ export default function ClienteSites() {
 
     setSaving(true);
     try {
+      const payload = {
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim() || null,
+        id_ciudad: form.id_ciudad || null,
+        id_cliente: id,
+        activo: form.activo === "1" ? 1 : 0,
+      };
+
       if (editing) {
         if (!canEdit) {
           showToast("No tienes permiso para editar sites.", "warning");
           setSaving(false);
           return;
         }
-        await updateSite(editing.id, { ...form, id_cliente: id });
+        await updateSite(editing.id, payload);
         showToast("Site actualizado correctamente", "success");
       } else {
         if (!canCreate) {
@@ -170,7 +191,7 @@ export default function ClienteSites() {
           setSaving(false);
           return;
         }
-        await createSite({ ...form, id_cliente: id });
+        await createSite(payload);
         showToast("Site creado correctamente", "success");
       }
       setOpen(false);
@@ -183,9 +204,10 @@ export default function ClienteSites() {
     }
   }
 
-  // 🔎 Filtrar rows con buscador + filtro por ciudad
+  // 🔎 Filtrar rows con buscador + ciudad + estado
   const filtered = useMemo(() => {
     const s = (search || "").toLowerCase();
+
     return (rows || []).filter((r) => {
       const matchSearch =
         (r.nombre || "").toLowerCase().includes(s) ||
@@ -194,11 +216,58 @@ export default function ClienteSites() {
 
       const matchCity =
         !cityFilter || String(r.id_ciudad) === String(cityFilter);
-      return matchSearch && matchCity;
-    });
-  }, [rows, search, cityFilter]);
 
-  // Ciudades únicas de los sites de este cliente (para mostrar solo las que existen)
+      // 👇 Normalizamos el valor de activo para que funcione si viene como 0/1, true/false o "0"/"1"
+      const isActivo =
+        r.activo === 1 ||
+        r.activo === true ||
+        r.activo === "1" ||
+        r.activo === "true";
+
+      const matchStatus =
+        statusFilter === "activos"
+          ? isActivo
+          : statusFilter === "inactivos"
+          ? !isActivo
+          : true; // "todos"
+
+      return matchSearch && matchCity && matchStatus;
+    });
+  }, [rows, search, cityFilter, statusFilter]);
+
+  // IDs visibles según filtros
+  const allVisibleIds = useMemo(
+    () => (filtered || []).map((r) => r.id),
+    [filtered]
+  );
+
+  const allSelectedInPage =
+    allVisibleIds.length > 0 &&
+    allVisibleIds.every((idSite) => selectedIds.includes(idSite));
+
+  // 🔀 selección múltiple
+  const toggleSelectOne = (idSite) => {
+    setSelectedIds((prev) =>
+      prev.includes(idSite)
+        ? prev.filter((x) => x !== idSite)
+        : [...prev, idSite]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      if (allSelectedInPage) {
+        // quitar todos los de esta vista
+        return prev.filter((idSite) => !allVisibleIds.includes(idSite));
+      }
+      // agregar todos los visibles (sin duplicados)
+      const set = new Set(prev);
+      allVisibleIds.forEach((idSite) => set.add(idSite));
+      return Array.from(set);
+    });
+  };
+
+  // Ciudades únicas de los sites de este cliente
   const availableCities = useMemo(() => {
     const seen = new Map();
     (rows || []).forEach((r) => {
@@ -208,6 +277,47 @@ export default function ClienteSites() {
     });
     return Array.from(seen, ([id, nombre]) => ({ id, nombre }));
   }, [rows]);
+
+  // 🔁 BULK: activar / inactivar seleccionados
+  async function bulkUpdateActivo(newActivo) {
+    if (!canEdit) {
+      showToast("No tienes permiso para editar sites.", "warning");
+      return;
+    }
+    if (!selectedIds.length) return;
+
+    setBulkSaving(true);
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(
+        ids.map((idSite) => {
+          const row = rows.find((r) => r.id === idSite);
+          if (!row) return null;
+          return updateSite(idSite, {
+            id_cliente: id,
+            nombre: row.nombre,
+            descripcion: row.descripcion || null,
+            id_ciudad: row.id_ciudad || null,
+            activo: newActivo ? 1 : 0,
+          });
+        })
+      );
+      showToast(
+        `Sites ${newActivo ? "activados" : "inactivados"} correctamente`,
+        "success"
+      );
+      setSelectedIds([]);
+      load();
+    } catch (err) {
+      showToast(
+        err?.message ||
+          `Error al ${newActivo ? "activar" : "inactivar"} los sites`,
+        "danger"
+      );
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   // view state
   const viewState = checkingSession
@@ -273,7 +383,6 @@ export default function ClienteSites() {
       );
     }
     if (viewState === "empty") {
-      // Diferenciar entre “no hay datos” y “no hay coincidencias”
       const noData = (rows || []).length === 0;
       return (
         <StatusCard
@@ -288,13 +397,12 @@ export default function ClienteSites() {
         />
       );
     }
-    // loading ya está manejado arriba con el check, aquí no se llega.
     return null;
   };
 
   return (
     <Box>
-      {/* Header con buscador + filtro + botón */}
+      {/* Header con buscador + filtros + botones */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
@@ -342,6 +450,60 @@ export default function ClienteSites() {
             ))}
           </Select>
 
+          {/* Filtro por estado */}
+          <Select
+            placeholder="Estado"
+            value={statusFilter}
+            onChange={(_, v) => setStatusFilter(v || "activos")}
+            sx={{ minWidth: 160 }}>
+            <Option value="activos">Activos</Option>
+            <Option value="inactivos">Inactivos</Option>
+            <Option value="todos">Todos</Option>
+          </Select>
+
+          {canEdit && (
+            <>
+              <Tooltip
+                title={
+                  hasSelection
+                    ? "Activar seleccionados"
+                    : "Selecciona uno o más sites"
+                }
+                variant="soft">
+                <span>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    startDecorator={<ToggleOnRoundedIcon />}
+                    disabled={!hasSelection || bulkSaving}
+                    onClick={() => bulkUpdateActivo(true)}>
+                    Activar
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <Tooltip
+                title={
+                  hasSelection
+                    ? "Inactivar seleccionados"
+                    : "Selecciona uno o más sites"
+                }
+                variant="soft">
+                <span>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    color="neutral"
+                    startDecorator={<ToggleOffRoundedIcon />}
+                    disabled={!hasSelection || bulkSaving}
+                    onClick={() => bulkUpdateActivo(false)}>
+                    Inactivar
+                  </Button>
+                </span>
+              </Tooltip>
+            </>
+          )}
+
           <Tooltip
             title={
               canCreate
@@ -373,15 +535,31 @@ export default function ClienteSites() {
           <Table size="sm" stickyHeader>
             <thead>
               <tr>
+                <th style={{ width: 40 }}>
+                  <Checkbox
+                    checked={allSelectedInPage}
+                    indeterminate={
+                      !allSelectedInPage && hasSelection && filtered.length > 0
+                    }
+                    onChange={toggleSelectAllVisible}
+                  />
+                </th>
                 <th>Nombre</th>
                 <th>Descripción</th>
                 <th>Ciudad</th>
+                <th>Estado</th>
                 <th style={{ width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id}>
+                  <td>
+                    <Checkbox
+                      checked={selectedIds.includes(r.id)}
+                      onChange={() => toggleSelectOne(r.id)}
+                    />
+                  </td>
                   <td>{r.nombre}</td>
                   <td>{r.descripcion || "—"}</td>
                   <td>
@@ -393,6 +571,25 @@ export default function ClienteSites() {
                       "—"
                     )}
                   </td>
+                  <td>
+                    {(() => {
+                      const isActivo =
+                        r.activo === 1 ||
+                        r.activo === true ||
+                        r.activo === "1" ||
+                        r.activo === "true";
+
+                      return (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={isActivo ? "success" : "neutral"}>
+                          {isActivo ? "Activo" : "Inactivo"}
+                        </Chip>
+                      );
+                    })()}
+                  </td>
+
                   <td>
                     <Tooltip
                       title={canEdit ? "Editar" : "Sin permiso"}
@@ -458,6 +655,17 @@ export default function ClienteSites() {
                     {c.ciudad}
                   </Option>
                 ))}
+              </Select>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Estado</FormLabel>
+              <Select
+                disabled={saving}
+                value={form.activo}
+                onChange={(_, v) => setForm({ ...form, activo: v })}>
+                <Option value="1">Activo</Option>
+                <Option value="0">Inactivo</Option>
               </Select>
             </FormControl>
           </Stack>

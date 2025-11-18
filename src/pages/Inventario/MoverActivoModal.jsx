@@ -14,7 +14,7 @@ import {
 import { moverActivo } from "../../services/UbicacionesServices";
 import { getBodegas } from "../../services/BodegasServices";
 import { getClientes } from "../../services/ClientesServices";
-import { getSitesByCliente } from "../../services/SitesServices";
+import { getActiveSitesByCliente } from "../../services/SitesServices";
 import { getEmpleados } from "../../services/AuthServices";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
@@ -90,7 +90,7 @@ export default function MoverActivoModal({
   useEffect(() => {
     if (tipoDestino === "Cliente" && clienteDestino) {
       setLoadingSites(true);
-      getSitesByCliente(clienteDestino)
+      getActiveSitesByCliente(clienteDestino)
         .then((rows) => setSites(Array.isArray(rows) ? rows : []))
         .catch(() => setSites([]))
         .finally(() => setLoadingSites(false));
