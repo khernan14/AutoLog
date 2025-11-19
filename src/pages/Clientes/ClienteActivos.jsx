@@ -143,6 +143,9 @@ export default function ClienteActivos() {
     load();
   }, [load]);
 
+  // nombre del cliente (si viene en la consulta)
+  const clienteNombre = useMemo(() => rows[0]?.cliente_nombre || "", [rows]);
+
   // acciones individuales
   function editActivo(row) {
     if (!canEdit)
@@ -392,60 +395,76 @@ export default function ClienteActivos() {
 
   return (
     <Box>
-      {/* Header / filtros */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={1.5}
-        mb={2}>
-        <Typography level="h5">Activos del Cliente ({rows.length})</Typography>
+      {/* HEADER NUEVO: título + totales arriba, filtros abajo */}
+      <Stack spacing={1.5} mb={2}>
+        <Box>
+          <Typography level="h4">
+            {clienteNombre || "Activos del Cliente"}
+          </Typography>
+          {clienteNombre && (
+            <Typography level="body-sm" color="neutral">
+              Inventario de activos asignados al cliente
+            </Typography>
+          )}
+          <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
+            Total activos: {rows.length}
+            {rows.length !== filtered.length &&
+              ` · Con filtros: ${filtered.length}`}
+          </Typography>
+        </Box>
 
+        {/* Filtros / acciones */}
         <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          flexWrap="wrap"
-          sx={{ width: { xs: "100%", sm: "auto" } }}>
-          <Input
-            placeholder="Buscar por código, nombre, modelo o serie…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            startDecorator={<SearchRoundedIcon />}
-            endDecorator={
-              search && (
-                <IconButton
-                  size="sm"
-                  variant="plain"
-                  color="neutral"
-                  onClick={() => setSearch("")}
-                  aria-label="Limpiar búsqueda">
-                  <ClearIcon />
-                </IconButton>
-              )
-            }
-            sx={{ width: { xs: "100%", sm: 280 } }}
-          />
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+          spacing={1.25}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Input
+              placeholder="Buscar por código, nombre, modelo o serie…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              startDecorator={<SearchRoundedIcon />}
+              endDecorator={
+                search && (
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    color="neutral"
+                    onClick={() => setSearch("")}
+                    aria-label="Limpiar búsqueda">
+                    <ClearIcon />
+                  </IconButton>
+                )
+              }
+              sx={{ width: { xs: "100%", sm: 280 } }}
+            />
 
-          {/* Filtro de estatus desde catálogo */}
-          <CatalogSelect
-            catalog="estatusActivo"
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v || "")}
-            placeholder="Estatus"
-            allowEmpty
-            sx={{ minWidth: 140 }}
-          />
+            {/* Filtro de estatus desde catálogo */}
+            <CatalogSelect
+              catalog="estatusActivo"
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v || "")}
+              placeholder="Estatus"
+              allowEmpty
+              sx={{ width: 200 }}
+            />
 
-          {/* Filtro de tipo desde catálogo */}
-          <CatalogSelect
-            catalog="tiposActivo"
-            value={typeFilter}
-            onChange={(v) => setTypeFilter(v || "")}
-            placeholder="Tipo"
-            allowEmpty
-            sx={{ minWidth: 140 }}
-          />
+            {/* Filtro de tipo desde catálogo */}
+            <CatalogSelect
+              catalog="tiposActivo"
+              value={typeFilter}
+              onChange={(v) => setTypeFilter(v || "")}
+              placeholder="Tipo"
+              allowEmpty
+              sx={{ width: 200 }}
+            />
+          </Stack>
 
           {/* Mover a bodega (masivo) */}
           {canMove && (
@@ -462,7 +481,8 @@ export default function ClienteActivos() {
                   variant="soft"
                   startDecorator={<SwapHorizRoundedIcon />}
                   disabled={!hasSelection}
-                  onClick={() => setOpenBulkMover(true)}>
+                  onClick={() => setOpenBulkMover(true)}
+                  sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}>
                   Mover a Bodega
                 </Button>
               </span>
@@ -511,6 +531,11 @@ export default function ClienteActivos() {
                 </Stack>
                 <Typography level="body-sm">
                   <strong>Serie:</strong> {r.serial_number || "—"}
+                </Typography>
+
+                {/* Site del activo */}
+                <Typography level="body-xs" sx={{ mt: 0.5 }}>
+                  <strong>Site:</strong> {r.site_nombre || "—"}
                 </Typography>
 
                 <Chip
@@ -610,8 +635,9 @@ export default function ClienteActivos() {
                 <th>Tipo</th>
                 <th>Modelo</th>
                 <th>Serie</th>
+                <th>Site</th>
                 <th>Estatus</th>
-                <th style={{ width: 180 }}></th>
+                <th style={{ width: 200 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -630,6 +656,15 @@ export default function ClienteActivos() {
                   <td>{r.tipo}</td>
                   <td>{r.modelo || "—"}</td>
                   <td>{r.serial_number || "—"}</td>
+                  <td>
+                    {r.site_nombre ? (
+                      <Chip size="sm" variant="soft" color="primary">
+                        {r.site_nombre}
+                      </Chip>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>
                     <Chip
                       size="sm"

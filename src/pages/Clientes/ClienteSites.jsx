@@ -72,7 +72,6 @@ export default function ClienteSites() {
   // filtros
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
-
   const [statusFilter, setStatusFilter] = useState("activos"); // "activos" | "inactivos" | "todos"
 
   // selección múltiple
@@ -90,6 +89,11 @@ export default function ClienteSites() {
   });
   const [saving, setSaving] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+
+  // helper para normalizar activo
+  function isActivoVal(value) {
+    return value === 1 || value === true || value === "1" || value === "true";
+  }
 
   const load = useCallback(async () => {
     if (checkingSession) {
@@ -154,7 +158,7 @@ export default function ClienteSites() {
       nombre: row.nombre,
       descripcion: row.descripcion || "",
       id_ciudad: row.id_ciudad ? String(row.id_ciudad) : "",
-      activo: row.activo ? "1" : "0",
+      activo: isActivoVal(row.activo) ? "1" : "0",
     });
     setOpen(true);
   }
@@ -217,12 +221,7 @@ export default function ClienteSites() {
       const matchCity =
         !cityFilter || String(r.id_ciudad) === String(cityFilter);
 
-      // 👇 Normalizamos el valor de activo para que funcione si viene como 0/1, true/false o "0"/"1"
-      const isActivo =
-        r.activo === 1 ||
-        r.activo === true ||
-        r.activo === "1" ||
-        r.activo === "true";
+      const isActivo = isActivoVal(r.activo);
 
       const matchStatus =
         statusFilter === "activos"
@@ -277,6 +276,14 @@ export default function ClienteSites() {
     });
     return Array.from(seen, ([id, nombre]) => ({ id, nombre }));
   }, [rows]);
+
+  // Métricas
+  const totalSites = rows.length;
+  const totalActivos = useMemo(
+    () => (rows || []).filter((r) => isActivoVal(r.activo)).length,
+    [rows]
+  );
+  const totalInactivos = totalSites - totalActivos;
 
   // 🔁 BULK: activar / inactivar seleccionados
   async function bulkUpdateActivo(newActivo) {
@@ -402,128 +409,149 @@ export default function ClienteSites() {
 
   return (
     <Box>
-      {/* Header con buscador + filtros + botones */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={1.5}
-        mb={2}>
-        <Typography level="h5">Sites del Cliente ({rows.length})</Typography>
+      {/* HEADER NUEVO: título + totales arriba, filtros y acciones abajo */}
+      <Stack spacing={1.5} mb={2}>
+        <Box>
+          <Typography level="h4">Sites del Cliente</Typography>
+          <Typography level="body-sm" color="neutral">
+            Puntos de servicio / instalación asociados al cliente.
+          </Typography>
+          <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
+            Total sites: {totalSites} · Activos: {totalActivos} · Inactivos:{" "}
+            {totalInactivos}
+            {totalSites !== filtered.length &&
+              ` · Con filtros: ${filtered.length}`}
+          </Typography>
+        </Box>
 
         <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          flexWrap="wrap"
-          sx={{ width: { xs: "100%", sm: "auto" } }}>
-          <Input
-            placeholder="Buscar por nombre, descripción o ciudad…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            startDecorator={<SearchRoundedIcon />}
-            endDecorator={
-              search && (
-                <IconButton
-                  size="sm"
-                  variant="plain"
-                  color="neutral"
-                  onClick={() => setSearch("")}
-                  aria-label="Limpiar búsqueda">
-                  <ClearIcon />
-                </IconButton>
-              )
-            }
-            sx={{ width: { xs: "100%", sm: 300 } }}
-          />
-
-          <Select
-            placeholder="Filtrar por ciudad"
-            value={cityFilter}
-            onChange={(_, v) => setCityFilter(v || "")}
-            sx={{ minWidth: 200 }}>
-            <Option value="">Todas las ciudades</Option>
-            {availableCities.map((c) => (
-              <Option key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </Option>
-            ))}
-          </Select>
-
-          {/* Filtro por estado */}
-          <Select
-            placeholder="Estado"
-            value={statusFilter}
-            onChange={(_, v) => setStatusFilter(v || "activos")}
-            sx={{ minWidth: 160 }}>
-            <Option value="activos">Activos</Option>
-            <Option value="inactivos">Inactivos</Option>
-            <Option value="todos">Todos</Option>
-          </Select>
-
-          {canEdit && (
-            <>
-              <Tooltip
-                title={
-                  hasSelection
-                    ? "Activar seleccionados"
-                    : "Selecciona uno o más sites"
-                }
-                variant="soft">
-                <span>
-                  <Button
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+          spacing={1.25}>
+          {/* Filtros */}
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Input
+              placeholder="Buscar por nombre, descripción o ciudad…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              startDecorator={<SearchRoundedIcon />}
+              endDecorator={
+                search && (
+                  <IconButton
                     size="sm"
-                    variant="soft"
-                    startDecorator={<ToggleOnRoundedIcon />}
-                    disabled={!hasSelection || bulkSaving}
-                    onClick={() => bulkUpdateActivo(true)}>
-                    Activar
-                  </Button>
-                </span>
-              </Tooltip>
-
-              <Tooltip
-                title={
-                  hasSelection
-                    ? "Inactivar seleccionados"
-                    : "Selecciona uno o más sites"
-                }
-                variant="soft">
-                <span>
-                  <Button
-                    size="sm"
-                    variant="soft"
+                    variant="plain"
                     color="neutral"
-                    startDecorator={<ToggleOffRoundedIcon />}
-                    disabled={!hasSelection || bulkSaving}
-                    onClick={() => bulkUpdateActivo(false)}>
-                    Inactivar
-                  </Button>
-                </span>
-              </Tooltip>
-            </>
-          )}
+                    onClick={() => setSearch("")}
+                    aria-label="Limpiar búsqueda">
+                    <ClearIcon />
+                  </IconButton>
+                )
+              }
+              sx={{ width: { xs: "100%", sm: 300 } }}
+            />
 
-          <Tooltip
-            title={
-              canCreate
-                ? "Crear site"
-                : "No tienes permiso para crear. Solicítalo al administrador."
-            }
-            variant="soft"
-            placement="top-end">
-            <span>
-              <Button
-                startDecorator={<AddRoundedIcon />}
-                onClick={newSite}
-                disabled={!canCreate}
-                aria-disabled={!canCreate}
-                variant={canCreate ? "solid" : "soft"}
-                color={canCreate ? "primary" : "neutral"}>
-                Nuevo
-              </Button>
-            </span>
-          </Tooltip>
+            <Select
+              placeholder="Filtrar por ciudad"
+              value={cityFilter}
+              onChange={(_, v) => setCityFilter(v || "")}
+              sx={{ minWidth: 200 }}>
+              <Option value="">Todas las ciudades</Option>
+              {availableCities.map((c) => (
+                <Option key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </Option>
+              ))}
+            </Select>
+
+            {/* Filtro por estado */}
+            <Select
+              placeholder="Estado"
+              value={statusFilter}
+              onChange={(_, v) => setStatusFilter(v || "activos")}
+              sx={{ minWidth: 160 }}>
+              <Option value="activos">Activos</Option>
+              <Option value="inactivos">Inactivos</Option>
+              <Option value="todos">Todos</Option>
+            </Select>
+          </Stack>
+
+          {/* Acciones masivas + Nuevo */}
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="flex-end"
+            flexWrap="wrap">
+            {canEdit && (
+              <>
+                <Tooltip
+                  title={
+                    hasSelection
+                      ? "Activar seleccionados"
+                      : "Selecciona uno o más sites"
+                  }
+                  variant="soft">
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      startDecorator={<ToggleOnRoundedIcon />}
+                      disabled={!hasSelection || bulkSaving}
+                      onClick={() => bulkUpdateActivo(true)}>
+                      Activar
+                    </Button>
+                  </span>
+                </Tooltip>
+
+                <Tooltip
+                  title={
+                    hasSelection
+                      ? "Inactivar seleccionados"
+                      : "Selecciona uno o más sites"
+                  }
+                  variant="soft">
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      color="neutral"
+                      startDecorator={<ToggleOffRoundedIcon />}
+                      disabled={!hasSelection || bulkSaving}
+                      onClick={() => bulkUpdateActivo(false)}>
+                      Inactivar
+                    </Button>
+                  </span>
+                </Tooltip>
+              </>
+            )}
+
+            <Tooltip
+              title={
+                canCreate
+                  ? "Crear site"
+                  : "No tienes permiso para crear. Solicítalo al administrador."
+              }
+              variant="soft"
+              placement="top-end">
+              <span>
+                <Button
+                  startDecorator={<AddRoundedIcon />}
+                  onClick={newSite}
+                  disabled={!canCreate}
+                  aria-disabled={!canCreate}
+                  variant={canCreate ? "solid" : "soft"}
+                  color={canCreate ? "primary" : "neutral"}>
+                  Nuevo
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
         </Stack>
       </Stack>
 
@@ -552,62 +580,55 @@ export default function ClienteSites() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <Checkbox
-                      checked={selectedIds.includes(r.id)}
-                      onChange={() => toggleSelectOne(r.id)}
-                    />
-                  </td>
-                  <td>{r.nombre}</td>
-                  <td>{r.descripcion || "—"}</td>
-                  <td>
-                    {r.ciudad ? (
-                      <Chip size="sm" variant="soft" color="primary">
-                        {r.ciudad}
-                      </Chip>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    {(() => {
-                      const isActivo =
-                        r.activo === 1 ||
-                        r.activo === true ||
-                        r.activo === "1" ||
-                        r.activo === "true";
-
-                      return (
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={isActivo ? "success" : "neutral"}>
-                          {isActivo ? "Activo" : "Inactivo"}
+              {filtered.map((r) => {
+                const isActivo = isActivoVal(r.activo);
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <Checkbox
+                        checked={selectedIds.includes(r.id)}
+                        onChange={() => toggleSelectOne(r.id)}
+                      />
+                    </td>
+                    <td>{r.nombre}</td>
+                    <td>{r.descripcion || "—"}</td>
+                    <td>
+                      {r.ciudad ? (
+                        <Chip size="sm" variant="soft" color="primary">
+                          {r.ciudad}
                         </Chip>
-                      );
-                    })()}
-                  </td>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color={isActivo ? "success" : "neutral"}>
+                        {isActivo ? "Activo" : "Inactivo"}
+                      </Chip>
+                    </td>
 
-                  <td>
-                    <Tooltip
-                      title={canEdit ? "Editar" : "Sin permiso"}
-                      variant="soft">
-                      <span>
-                        <IconButton
-                          onClick={() => editSite(r)}
-                          disabled={!canEdit}
-                          aria-disabled={!canEdit}
-                          variant={canEdit ? "soft" : "plain"}
-                          color={canEdit ? "primary" : "neutral"}>
-                          <EditRoundedIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      <Tooltip
+                        title={canEdit ? "Editar" : "Sin permiso"}
+                        variant="soft">
+                        <span>
+                          <IconButton
+                            onClick={() => editSite(r)}
+                            disabled={!canEdit}
+                            aria-disabled={!canEdit}
+                            variant={canEdit ? "soft" : "plain"}
+                            color={canEdit ? "primary" : "neutral"}>
+                            <EditRoundedIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}

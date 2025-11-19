@@ -12,7 +12,8 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded"; // icono para "inactivos"
+import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
+import ClearIcon from "@mui/icons-material/Clear";
 
 /**
  * Presentacional (sin lógica de permisos interna).
@@ -59,11 +60,10 @@ export default function VehiculosToolBar({
       justifyContent="space-between"
       alignItems={{ xs: "stretch", sm: "center" }}
       spacing={1.5}
-      sx={{ mb: 2 }}
-    >
+      sx={{ mb: 2 }}>
       {/* Búsqueda */}
       <Box sx={{ flex: 1 }}>
-        <Input
+        {/* <Input
           placeholder="Buscar por placa, marca, modelo o ubicación…"
           startDecorator={<SearchRoundedIcon />}
           endDecorator={
@@ -87,7 +87,29 @@ export default function VehiculosToolBar({
           }}
           size="md"
           variant="soft"
-        />
+        /> */}
+        <Tooltip title="Buscar por placa, marca, modelo o ubicación…">
+          <Input
+            placeholder="Buscar…"
+            value={value}
+            onChange={handleSearchChange}
+            startDecorator={<SearchRoundedIcon />}
+            endDecorator={
+              value && (
+                <Button
+                  size="sm"
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setSearch("")}
+                  sx={{ minWidth: "auto", px: 0.5 }}>
+                  <ClearIcon fontSize="small" />
+                </Button>
+              )
+            }
+            sx={{ width: { xs: "100%", md: 260 } }}
+            size="md"
+          />
+        </Tooltip>
       </Box>
 
       {/* Controles derechos */}
@@ -98,8 +120,7 @@ export default function VehiculosToolBar({
           variant={showInactive ? "solid" : "soft"}
           color={showInactive ? "warning" : "neutral"}
           startDecorator={<Inventory2RoundedIcon />}
-          sx={{ cursor: "pointer" }}
-        >
+          sx={{ cursor: "pointer" }}>
           Ver inactivos
         </Chip>
 
@@ -109,11 +130,10 @@ export default function VehiculosToolBar({
             canAdd
               ? "Agregar vehículo"
               : addDisabledReason ||
-              "No tienes permiso para crear. Solicítalo al administrador."
+                "No tienes permiso para crear. Solicítalo al administrador."
           }
           variant="soft"
-          placement="top"
-        >
+          placement="top">
           <span>
             <Button
               startDecorator={<AddIcon />}
@@ -121,8 +141,7 @@ export default function VehiculosToolBar({
               disabled={!canAdd}
               aria-disabled={!canAdd}
               variant={canAdd ? "solid" : "soft"}
-              color={canAdd ? "primary" : "neutral"}
-            >
+              color={canAdd ? "primary" : "neutral"}>
               Agregar
             </Button>
           </span>

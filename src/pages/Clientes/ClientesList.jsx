@@ -1,3 +1,4 @@
+// src/pages/Clientes/ClientesList.jsx
 import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   getClientes,
@@ -21,20 +22,20 @@ import {
   Option,
   Divider,
   Avatar,
-  CircularProgress,
-  useTheme,
   Tooltip,
 } from "@mui/joy";
-import AddIcon from "@mui/icons-material/Add";
+
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import ClearIcon from "@mui/icons-material/Clear";
 
 import { useToast } from "../../context/ToastContext";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
-// ✅ NUEVOS IMPORTS (ajusta rutas si los pusiste en otra carpeta)
+// Helpers tuyos
 import ResourceState from "../../components/common/ResourceState";
 import useIsMobile from "../../hooks/useIsMobile";
 import usePermissions from "../../hooks/usePermissions";
@@ -46,7 +47,9 @@ export default function ClientesList() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos"); // "todos" | "Activo" | "Inactivo"
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -62,19 +65,14 @@ export default function ClientesList() {
   const [sortKey, setSortKey] = useState("nombre");
   const [sortDir, setSortDir] = useState("asc");
 
-  const theme = useTheme();
   const isMobile = useIsMobile(768);
   const { showToast } = useToast();
-
-  // Usamos Auth solo para saber si la sesión se está verificando
   const { checkingSession } = useAuth();
 
-  // ✅ Permisos centralizados
+  // Permisos
   const { canAny } = usePermissions();
   const canView = canAny("ver_companias");
   const canCreate = canAny("crear_companias");
-  // Si luego usas edición, deja listo:
-  // const canEdit   = canAny("editar_companias", "gestionar_companias");
 
   const loadClientes = useCallback(async () => {
     if (checkingSession) {
@@ -109,6 +107,7 @@ export default function ClientesList() {
     loadClientes();
   }, [loadClientes]);
 
+  // limpia blob del logo al desmontar
   useEffect(
     () => () => {
       if (logoPreview) URL.revokeObjectURL(logoPreview);
@@ -156,14 +155,23 @@ export default function ClientesList() {
     }
   }
 
+  // Filtro por búsqueda + estatus
   const filtered = useMemo(() => {
     const src = Array.isArray(rows) ? rows : [];
-    return src.filter(
-      (r) =>
-        (r.codigo || "").toLowerCase().includes(search.toLowerCase()) ||
-        (r.nombre || "").toLowerCase().includes(search.toLowerCase())
-    );
-  }, [rows, search]);
+    const q = (search || "").trim().toLowerCase();
+
+    return src.filter((r) => {
+      const matchSearch =
+        !q ||
+        (r.codigo || "").toLowerCase().includes(q) ||
+        (r.nombre || "").toLowerCase().includes(q);
+
+      const matchStatus =
+        statusFilter === "todos" ? true : r.estatus === statusFilter;
+
+      return matchSearch && matchStatus;
+    });
+  }, [rows, search, statusFilter]);
 
   const sortedRows = useMemo(() => {
     const arr = [...filtered];
@@ -178,6 +186,7 @@ export default function ClientesList() {
   }, [filtered, sortKey, sortDir]);
 
   const handleSort = (key) => {
+    if (!key) return;
     if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(key);
@@ -185,7 +194,7 @@ export default function ClientesList() {
     }
   };
 
-  // ✅ Estado de vista usando tu helper
+  // Estado de vista
   const viewState = getViewState({
     checkingSession,
     canView,
@@ -209,30 +218,76 @@ export default function ClientesList() {
         alignItems: "center",
         overflow: "auto",
         minHeight: "100dvh",
+        bgcolor: "background.body",
       }}>
-      <Box sx={{ width: "100%" }}>
+      <Box sx={{ width: "100%", maxWidth: 1100 }}>
         {/* Header */}
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1}
+          alignItems={{ xs: "stretch", md: "center" }}
+          spacing={1.5}
           mb={2}>
-          <Typography level="h4">Clientes</Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Box>
+            <Typography
+              level="body-xs"
+              sx={{ textTransform: "uppercase", opacity: 0.7 }}>
+              Clientes
+            </Typography>
+            <Typography level="h4">Catálogo de compañías</Typography>
+            <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.25 }}>
+              Mostrando {sortedRows.length} de {rows.length || 0}
+            </Typography>
+          </Box>
+
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            sx={{ width: { xs: "100%", md: "auto" } }}>
+            {/* Búsqueda */}
             <Input
               placeholder="Buscar por código o nombre…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              startDecorator={<SearchRoundedIcon />}
+              endDecorator={
+                search && (
+                  <Button
+                    size="sm"
+                    variant="plain"
+                    color="neutral"
+                    onClick={() => setSearch("")}
+                    sx={{ minWidth: "auto", px: 0.5 }}>
+                    <ClearIcon fontSize="small" />
+                  </Button>
+                )
+              }
+              sx={{ width: { xs: "100%", md: 260 } }}
+              size="sm"
             />
+
+            {/* Filtro estatus */}
+            <Select
+              size="sm"
+              value={statusFilter}
+              onChange={(_, v) => setStatusFilter(v || "todos")}
+              sx={{ minWidth: 150 }}>
+              <Option value="todos">Todos</Option>
+              <Option value="Activo">Activos</Option>
+              <Option value="Inactivo">Inactivos</Option>
+            </Select>
+
+            {/* Botón nuevo */}
             <Tooltip
               title={
                 canCreate
                   ? "Crear cliente"
                   : "No tienes permiso para crear. Solicítalo al administrador."
               }
-              variant="solid"
-              placement="right-end">
+              variant="soft"
+              placement="top-end">
               <span>
                 <Button
                   startDecorator={<AddRoundedIcon />}
@@ -240,7 +295,9 @@ export default function ClientesList() {
                   disabled={!canCreate}
                   aria-disabled={!canCreate}
                   variant={canCreate ? "solid" : "soft"}
-                  color={canCreate ? "primary" : "neutral"}>
+                  color={canCreate ? "primary" : "neutral"}
+                  size="sm"
+                  sx={{ borderRadius: "999px" }}>
                   Nuevo
                 </Button>
               </span>
@@ -248,8 +305,14 @@ export default function ClientesList() {
           </Stack>
         </Stack>
 
-        <Card variant="outlined" sx={{ overflowX: "auto", width: "100%" }}>
-          {/* ✅ Estado reutilizable */}
+        {/* Contenedor principal */}
+        <Card
+          variant="outlined"
+          sx={{
+            overflowX: "auto",
+            width: "100%",
+            background: "background.surface",
+          }}>
           {viewState !== "data" ? (
             <Box p={2}>
               <ResourceState
@@ -261,7 +324,7 @@ export default function ClientesList() {
               />
             </Box>
           ) : isMobile ? (
-            // ---- MÓVIL: tarjetas (solo ver detalle) ----
+            // ---- MÓVIL: tarjetas ----
             <Stack spacing={2} p={2}>
               {sortedRows.map((r) => (
                 <Sheet
@@ -311,8 +374,22 @@ export default function ClientesList() {
               ))}
             </Stack>
           ) : (
-            // ---- ESCRITORIO: tabla (sin columna de acciones) ----
-            <Table size="sm" stickyHeader hoverRow sx={{ minWidth: 800 }}>
+            // ---- ESCRITORIO: tabla ----
+            <Table
+              size="sm"
+              stickyHeader
+              hoverRow
+              sx={{
+                minWidth: 880,
+                "--TableCell-headBackground":
+                  "var(--joy-palette-background-level5)",
+                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
+                "--TableCell-headFontWeight": 600,
+                "--TableCell-headBorderBottom":
+                  "1px solid var(--joy-palette-divider)",
+                "--TableRow-hoverBackground":
+                  "var(--joy-palette-background-level1)",
+              }}>
               <thead>
                 <tr>
                   {[
@@ -328,7 +405,18 @@ export default function ClientesList() {
                           variant="plain"
                           size="sm"
                           onClick={() => handleSort(col.key)}
-                          endDecorator={<ArrowDropDownIcon />}>
+                          endDecorator={
+                            <ArrowDropDownIcon
+                              sx={{
+                                transform:
+                                  sortKey === col.key && sortDir === "desc"
+                                    ? "rotate(180deg)"
+                                    : "none",
+                                transition: "0.15s",
+                                opacity: sortKey === col.key ? 1 : 0.35,
+                              }}
+                            />
+                          }>
                           {col.label}
                         </Button>
                       ) : (
@@ -347,8 +435,13 @@ export default function ClientesList() {
                         to={`/admin/clientes/${r.id}/informacion`}
                         sx={{
                           textDecoration: "none",
-                          color: "primary.plainColor",
+                          color: "inherit",
                           cursor: "pointer",
+                          fontWeight: 500,
+                          "&:hover": {
+                            textDecoration: "underline",
+                            color: "inherit",
+                          },
                         }}>
                         {r.codigo}
                       </Typography>
@@ -359,19 +452,25 @@ export default function ClientesList() {
                         to={`/admin/clientes/${r.id}/informacion`}
                         sx={{
                           textDecoration: "none",
-                          color: "primary.plainColor",
+                          color: "inherit",
                           cursor: "pointer",
+                          fontWeight: 500,
+                          "&:hover": {
+                            textDecoration: "underline",
+                            color: "inherit",
+                          },
                         }}>
                         {r.nombre}
                       </Typography>
                     </td>
                     <td>{r.descripcion || "—"}</td>
                     <td>
-                      <Typography
-                        level="body-sm"
-                        color={r.estatus === "Activo" ? "success" : "danger"}>
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color={r.estatus === "Activo" ? "success" : "neutral"}>
                         {r.estatus}
-                      </Typography>
+                      </Chip>
                     </td>
                     <td>
                       {r.logo_url ? (
@@ -390,7 +489,7 @@ export default function ClientesList() {
           )}
         </Card>
 
-        {/* Modal crear (solo si puede crear) */}
+        {/* Modal crear */}
         {open && canCreate && (
           <Modal open={open} onClose={() => setOpen(false)}>
             <ModalDialog

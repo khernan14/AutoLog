@@ -1,3 +1,4 @@
+// src/pages/Vehiculos/Vehiculos.jsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   obtenerVehiculos,
@@ -9,7 +10,7 @@ import {
 import VehiculosTable from "../../components/VehiculosForm/VehiculosTable";
 import VehiculoModal from "../../components/VehiculosForm/VehiculosModal";
 import VehiculosToolBar from "../../components/VehiculosForm/VehiculosToolBar";
-import { Box, Card } from "@mui/joy";
+import { Box, Card, Sheet, Typography } from "@mui/joy";
 import Swal from "sweetalert2";
 import { useAuth } from "../../context/AuthContext";
 
@@ -221,64 +222,94 @@ export default function Vehiculos() {
   });
 
   return (
-    <Box p={2}>
-      <Card
-        variant="plain"
-        sx={{ p: 2, backgroundColor: "background.surface" }}>
-        {viewState !== "data" ? (
-          <ResourceState
-            state={viewState}
-            error={error}
-            onRetry={loadVehiculos}
-            emptyTitle="Sin vehículos"
-            emptyDescription="Aún no hay vehículos registrados."
-          />
-        ) : (
-          <>
-            <VehiculosToolBar
-              searchText={searchText}
-              onSearch={setSearchText}
-              onAdd={handleAddVehiculo}
-              showInactive={showInactive}
-              setShowInactive={setShowInactive}
-              canAdd={canCreate}
-              addDisabledReason={
-                !canCreate
-                  ? "No tienes permiso para crear. Solicítalo al administrador."
-                  : undefined
-              }
+    <Sheet
+      variant="plain"
+      sx={{
+        flex: 1,
+        width: "100%",
+        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
+        pb: { xs: 2, sm: 2, md: 4 },
+        px: { xs: 2, md: 4 },
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "auto",
+        minHeight: "100dvh",
+        bgcolor: "background.body",
+      }}>
+      <Box sx={{ width: "100%" }}>
+        {/* Header de la página */}
+        <Box sx={{ mb: 1.5 }}>
+          <Typography level="h4">Vehículos</Typography>
+          <Typography level="body-sm" color="neutral">
+            Gestión del catálogo de vehículos de la flota.
+          </Typography>
+          <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
+            Total registrados: {vehiculos.length}
+          </Typography>
+        </Box>
+
+        {/* Barra de búsqueda / filtros / agregar – FUERA del Card */}
+        <VehiculosToolBar
+          searchText={searchText}
+          onSearch={setSearchText}
+          onAdd={handleAddVehiculo}
+          showInactive={showInactive}
+          setShowInactive={setShowInactive}
+          canAdd={canCreate}
+          addDisabledReason={
+            !canCreate
+              ? "No tienes permiso para crear. Solicítalo al administrador."
+              : undefined
+          }
+        />
+
+        {/* Contenedor principal (solo tabla / estados) */}
+        <Card
+          variant="outlined"
+          sx={{
+            mt: 1,
+            p: 2,
+            backgroundColor: "background.surface",
+            overflowX: "auto",
+          }}>
+          {viewState !== "data" ? (
+            <ResourceState
+              state={viewState}
+              error={error}
+              onRetry={loadVehiculos}
+              emptyTitle="Sin vehículos"
+              emptyDescription="Aún no hay vehículos registrados."
             />
-
-            {filteredVehiculos.length === 0 ? (
-              <Box sx={{ p: 2 }}>
-                <ResourceState
-                  state="empty"
-                  emptyTitle={
-                    vehiculos.length ? "Sin coincidencias" : "Sin vehículos"
-                  }
-                  emptyDescription={
-                    vehiculos.length
-                      ? "No encontramos vehículos con los filtros actuales."
-                      : "Aún no hay vehículos registrados."
-                  }
-                />
-              </Box>
-            ) : (
-              <VehiculosTable
-                vehiculos={filteredVehiculos}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onRestore={handleRestore}
-                showInactive={showInactive}
-                setShowInactive={setShowInactive}
-                canEdit={canEdit}
-                canDelete={canDelete}
+          ) : filteredVehiculos.length === 0 ? (
+            <Box sx={{ p: 2 }}>
+              <ResourceState
+                state="empty"
+                emptyTitle={
+                  vehiculos.length ? "Sin coincidencias" : "Sin vehículos"
+                }
+                emptyDescription={
+                  vehiculos.length
+                    ? "No encontramos vehículos con los filtros actuales."
+                    : "Aún no hay vehículos registrados."
+                }
               />
-            )}
-          </>
-        )}
-      </Card>
+            </Box>
+          ) : (
+            <VehiculosTable
+              vehiculos={filteredVehiculos}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onRestore={handleRestore}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canRestore={canRestore}
+            />
+          )}
+        </Card>
+      </Box>
 
+      {/* Modal crear/editar */}
       <VehiculoModal
         open={openModal}
         onClose={() => {
@@ -288,6 +319,6 @@ export default function Vehiculos() {
         initialValues={editVehiculo || undefined}
         onSubmit={handleSubmitVehiculo}
       />
-    </Box>
+    </Sheet>
   );
 }

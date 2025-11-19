@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   Box,
   Table,
@@ -20,24 +20,7 @@ import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 
-/* Hook simple (sin @mui/material) para detectar móvil */
-function useIsMobile(bp = 768) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.matchMedia(`(max-width:${bp}px)`).matches : false
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mql = window.matchMedia(`(max-width:${bp}px)`);
-    const onChange = (e) => setIsMobile(e.matches);
-    mql.addEventListener?.("change", onChange);
-    mql.addListener?.(onChange);
-    return () => {
-      mql.removeEventListener?.("change", onChange);
-      mql.removeListener?.(onChange);
-    };
-  }, [bp]);
-  return isMobile;
-}
+import useIsMobile from "@/hooks/useIsMobile";
 
 /**
  * Presentacional.
@@ -64,14 +47,17 @@ export default function VehiculosTable({
   const [sortField, setSortField] = useState("placa");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const handleSort = useCallback((field) => {
-    if (field === sortField) {
-      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-  }, [sortField]);
+  const handleSort = useCallback(
+    (field) => {
+      if (field === sortField) {
+        setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortOrder("asc");
+      }
+    },
+    [sortField]
+  );
 
   const sortedVehiculos = useMemo(() => {
     const arr = Array.isArray(vehiculos) ? [...vehiculos] : [];
@@ -98,12 +84,20 @@ export default function VehiculosTable({
       <Stack spacing={2} p={2}>
         {sortedVehiculos.map((v) => {
           const showMenu =
-            (canEdit && onEdit) || (canDelete && onDelete && !isInactive(v)) || (canRestore && onRestore && isInactive(v));
+            (canEdit && onEdit) ||
+            (canDelete && onDelete && !isInactive(v)) ||
+            (canRestore && onRestore && isInactive(v));
 
           return (
-            <Sheet key={v.id} variant="outlined" sx={{ p: 2, borderRadius: "md" }}>
+            <Sheet
+              key={v.id}
+              variant="outlined"
+              sx={{ p: 2, borderRadius: "md" }}>
               <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center">
                   <Box>
                     <Typography level="title-md">{v.placa}</Typography>
                     <Typography level="body-xs" sx={{ opacity: 0.7 }}>
@@ -115,7 +109,9 @@ export default function VehiculosTable({
                     <Dropdown>
                       <MenuButton
                         slots={{ root: IconButton }}
-                        slotProps={{ root: { variant: "plain", color: "neutral" } }}
+                        slotProps={{
+                          root: { variant: "plain", color: "neutral" },
+                        }}
                         aria-label="Acciones">
                         <MoreHorizRoundedIcon />
                       </MenuButton>
@@ -127,18 +123,20 @@ export default function VehiculosTable({
                           </MenuItem>
                         )}
                         {isInactive(v)
-                          ? (canRestore && onRestore && (
-                            <MenuItem onClick={() => onRestore(v.id)}>
-                              <RestoreRoundedIcon fontSize="small" />
-                              Restaurar
-                            </MenuItem>
-                          ))
-                          : (canDelete && onDelete && (
-                            <MenuItem onClick={() => onDelete(v.id)}>
-                              <DeleteRoundedIcon fontSize="small" />
-                              Inactivar
-                            </MenuItem>
-                          ))}
+                          ? canRestore &&
+                            onRestore && (
+                              <MenuItem onClick={() => onRestore(v.id)}>
+                                <RestoreRoundedIcon fontSize="small" />
+                                Restaurar
+                              </MenuItem>
+                            )
+                          : canDelete &&
+                            onDelete && (
+                              <MenuItem onClick={() => onDelete(v.id)}>
+                                <DeleteRoundedIcon fontSize="small" />
+                                Inactivar
+                              </MenuItem>
+                            )}
                       </Menu>
                     </Dropdown>
                   )}
@@ -148,8 +146,7 @@ export default function VehiculosTable({
                   <Chip
                     size="sm"
                     variant="soft"
-                    color={v.estado === "Disponible" ? "success" : "warning"}
-                  >
+                    color={v.estado === "Disponible" ? "success" : "warning"}>
                     {v.estado || "—"}
                   </Chip>
                   <Chip size="sm" variant="soft">
@@ -166,95 +163,117 @@ export default function VehiculosTable({
 
   // ====== ESCRITORIO: Tabla ======
   return (
-    <Sheet variant="outlined" sx={{ borderRadius: "md", p: 2 }}>
-      <Table hoverRow aria-label="Tabla de vehículos" size="sm" stickyHeader sx={{ minWidth: 800 }}>
-        <thead>
-          <tr>
-            {[
-              { label: "Vehículo", key: "placa" },
-              { label: "Marca", key: "marca" },
-              { label: "Modelo", key: "modelo" },
-              { label: "Estado", key: "estado" },
-              { label: "Ubicación", key: "nombre_ubicacion" },
-            ].map((col) => (
-              <th key={col.key}>
-                <Button
-                  variant="plain"
-                  size="sm"
-                  onClick={() => handleSort(col.key)}
-                  endDecorator={
-                    <ArrowDropDownIcon
-                      sx={{
-                        transform:
-                          sortField === col.key && sortOrder === "desc"
-                            ? "rotate(180deg)"
-                            : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  }
-                >
-                  {col.label}
-                </Button>
-              </th>
-            ))}
+    <Table
+      hoverRow
+      aria-label="Tabla de vehículos"
+      size="sm"
+      stickyHeader
+      sx={{
+        minWidth: 800,
+        "--TableCell-headBackground": "var(--joy-palette-background-level5)",
+        "--TableCell-headColor": "var(--joy-palette-text-secondary)",
+        "--TableCell-headFontWeight": 600,
+        "--TableCell-headBorderBottom": "1px solid var(--joy-palette-divider)",
+        "--TableRow-hoverBackground": "var(--joy-palette-background-level1)",
+      }}>
+      <thead>
+        <tr>
+          {[
+            { label: "Vehículo", key: "placa" },
+            { label: "Marca", key: "marca" },
+            { label: "Modelo", key: "modelo" },
+            { label: "Estado", key: "estado" },
+            { label: "Ubicación", key: "nombre_ubicacion" },
+          ].map((col) => (
+            <th key={col.key}>
+              <Button
+                variant="plain"
+                size="sm"
+                onClick={() => handleSort(col.key)}
+                endDecorator={
+                  <ArrowDropDownIcon
+                    sx={{
+                      transform:
+                        sortField === col.key && sortOrder === "desc"
+                          ? "rotate(180deg)"
+                          : "none",
+                      transition: "0.2s",
+                      opacity: sortField === col.key ? 1 : 0.4,
+                    }}
+                  />
+                }>
+                {col.label}
+              </Button>
+            </th>
+          ))}
 
-            {hasActions && <th>Acciones</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedVehiculos.map((v) => (
-            <tr key={v.id}>
-              <td>{v.placa}</td>
-              <td>{v.marca}</td>
-              <td>{v.modelo}</td>
+          {hasActions && <th>Acciones</th>}
+        </tr>
+      </thead>
+      <tbody>
+        {sortedVehiculos.map((v) => (
+          <tr key={v.id}>
+            <td>{v.placa}</td>
+            <td>{v.marca}</td>
+            <td>{v.modelo}</td>
+            <td>
+              <Chip
+                size="sm"
+                variant="soft"
+                color={v.estado === "Disponible" ? "success" : "warning"}>
+                {v.estado || "—"}
+              </Chip>
+            </td>
+            <td>
+              {v.nombre_ubicacion ? (
+                <Chip size="sm" variant="soft">
+                  {v.nombre_ubicacion}
+                </Chip>
+              ) : (
+                "—"
+              )}
+            </td>
+
+            {hasActions && (
               <td>
-                <Typography
-                  level="body-sm"
-                  color={v.estado === "Disponible" ? "success" : "warning"}
-                >
-                  {v.estado}
-                </Typography>
-              </td>
-              <td>{v.nombre_ubicacion}</td>
-
-              {hasActions && (
-                <td>
-                  <Dropdown>
-                    <MenuButton
-                      slots={{ root: IconButton }}
-                      slotProps={{ root: { variant: "plain", color: "neutral" } }}
-                      aria-label="Acciones">
-                      <MoreHorizRoundedIcon />
-                    </MenuButton>
-                    <Menu>
-                      {canEdit && onEdit && (
-                        <MenuItem onClick={() => onEdit(v)}>
-                          <EditRoundedIcon fontSize="small" />
-                          Editar
-                        </MenuItem>
-                      )}
-                      {isInactive(v)
-                        ? (canRestore && onRestore && (
+                <Dropdown>
+                  <MenuButton
+                    slots={{ root: IconButton }}
+                    slotProps={{
+                      root: { variant: "plain", color: "neutral" },
+                    }}
+                    aria-label="Acciones">
+                    <MoreHorizRoundedIcon />
+                  </MenuButton>
+                  <Menu>
+                    {canEdit && onEdit && (
+                      <MenuItem onClick={() => onEdit(v)}>
+                        <EditRoundedIcon fontSize="small" />
+                        Editar
+                      </MenuItem>
+                    )}
+                    {isInactive(v)
+                      ? canRestore &&
+                        onRestore && (
                           <MenuItem onClick={() => onRestore(v.id)}>
                             <RestoreRoundedIcon fontSize="small" />
                             Restaurar
                           </MenuItem>
-                        ))
-                        : (canDelete && onDelete && (
+                        )
+                      : canDelete &&
+                        onDelete && (
                           <MenuItem onClick={() => onDelete(v.id)}>
                             <DeleteRoundedIcon fontSize="small" />
                             Inhabilitar
                           </MenuItem>
-                        ))}
-                    </Menu>
-                  </Dropdown>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    </Sheet>
+                        )}
+                  </Menu>
+                </Dropdown>
+              </td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
