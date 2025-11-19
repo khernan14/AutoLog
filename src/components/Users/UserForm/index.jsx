@@ -32,7 +32,7 @@ import {
   getUserSupervisors,
 } from "../../../services/AuthServices";
 import { getCiudades } from "../../../services/RegistrosService";
-import { sendMail } from "../../../services/MailServices";
+import { sendMail, sendRecoveryPassword } from "../../../services/MailServices";
 
 import StatusCard from "../../../components/common/StatusCard";
 import UserToolbar from "./UserToolbar";
@@ -243,6 +243,41 @@ export default function Users() {
     } catch {
       showToast(
         "Error de conexión al inactivar usuarios seleccionados.",
+        "danger"
+      );
+    }
+  };
+
+  const onResetPassword = async (email) => {
+    if (!email) {
+      return showToast("El usuario no tiene un correo válido.", "warning");
+    }
+
+    const res = await Swal.fire({
+      title: "¿Reiniciar contraseña?",
+      text: `Se enviará un correo de restablecimiento a: ${email}`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#03624C",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Sí, enviar correo",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (!res.isConfirmed) return;
+
+    try {
+      // Usa el mismo servicio que ya usas en "¿Olvidaste tu contraseña?"
+      await sendRecoveryPassword(email);
+
+      showToast(
+        "Si el correo está registrado, se envió un enlace para restablecer la contraseña.",
+        "success"
+      );
+    } catch (error) {
+      console.error(error);
+      showToast(
+        "No se pudo solicitar el reinicio de contraseña. Intenta de nuevo.",
         "danger"
       );
     }
@@ -481,6 +516,7 @@ export default function Users() {
             ciudades={ciudades}
             supervisores={supervisores}
             saving={saving}
+            onResetPassword={onResetPassword}
           />
         )}
       </Box>

@@ -4,6 +4,8 @@ import {
   TIPOS_ACTIVO,
   PRODUCTO_UNIDADES,
   PRODUCTO_TIPOS,
+  ROLES_USUARIO,
+  PUESTOS_USUARIO,
   toOptions,
 } from "@/constants/inventario";
 
@@ -13,10 +15,12 @@ const MAP = {
   tiposActivo: TIPOS_ACTIVO,
   unidadesProducto: PRODUCTO_UNIDADES,
   tiposProducto: PRODUCTO_TIPOS,
+  rolesUsuario: ROLES_USUARIO,
+  puestosUsuario: PUESTOS_USUARIO,
 };
 
 export default function CatalogSelect({
-  catalog, // "estatusActivo" | "tiposActivo" | "unidadesProducto" | "tiposProducto"
+  catalog, // "estatusActivo" | "tiposActivo" | "unidadesProducto" | "tiposProducto" | "rolesUsuario" | "puestosUsuario"
   value,
   onChange,
   label,

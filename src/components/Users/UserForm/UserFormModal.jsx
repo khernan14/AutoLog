@@ -8,29 +8,36 @@ import {
   FormControl,
   FormLabel,
   Input,
-  Select,
-  Option,
+  Autocomplete,
   Button,
 } from "@mui/joy";
+import CatalogSelect from "@/components/forms/CatalogSelect"; // ajusta ruta si es distinta
 
-const ROLES_DEFAULT = ["Empleado", "Supervisor"]; // 🔧 ajusta si tienes roles fijos desde backend
+// 🔐 Generador de contraseña segura (12 caracteres, con mayúsculas, minúsculas, números y símbolos)
+function generateSecurePassword(length = 12) {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const specials = "@#$%&*_-+!";
+  const all = upper + lower + numbers + specials;
 
-// Lista de puestos por defecto (puedes editarla aquí)
-const PUESTOS_DEFAULT = [
-  "Gerente de Ingeniería",
-  "Gerente de Finanzas",
-  "Oficial de servicios",
-  "Supervisor Tecnico - ATM",
-  "Supervisor Tecnico - Microsistemas",
-  "Técnico de ATM",
-  "Técnico de Microsistemas",
-  "Técnico de Alta Disponibilidad",
-  "Técnico de Soporte",
-  "Técnico de Inventario",
-  "Asistente de Contabilidad",
-  "Asistente de Cuentas por Cobrar",
-  "Especialista de Soluciones",
-];
+  let pwd = "";
+  // al menos uno de cada tipo
+  pwd += upper[Math.floor(Math.random() * upper.length)];
+  pwd += lower[Math.floor(Math.random() * lower.length)];
+  pwd += numbers[Math.floor(Math.random() * numbers.length)];
+  pwd += specials[Math.floor(Math.random() * specials.length)];
+
+  for (let i = pwd.length; i < length; i++) {
+    pwd += all[Math.floor(Math.random() * all.length)];
+  }
+
+  // mezclar
+  return pwd
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
 
 export default function UserFormModal({
   open,
@@ -39,8 +46,8 @@ export default function UserFormModal({
   initialValues = null, // user para editar o null para crear
   ciudades = [],
   supervisores = [],
-  puestosOptions = PUESTOS_DEFAULT, // <- opcional: pasar desde el padre
   saving = false,
+  onResetPassword, // <-- nuevo callback para enviar correo de reset
 }) {
   const isEditing = !!initialValues?.id_usuario;
 
@@ -56,14 +63,17 @@ export default function UserFormModal({
     supervisor_id: "", // id supervisor
   });
 
+  // Cuando se abre el modal, setear datos / generar password
   useEffect(() => {
     if (!open) return;
+
     if (isEditing) {
       setForm({
         id_usuario: initialValues.id_usuario,
         nombre: initialValues.nombre || "",
         email: initialValues.email || "",
         username: initialValues.username || "",
+        // en edición NO cambiamos password desde aquí
         password: "",
         rol: initialValues.rol || "",
         puesto: initialValues.puesto || "",
@@ -74,12 +84,14 @@ export default function UserFormModal({
             : "",
       });
     } else {
+      // Nuevo usuario → generar contraseña automáticamente (no visible)
+      const autoPassword = generateSecurePassword(12);
       setForm({
         id_usuario: null,
         nombre: "",
         email: "",
         username: "",
-        password: "",
+        password: autoPassword, // se manda al backend y al correo, pero no se muestra
         rol: "",
         puesto: "",
         ciudad: "",
@@ -92,9 +104,9 @@ export default function UserFormModal({
     if (!form.nombre.trim()) return false;
     if (!form.email.trim()) return false;
     if (!form.username.trim()) return false;
-    if (!isEditing && !form.password.trim()) return false;
+    // ya NO validamos password, porque se genera sola para nuevos
     return true;
-  }, [form, isEditing]);
+  }, [form]);
 
   const handleSubmit = (e) => {
     e?.preventDefault?.();
@@ -105,13 +117,20 @@ export default function UserFormModal({
       nombre: form.nombre.trim(),
       email: form.email.trim(),
       username: form.username.trim(),
-      password: form.password || undefined,
+      // en edición no tocamos password (queda undefined)
+      password: isEditing ? undefined : form.password,
       rol: form.rol || undefined,
       puesto: form.puesto || undefined,
       id_ciudad: form.ciudad || undefined,
       supervisor_id: form.supervisor_id || undefined,
     };
+
     onSubmit?.(payload);
+  };
+
+  const handleResetClick = () => {
+    if (!onResetPassword || !form.email) return;
+    onResetPassword(form.email);
   };
 
   return (
@@ -160,98 +179,122 @@ export default function UserFormModal({
             />
           </FormControl>
 
-          {!isEditing && (
-            <FormControl required>
-              <FormLabel>Contraseña</FormLabel>
-              <Input
-                type="password"
-                value={form.password}
-                onChange={(e) =>
-                  setForm((s) => ({ ...s, password: e.target.value }))
-                }
-                disabled={saving}
-              />
-            </FormControl>
-          )}
+          {/* 🔐 Ya no mostramos campo de contraseña.
+              Se genera automáticamente para nuevos usuarios y se manda en el payload. */}
 
+          {/* Rol con Autocomplete vía CatalogSelect */}
           <FormControl>
             <FormLabel>Rol</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="rolesUsuario"
               value={form.rol || ""}
-              onChange={(_, v) => setForm((s) => ({ ...s, rol: v || "" }))}
+              onChange={(v) =>
+                setForm((s) => ({
+                  ...s,
+                  rol: v || "",
+                }))
+              }
+              placeholder="Selecciona rol"
               disabled={saving}
-              placeholder="Selecciona rol">
-              <Option value="">—</Option>
-              {ROLES_DEFAULT.map((r) => (
-                <Option key={r} value={r}>
-                  {r}
-                </Option>
-              ))}
-            </Select>
+              allowEmpty
+            />
           </FormControl>
 
-          {/* Puesto como Select */}
+          {/* Puesto con Autocomplete vía CatalogSelect */}
           <FormControl>
             <FormLabel>Puesto</FormLabel>
-            <Select
+            <CatalogSelect
+              catalog="puestosUsuario"
               value={form.puesto || ""}
-              onChange={(_, v) => setForm((s) => ({ ...s, puesto: v || "" }))}
+              onChange={(v) =>
+                setForm((s) => ({
+                  ...s,
+                  puesto: v || "",
+                }))
+              }
+              placeholder="Selecciona puesto"
               disabled={saving}
-              placeholder="Selecciona puesto">
-              <Option value="">—</Option>
-              {puestosOptions.map((p) => (
-                <Option key={p} value={p}>
-                  {p}
-                </Option>
-              ))}
-            </Select>
+              allowEmpty
+            />
           </FormControl>
 
+          {/* Ciudad con Autocomplete normal */}
           <FormControl>
             <FormLabel>Ciudad</FormLabel>
-            <Select
-              value={form.ciudad || ""}
-              onChange={(_, v) => setForm((s) => ({ ...s, ciudad: v || "" }))}
-              disabled={saving}
-              placeholder="Selecciona ciudad">
-              <Option value="">—</Option>
-              {ciudades.map((c) => (
-                <Option key={c.id} value={String(c.id)}>
-                  {c.nombre /* si tu API usa c.ciudad, cámbialo */}
-                </Option>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Supervisor</FormLabel>
-            <Select
-              value={form.supervisor_id || ""}
-              onChange={(_, v) =>
-                setForm((s) => ({ ...s, supervisor_id: v || "" }))
+            <Autocomplete
+              placeholder="Selecciona ciudad"
+              options={ciudades}
+              getOptionLabel={(opt) => opt?.nombre ?? opt?.ciudad ?? ""}
+              value={
+                ciudades.find(
+                  (c) =>
+                    String(c.id) === String(form.ciudad) ||
+                    String(c.id_ciudad) === String(form.ciudad)
+                ) || null
+              }
+              onChange={(_, opt) =>
+                setForm((s) => ({
+                  ...s,
+                  ciudad: opt ? String(opt.id ?? opt.id_ciudad) : "",
+                }))
               }
               disabled={saving}
-              placeholder="Selecciona supervisor">
-              <Option value="">—</Option>
-              {supervisores.map((s) => (
-                <Option key={s.id} value={String(s.id)}>
-                  {s.nombre}
-                </Option>
-              ))}
-            </Select>
+              clearOnBlur={false}
+            />
+          </FormControl>
+
+          {/* Supervisor con Autocomplete normal */}
+          <FormControl>
+            <FormLabel>Supervisor</FormLabel>
+            <Autocomplete
+              placeholder="Selecciona supervisor"
+              options={supervisores}
+              getOptionLabel={(opt) => opt?.nombre ?? ""}
+              value={
+                supervisores.find(
+                  (sup) => String(sup.id) === String(form.supervisor_id)
+                ) || null
+              }
+              onChange={(_, opt) =>
+                setForm((s) => ({
+                  ...s,
+                  supervisor_id: opt ? String(opt.id) : "",
+                }))
+              }
+              disabled={saving}
+              clearOnBlur={false}
+            />
           </FormControl>
         </Stack>
 
-        <Stack direction="row" justifyContent="flex-end" spacing={1.25} mt={2}>
-          <Button variant="plain" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            disabled={!canSubmit || saving}>
-            Guardar
-          </Button>
+        {/* Footer con botón de reset + acciones */}
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          spacing={1.25}
+          mt={2}>
+          {isEditing && onResetPassword && (
+            <Button
+              variant="soft"
+              color="warning"
+              disabled={saving || !form.email}
+              onClick={handleResetClick}>
+              Reiniciar contraseña
+            </Button>
+          )}
+
+          <Stack direction="row" spacing={1.25}>
+            <Button variant="plain" onClick={onClose} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={saving}
+              disabled={!canSubmit || saving}>
+              Guardar
+            </Button>
+          </Stack>
         </Stack>
       </ModalDialog>
     </Modal>
