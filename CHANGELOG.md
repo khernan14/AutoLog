@@ -1,3 +1,14 @@
+## v1.1.1 - 2025-11-19
+
+* chore(release): v1.1.1 (24e15ed)
+* feat(ui): Se actualiza la vista de users y se agrega un boton de reset password (12335e1)
+* modify(ui): Se cambia la parte del sidebar en vista mobile para que cierre auto el sidebar (8e0fe33)
+* feat(ui): Se actualiza la vista de public page donde muestra los datos de los activos (a4099c9)
+* feat(ui): Actualizar vistas de sites/activos_clientes/compa├▒ias (123033b)
+* docs(changelog): v1.1.0 (6fac773)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.1.0...v1.1.1
+
 ## v1.1.0 - 2025-11-18
 
 * chore(release): v1.1.0 (62a8716)
@@ -59,5 +70,6 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
