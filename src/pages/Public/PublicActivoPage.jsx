@@ -12,12 +12,19 @@ import {
   LinearProgress,
   Sheet,
   Avatar,
-  Link as JoyLink,
   Button,
 } from "@mui/joy";
+import useIsMobile from "../../hooks/useIsMobile";
 
-const API_BASE = "https://autologapi-production.up.railway.app";
-// const API_BASE = "http://localhost:3000";
+// Usa env var para no estar cambiando a mano entre dev/prod
+const API_BASE =
+  import.meta.env.VITE_PUBLIC_API_BASE_URL ||
+  "https://autologapi-production.up.railway.app";
+
+// Soporte
+const SUPPORT_EMAIL = "micros.teh@tecnasa.com";
+// Reemplaza por el número real en formato internacional SIN el "+" (ej: 5049xxxxxxx)
+const WHATSAPP_NUMBER = "50432898115";
 
 const StatusChip = ({ estatus }) => {
   const color = useMemo(() => {
@@ -53,6 +60,7 @@ export default function PublicActivoPage() {
   const { codigo } = useParams();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
+  const isMobile = useIsMobile(768);
 
   const [data, setData] = useState(null);
   const [state, setState] = useState({ loading: true, error: null });
@@ -61,7 +69,6 @@ export default function PublicActivoPage() {
     let mounted = true;
     setState({ loading: true, error: null });
 
-    // ⚠️ Enforce token (seguridad): si no hay token, no mostramos datos
     if (!token) {
       setState({
         loading: false,
@@ -148,216 +155,301 @@ export default function PublicActivoPage() {
     asignacion_vigente,
   } = data;
 
+  // Links de soporte (correo + WhatsApp) con mensaje personalizado
+  const emailSubject = encodeURIComponent(
+    `Reporte de falla - Activo ${codigo}`
+  );
+  const emailBody = encodeURIComponent(
+    [
+      "Hola equipo de soporte Tecnasa,",
+      "",
+      "Estoy reportando una falla en el siguiente equipo:",
+      "",
+      `- Código: ${codigo}`,
+      `- Nombre: ${nombre || "—"}`,
+      `- Modelo: ${modelo || "—"}`,
+      `- Serie: ${serial_number || "—"}`,
+      `- Ubicación: ${ubicacion_actual?.site || "—"}`,
+      "",
+      "Descripción de la falla (favor completar):",
+      "- ...............................................................",
+      "",
+      "Les agradezco su apoyo con esta gestión.",
+      "",
+      "Saludos.",
+    ].join("\n")
+  );
+  const emailHref = `mailto:${SUPPORT_EMAIL}?subject=${emailSubject}&body=${emailBody}`;
+
+  const whatsappText = encodeURIComponent(
+    `Hola, estoy reportando una falla en el activo ${codigo} (${
+      nombre || "sin nombre"
+    } con N° de serie: ${serial_number}).\n\nPor favor su ayuda con esta gestión.\n\nDescripción de la falla: `
+  );
+
+  const whatsappHref = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappText}`;
+
   return (
     <OuterContainer>
       <Card
         variant="outlined"
         sx={{
           width: "100%",
-          maxWidth: 720,
+          maxWidth: 780,
           borderRadius: "2xl",
           boxShadow: "lg",
           p: { xs: 2, sm: 3 },
           mx: "auto",
         }}>
-        {/* Header */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          alignItems={{ xs: "flex-start", sm: "center" }}
-          justifyContent="space-between"
-          spacing={2}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar
-              sx={{ "--Avatar-size": "72px" }}
-              src={data.tecnasa_logo_url || "/logo-tecnasa.png"}
-              alt="Tecnasa Honduras"
-              variant="soft"
-            />
-            <Box>
-              <Typography level="title-lg">Tecnasa Honduras</Typography>
-              <Typography level="body-sm" color="neutral">
-                Activo: <b>{codigo}</b>
-              </Typography>
-            </Box>
+        {/* Header / branding */}
+        <Stack spacing={2}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            spacing={2}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar
+                sx={{ "--Avatar-size": "64px" }}
+                src={data.tecnasa_logo_url || "/logo-tecnasa.png"}
+                alt="Tecnasa Honduras"
+                variant="soft"
+              />
+              <Box>
+                <Typography level="body-xs" color="neutral">
+                  Ficha de activo
+                </Typography>
+                <Typography level="h4">
+                  {nombre || "Activo sin nombre"}
+                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
+                  <Typography level="body-sm" color="neutral">
+                    Código: <b>{codigo}</b>
+                  </Typography>
+                  {estatus && <StatusChip estatus={estatus} />}
+                </Stack>
+              </Box>
+            </Stack>
+
+            {/* Lado derecho: logo cliente / bodega / iniciales */}
+            {data.meta?.isEnCliente && data.cliente_logo_url ? (
+              <Sheet
+                variant="outlined"
+                sx={{
+                  p: 1.25,
+                  borderRadius: "lg",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 140,
+                }}>
+                <img
+                  src={data.cliente_logo_url}
+                  alt="Logo cliente"
+                  style={{ width: 140, height: 88, objectFit: "contain" }}
+                />
+              </Sheet>
+            ) : data.meta?.isEnBodega ? (
+              <Sheet
+                variant="soft"
+                sx={{ px: 1.25, py: 0.75, borderRadius: "lg" }}>
+                <Typography level="body-sm">
+                  <b>Bodega:</b> {data.ubicacion_actual?.bodega || "—"}
+                </Typography>
+              </Sheet>
+            ) : (
+              <Avatar
+                variant="outlined"
+                color="neutral"
+                sx={{ "--Avatar-size": "56px" }}>
+                {asignacion_vigente?.cliente?.slice(0, 2).toUpperCase() || "—"}
+              </Avatar>
+            )}
           </Stack>
 
-          {data.meta?.isEnCliente && data.cliente_logo_url ? (
-            <Sheet
-              variant="outlined"
-              sx={{
-                p: 1.25,
-                borderRadius: "lg",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}>
-              <img
-                src={data.cliente_logo_url}
-                alt="Logo cliente"
-                style={{ width: 140, height: 88, objectFit: "contain" }}
-              />
-            </Sheet>
-          ) : data.meta?.isEnBodega ? (
-            <Sheet
-              variant="soft"
-              sx={{ px: 1.25, py: 0.75, borderRadius: "lg" }}>
-              <Typography level="body-sm">
-                <b>Bodega:</b> {data.ubicacion_actual?.bodega || "—"}
-              </Typography>
-            </Sheet>
-          ) : (
-            <Avatar
-              variant="outlined"
-              color="neutral"
-              sx={{ "--Avatar-size": "56px" }}>
-              {asignacion_vigente?.cliente?.slice(0, 2).toUpperCase() || "—"}
-            </Avatar>
-          )}
-        </Stack>
+          <Divider />
 
-        <Divider sx={{ my: 2 }} />
-
-        {/* Datos */}
-        <CardContent sx={{ pt: 0 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <Sheet variant="soft" sx={{ flex: 1, p: 2, borderRadius: "lg" }}>
-              <Typography level="title-sm">Información del activo</Typography>
-              <Stack spacing={0.5} mt={1}>
-                <Row label="Nombre" value={nombre} />
-                <Row label="Modelo" value={modelo || "—"} />
-                <Row label="Serie" value={serial_number || "—"} />
-                <Row label="Tipo" value={tipo || "—"} />
-                <Row label="Estatus" value={<StatusChip estatus={estatus} />} />
-                <Row label="Registrado" value={formatDate(fecha_registro)} />
-              </Stack>
-            </Sheet>
-
-            <Sheet variant="soft" sx={{ flex: 1, p: 2, borderRadius: "lg" }}>
-              <Typography level="title-sm" mb={1}>
-                Ubicación actual
-              </Typography>
-              {ubicacion_actual ? (
-                <Stack spacing={0.5}>
+          {/* Datos principales */}
+          <CardContent sx={{ pt: 0 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems="stretch">
+              <Sheet variant="soft" sx={{ flex: 1, p: 2, borderRadius: "lg" }}>
+                <Typography level="title-sm">Información del activo</Typography>
+                <Stack spacing={0.5} mt={1}>
+                  <Row label="Nombre" value={nombre} />
+                  <Row label="Modelo" value={modelo || "—"} />
+                  <Row label="Serie" value={serial_number || "—"} />
+                  <Row label="Tipo" value={tipo || "—"} />
                   <Row
-                    label="Destino"
-                    value={
-                      <UbicacionChip tipo={ubicacion_actual.tipo_destino} />
-                    }
+                    label="Estatus"
+                    value={<StatusChip estatus={estatus} />}
                   />
-                  {ubicacion_actual.tipo_destino === "Cliente" ? (
-                    <>
-                      <Row
-                        label="Cliente"
-                        value={ubicacion_actual.cliente || "—"}
-                      />
-                      <Row label="Site" value={ubicacion_actual.site || "—"} />
-                    </>
-                  ) : (
+                  <Row label="Registrado" value={formatDate(fecha_registro)} />
+                </Stack>
+              </Sheet>
+
+              <Sheet variant="soft" sx={{ flex: 1, p: 2, borderRadius: "lg" }}>
+                <Typography level="title-sm">Ubicación actual</Typography>
+                {ubicacion_actual ? (
+                  <Stack spacing={0.5} mt={1}>
                     <Row
-                      label="Bodega"
-                      value={ubicacion_actual.bodega || "—"}
+                      label="Destino"
+                      value={
+                        <UbicacionChip tipo={ubicacion_actual.tipo_destino} />
+                      }
                     />
-                  )}
-                  <Row
-                    label="Desde"
-                    value={formatDate(ubicacion_actual.desde)}
-                  />
-                  {ubicacion_actual.motivo && (
-                    <Row label="Motivo" value={ubicacion_actual.motivo} />
-                  )}
+                    {ubicacion_actual.tipo_destino === "Cliente" ? (
+                      <>
+                        <Row
+                          label="Cliente"
+                          value={ubicacion_actual.cliente || "—"}
+                        />
+                        <Row
+                          label="Site"
+                          value={ubicacion_actual.site || "—"}
+                        />
+                      </>
+                    ) : (
+                      <Row
+                        label="Bodega"
+                        value={ubicacion_actual.bodega || "—"}
+                      />
+                    )}
+                    <Row
+                      label="Desde"
+                      value={formatDate(ubicacion_actual.desde)}
+                    />
+                    {ubicacion_actual.motivo && (
+                      <Row label="Motivo" value={ubicacion_actual.motivo} />
+                    )}
+                  </Stack>
+                ) : (
+                  <Typography level="body-sm" color="neutral" mt={1}>
+                    Sin ubicación activa registrada.
+                  </Typography>
+                )}
+              </Sheet>
+            </Stack>
+
+            {/* Asignación vigente */}
+            <Sheet variant="outlined" sx={{ mt: 2, p: 2, borderRadius: "lg" }}>
+              <Typography level="title-sm">
+                Asignación vigente (para facturación)
+              </Typography>
+              {asignacion_vigente ? (
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={2}
+                  mt={1}>
+                  <Box flex={1}>
+                    <Row label="Cliente" value={asignacion_vigente.cliente} />
+                    <Row
+                      label="Contrato"
+                      value={asignacion_vigente.contrato_codigo}
+                    />
+                    <Row
+                      label="Adenda"
+                      value={asignacion_vigente.adenda_codigo}
+                    />
+                    <Row
+                      label="Modalidad"
+                      value={
+                        asignacion_vigente.es_temporal
+                          ? "Temporal"
+                          : "Permanente"
+                      }
+                    />
+                  </Box>
+                  <Box flex={1}>
+                    <Row
+                      label="Modelo (contrato)"
+                      value={asignacion_vigente.modelo_contrato}
+                    />
+                    <Row
+                      label="Arrendamiento"
+                      value={money(asignacion_vigente.precio_arrendamiento)}
+                    />
+                    <Row
+                      label="Costo B/N"
+                      value={perPage(asignacion_vigente.costo_impresion_bn)}
+                    />
+                    <Row
+                      label="Costo Color"
+                      value={perPage(asignacion_vigente.costo_impresion_color)}
+                    />
+                  </Box>
                 </Stack>
               ) : (
                 <Typography level="body-sm" color="neutral" mt={1}>
-                  Sin ubicación activa registrada.
+                  Sin asignación vigente.
                 </Typography>
               )}
             </Sheet>
-          </Stack>
 
-          <Sheet variant="outlined" sx={{ mt: 2, p: 2, borderRadius: "lg" }}>
-            <Typography level="title-sm">
-              Asignación vigente (para facturación)
-            </Typography>
-            {asignacion_vigente ? (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={1}>
-                <Box flex={1}>
-                  <Row label="Cliente" value={asignacion_vigente.cliente} />
-                  <Row
-                    label="Contrato"
-                    value={asignacion_vigente.contrato_codigo}
-                  />
-                  <Row
-                    label="Adenda"
-                    value={asignacion_vigente.adenda_codigo}
-                  />
-                  <Row
-                    label="Modalidad"
-                    value={
-                      asignacion_vigente.es_temporal ? "Temporal" : "Permanente"
-                    }
-                  />
-                </Box>
-                <Box flex={1}>
-                  <Row
-                    label="Modelo (contrato)"
-                    value={asignacion_vigente.modelo_contrato}
-                  />
-                  <Row
-                    label="Arrendamiento"
-                    value={money(asignacion_vigente.precio_arrendamiento)}
-                  />
-                  <Row
-                    label="Costo B/N"
-                    value={perPage(asignacion_vigente.costo_impresion_bn)}
-                  />
-                  <Row
-                    label="Costo Color"
-                    value={perPage(asignacion_vigente.costo_impresion_color)}
-                  />
-                </Box>
+            {/* Soporte */}
+            <Sheet
+              variant="soft"
+              sx={{
+                mt: 2,
+                p: 1.5,
+                borderRadius: "lg",
+              }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                spacing={1.5}>
+                <Typography level="body-sm" color="neutral">
+                  ¿Tiene algún problema con este equipo? Contáctanos para poder
+                  resolverlo.
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  flexWrap="wrap"
+                  justifyContent={isMobile ? "flex-start" : "flex-end"}>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    component="a"
+                    href={emailHref}>
+                    Enviar correo
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    color="success"
+                    component="a"
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noreferrer">
+                    WhatsApp
+                  </Button>
+                </Stack>
               </Stack>
-            ) : (
-              <Typography level="body-sm" color="neutral" mt={1}>
-                Sin asignación vigente.
-              </Typography>
-            )}
-          </Sheet>
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            mt={2}
-            spacing={1}>
-            <Typography level="body-xs" color="neutral">
-              Si los datos no coinciden con el equipo físico, contacte al
-              soporte.
-            </Typography>
-            <JoyLink
-              href="https://www.herndevs.com"
-              target="_blank"
-              rel="noreferrer">
-              herndevs.com
-            </JoyLink>
-          </Stack>
-        </CardContent>
+            </Sheet>
+          </CardContent>
+        </Stack>
       </Card>
     </OuterContainer>
   );
 }
 
 function OuterContainer({ children }) {
+  const isMobile = useIsMobile(768);
   return (
     <Box
       sx={{
         position: "fixed",
-        inset: 0, // top:0, right:0, bottom:0, left:0
+        inset: 0,
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
-        height: { xs: "100svh", sm: "100dvh" }, // svh = viewport “seguro” en móvil
+        height: { xs: "100svh", sm: "100dvh" },
         bgcolor: "background.level1",
-        py: { xs: 2, sm: 3 },
-        px: { xs: 1.5, sm: 3 },
+        py: isMobile ? 2 : 3,
+        px: isMobile ? 1.5 : 3,
       }}>
       {children}
     </Box>
