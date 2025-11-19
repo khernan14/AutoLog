@@ -1,26 +1,34 @@
-export function openSidebar() {
-  if (typeof window !== "undefined") {
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.setProperty("--SideNavigation-slideIn", "1");
+// src/utils/ToggleSidebar.js
+const VAR_NAME = "--SideNavigation-slideIn";
+
+function setSlideIn(value) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty(VAR_NAME, String(value));
+  if (value === 1) {
+    document.body.classList.add("Sidebar-open");
+  } else {
+    document.body.classList.remove("Sidebar-open");
   }
+}
+
+export function openSidebar() {
+  setSlideIn(1);
 }
 
 export function closeSidebar() {
-  if (typeof window !== "undefined") {
-    document.documentElement.style.removeProperty("--SideNavigation-slideIn");
-    document.body.style.removeProperty("overflow");
-  }
+  setSlideIn(0);
 }
 
 export function toggleSidebar() {
-  if (typeof window !== "undefined" && typeof document !== "undefined") {
-    const slideIn = window
-      .getComputedStyle(document.documentElement)
-      .getPropertyValue("--SideNavigation-slideIn");
-    if (slideIn) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
+  if (typeof document === "undefined") return;
+  const current = getComputedStyle(document.documentElement).getPropertyValue(
+    VAR_NAME
+  );
+
+  const asNumber = Number((current || "0").trim() || 0);
+  if (asNumber === 1) {
+    closeSidebar();
+  } else {
+    openSidebar();
   }
 }

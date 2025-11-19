@@ -1,3 +1,5 @@
+// src/context/Sidebar.jsx (o donde lo tengas)
+
 import * as React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import GlobalStyles from "@mui/joy/GlobalStyles";
@@ -81,6 +83,7 @@ import { closeSidebar } from "../utils/ToggleSidebar";
 import logoLight from "../assets/newLogoTecnasaBlack.png";
 import logoDark from "../assets/newLogoTecnasa.png";
 import Swal from "sweetalert2";
+import useIsMobile from "../hooks/useIsMobile"; // 👈 usar hook que ya tienes
 
 /* Helpers */
 function getInitials(name) {
@@ -181,6 +184,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
   const { mode } = useColorScheme();
+  const isMobile = useIsMobile(768); // 👈 mobile detection
 
   const userName = userData?.nombre || "Usuario";
   const userEmail = userData?.email || "usuario@test.com";
@@ -485,8 +489,8 @@ export default function Sidebar() {
 
   const handleNavigate = (path) => {
     navigate(path);
-    if (window.matchMedia("(max-width: 768px)").matches) {
-      closeSidebar();
+    if (isMobile) {
+      closeSidebar(); // 👈 cerrar sidebar en mobile al elegir opción
     }
   };
 
@@ -500,7 +504,6 @@ export default function Sidebar() {
       const term = (q || "").trim();
       if (!term) return;
 
-      // si quieres auto-abrir exacto y único:
       const allowed = (r) =>
         userRole === "Admin" || !r.perm || hasPermiso(r.perm);
       const exacts = (results || []).filter((r) => r.exact && allowed(r));
@@ -512,7 +515,6 @@ export default function Sidebar() {
         return;
       }
 
-      // por defecto -> página de resultados
       navigate(`/admin/search?q=${encodeURIComponent(term)}`);
       setOpenSearch(false);
     }
@@ -560,7 +562,6 @@ export default function Sidebar() {
       const ctrlOrCmd = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
-      // ya tenías Ctrl/⌘ + K
       if (ctrlOrCmd && key === "k") {
         e.preventDefault();
         inputRef.current?.focus();
@@ -570,14 +571,6 @@ export default function Sidebar() {
         return;
       }
 
-      // Perfil: Ctrl/⌘ + P
-      // if (ctrlOrCmd && key === "p") {
-      //   e.preventDefault();
-      //   navigate("/admin/mi-cuenta");
-      //   return;
-      // }
-
-      // Configuraciones: Ctrl/⌘ + ,
       if (ctrlOrCmd && e.key === ",") {
         e.preventDefault();
         if (checkPermission("ver_configuraciones")) {
@@ -586,14 +579,12 @@ export default function Sidebar() {
         return;
       }
 
-      // Ayuda: Ctrl/⌘ + H
       if (ctrlOrCmd && key === "h") {
         e.preventDefault();
         navigate("/admin/help");
         return;
       }
 
-      // Cerrar sesión: Ctrl/⌘ + Shift + Q
       if ((e.ctrlKey || e.metaKey) && key === "q") {
         e.preventDefault();
         logout();
@@ -607,534 +598,548 @@ export default function Sidebar() {
 
   const currentPath = location.pathname;
 
+  // ====== swipe to close en mobile ======
+  const touchStartXRef = React.useRef(null);
+  const touchCurrentXRef = React.useRef(null);
+
+  const handleTouchStart = (e) => {
+    if (!isMobile) return;
+    const touch = e.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchCurrentXRef.current = touch.clientX;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isMobile || touchStartXRef.current == null) return;
+    const touch = e.touches[0];
+    touchCurrentXRef.current = touch.clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!isMobile || touchStartXRef.current == null) {
+      touchStartXRef.current = null;
+      touchCurrentXRef.current = null;
+      return;
+    }
+    const deltaX = (touchCurrentXRef.current || 0) - touchStartXRef.current;
+    // swipe hacia la izquierda (> 50px) → cerrar
+    if (deltaX < -50) {
+      closeSidebar();
+    }
+    touchStartXRef.current = null;
+    touchCurrentXRef.current = null;
+  };
+
   return (
-    <Sheet
-      className="Sidebar"
-      sx={{
-        position: { xs: "fixed", md: "sticky" },
-        transform: {
-          xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1)))",
-          md: "none",
-        },
-        transition: "transform 0.4s, width 0.4s",
-        zIndex: 10000,
-        height: "100dvh",
-        width: "var(--Sidebar-width)",
-        top: 0,
-        p: 2,
-        flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        borderRight: "1px solid",
-        borderColor: "divider",
-        boxShadow: { xs: "md", md: "none" },
-      }}>
-      <GlobalStyles
-        styles={(theme) => ({
-          ":root": {
-            "--Sidebar-width": "260px",
-            [theme.breakpoints.up("lg")]: { "--Sidebar-width": "280px" },
-          },
-        })}
-      />
+    <>
+      {/* Overlay para mobile: cierra al tocar fuera */}
       <Box className="Sidebar-overlay" onClick={closeSidebar} />
 
-      {/* Logo */}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <img
-          src={mode === "dark" ? logoDark : logoLight}
-          alt="Logo cliente"
-          style={{ width: 240, height: 75, objectFit: "contain" }}
-        />
-      </Box>
-
-      {/* Búsqueda (Joy-only, dropdown absoluto) */}
-      <Box
-        ref={containerRef}
+      <Sheet
+        className="Sidebar"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         sx={{
-          display: { xs: "none", sm: "block" },
-          position: "relative",
-        }}>
-        <Tooltip
-          title="Buscar módulos y datos… (Ctrl/⌘+K)"
-          variant="soft"
-          placement="top-end"
-          sx={{ zIndex: 13000 }}>
-          <Input
-            ref={inputRootRef}
-            value={q}
-            onChange={onChangeSearch}
-            onKeyDown={onKeyDownSearch}
-            onFocus={() =>
-              q.trim().length >= 2 && results.length && setOpenSearch(true)
-            }
-            onBlur={() => setTimeout(() => setOpenSearch(false), 120)}
-            startDecorator={<SearchRoundedIcon />}
-            placeholder="Buscar módulos y datos… (Ctrl/⌘+K)"
-            slotProps={{
-              input: { ref: inputRef },
-            }}
-            sx={{
-              [`& .${inputClasses.input}`]: { pr: 1 },
-            }}
-          />
-        </Tooltip>
-
-        {openSearch && (
-          <Sheet
-            variant="outlined"
-            sx={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: "calc(100% + 8px)",
-              borderRadius: "md",
-              p: 0.5,
-              bgcolor: "background.body",
-              boxShadow: "lg",
-              zIndex: 13000,
-              maxHeight: 360,
-              overflowY: "auto",
-            }}
-            onMouseDown={(e) => e.preventDefault()} // no cerrar por mousedown para permitir click
-          >
-            {loadingSearch ? (
-              <List sx={{ p: 0.5 }}>
-                {[...Array(4)].map((_, i) => (
-                  <ListItem key={i}>
-                    <Typography level="body-sm">Buscando…</Typography>
-                  </ListItem>
-                ))}
-              </List>
-            ) : results.length === 0 ? (
-              <Box sx={{ p: 1 }}>
-                <Typography level="body-sm" color="neutral">
-                  Sin resultados
-                </Typography>
-              </Box>
-            ) : (
-              <List sx={{ p: 0 }}>
-                {results.map((r, idx) => {
-                  const allowed =
-                    userRole === "Admin" || !r.perm || hasPermiso(r.perm);
-                  const content = (
-                    <ListItemButton
-                      key={r.id || r.url || idx}
-                      selected={idx === activeIndex}
-                      disabled={!allowed}
-                      onClick={() => {
-                        if (allowed && r.url) {
-                          handleNavigate(r.url);
-                          setOpenSearch(false);
-                          setQ("");
-                        }
-                      }}
-                      sx={{
-                        borderRadius: "sm",
-                        "&[aria-disabled='true']": {
-                          opacity: 0.5,
-                          cursor: "not-allowed",
-                        },
-                      }}>
-                      <ListItemDecorator>
-                        {allowed ? (
-                          <KindIcon kind={r.kind} />
-                        ) : (
-                          <LockRoundedIcon fontSize="small" />
-                        )}
-                      </ListItemDecorator>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography level="title-sm" noWrap>
-                          {r.title}
-                        </Typography>
-                        {r.subtitle && (
-                          <Typography level="body-xs" color="neutral" noWrap>
-                            {r.subtitle}
-                          </Typography>
-                        )}
-                      </Box>
-                    </ListItemButton>
-                  );
-
-                  return allowed ? (
-                    <ListItem key={idx} sx={{ p: 0 }}>
-                      {content}
-                    </ListItem>
-                  ) : (
-                    <Tooltip
-                      key={idx}
-                      title="No tienes permiso para acceder"
-                      variant="soft"
-                      placement="left"
-                      sx={{ zIndex: 13000 }}>
-                      <ListItem sx={{ p: 0 }}>{content}</ListItem>
-                    </Tooltip>
-                  );
-                })}
-              </List>
-            )}
-          </Sheet>
-        )}
-      </Box>
-
-      {/* Navegación */}
-      <Box
-        sx={{
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-          flexGrow: 1,
+          position: { xs: "fixed", md: "sticky" },
+          left: 0,
+          transform: {
+            xs: "translateX(calc(100% * (var(--SideNavigation-slideIn, 0) - 1)))",
+            md: "none",
+          },
+          transition: "transform 0.35s ease, width 0.35s ease",
+          zIndex: 10000,
+          height: "100dvh",
+          width: { xs: "80vw", md: "var(--Sidebar-width)" },
+          maxWidth: { xs: 320, md: "var(--Sidebar-width)" },
+          top: 0,
+          p: 2,
+          flexShrink: 0,
           display: "flex",
           flexDirection: "column",
-          [`& .${listItemButtonClasses.root}`]: {
-            gap: 1.5,
-            borderRadius: "md",
-          },
-          [`& .${listItemButtonClasses.root}[aria-selected="true"]`]: {
-            backgroundColor: "primary.solidBg",
-            color: "primary.solidColor",
-            "&:hover": { backgroundColor: "primary.solidBg" },
-          },
+          gap: 2,
+          borderRight: "1px solid",
+          borderColor: "divider",
+          boxShadow: { xs: "md", md: "none" },
+          bgcolor: "background.surface",
         }}>
-        <Typography
-          level="body-xs"
-          sx={{
-            pl: 2,
-            mt: 1,
-            mb: 0.5,
-            color: "text.tertiary",
-            textTransform: "uppercase",
-          }}>
-          General
-        </Typography>
+        <GlobalStyles
+          styles={(theme) => ({
+            ":root": {
+              "--Sidebar-width": "260px",
+              [theme.breakpoints.up("lg")]: { "--Sidebar-width": "280px" },
+            },
+            ["@media (max-width: 768px)"]: {
+              ".Sidebar-overlay": {
+                position: "fixed",
+                inset: 0,
+                zIndex: 9990,
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(15, 23, 42, 0.6)"
+                    : "rgba(15, 23, 42, 0.35)",
+                backdropFilter: "blur(2px)",
+                transition: "opacity 0.25s ease",
+                opacity: 0,
+                pointerEvents: "none",
+              },
+              "body.Sidebar-open .Sidebar-overlay": {
+                opacity: 1,
+                pointerEvents: "auto",
+              },
+            },
+          })}
+        />
 
-        <List size="sm" sx={{ gap: 1, "--List-nestedInsetStart": "30px" }}>
-          {navItems.map((item) => (
-            <NavItem
-              key={item.path}
-              path={item.path}
-              icon={item.icon}
-              label={item.label}
-              currentPath={location.pathname}
-              onNavigate={handleNavigate}
-              canView={item.canView}
-            />
-          ))}
-
-          {(checkPermission("gestionar_companias") ||
-            checkPermission("gestionar_paises") ||
-            checkPermission("gestionar_ciudades") ||
-            checkPermission("gestionar_estacionamientos")) && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": { backgroundColor: "neutral.softBg" },
-                    }}>
-                    <AdminPanelSettingsIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Gestión</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
-                      sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  </ListItemButton>
-                )}>
-                {managementItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
-
-          {(checkPermission("gestionar_bodegas") ||
-            checkPermission("gestionar_activos")) && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": { backgroundColor: "neutral.softBg" },
-                    }}>
-                    <DnsRoundedIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Inventario</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
-                      sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  </ListItemButton>
-                )}>
-                {inventoryItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
-
-          {(checkPermission("asignar_permisos") ||
-            checkPermission("gestionar_usuarios")) && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": { backgroundColor: "neutral.softBg" },
-                    }}>
-                    <SettingsRoundedIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Sistema</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
-                      sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  </ListItemButton>
-                )}>
-                {systemItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
-
-          {checkPermission("help_manage") && (
-            <ListItem nested>
-              <Toggler
-                renderToggle={({ open, setOpen }) => (
-                  <ListItemButton
-                    onClick={() => setOpen(!open)}
-                    aria-expanded={open}
-                    sx={{
-                      fontWeight: "md",
-                      "&:hover": { backgroundColor: "neutral.softBg" },
-                    }}>
-                    <SupportAgentIcon />
-                    <ListItemContent>
-                      <Typography level="title-sm">Soporte y Ayuda</Typography>
-                    </ListItemContent>
-                    <KeyboardArrowDownIcon
-                      sx={{
-                        transform: open ? "rotate(180deg)" : "none",
-                        transition: "0.2s",
-                      }}
-                    />
-                  </ListItemButton>
-                )}>
-                {supportAndHelpItems.map((item) => (
-                  <NavItem
-                    key={item.path}
-                    path={item.path}
-                    icon={item.icon}
-                    label={item.label}
-                    currentPath={location.pathname}
-                    onNavigate={handleNavigate}
-                    canView={item.canView}
-                  />
-                ))}
-              </Toggler>
-            </ListItem>
-          )}
-        </List>
-      </Box>
-
-      {/* Pie: tarjeta de usuario */}
-      <Divider />
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1.25,
-          alignItems: "center",
-          p: 1,
-          borderRadius: "md",
-          position: "relative",
-          overflow: "visible",
-        }}>
-        <Avatar
-          variant="soft"
-          size="md"
-          sx={{
-            bgcolor: "primary.softBg",
-            color: "primary.softColor",
-            fontWeight: "bold",
-            textTransform: "uppercase",
-            border: "2px solid",
-            borderColor: "primary.softColor",
-            flexShrink: 0,
-          }}>
-          {getInitials(userName)}
-        </Avatar>
-
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Tooltip
-            title={userName}
-            variant="soft"
-            placement="top"
-            sx={{ zIndex: 13000 }}>
-            <Typography level="title-md" noWrap>
-              {userName}
-            </Typography>
-          </Tooltip>
-          <Tooltip title={userEmail} variant="soft" sx={{ zIndex: 13000 }}>
-            <Typography level="body-xs" sx={{ color: "text.secondary" }} noWrap>
-              {userEmail}
-            </Typography>
-          </Tooltip>
+        {/* Logo */}
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <img
+            src={mode === "dark" ? logoDark : logoLight}
+            alt="Logo cliente"
+            style={{ width: 240, height: 75, objectFit: "contain" }}
+          />
         </Box>
 
-        {/* <Dropdown>
+        {/* Búsqueda (solo desktop / tablet) */}
+        <Box
+          ref={containerRef}
+          sx={{
+            display: { xs: "none", sm: "block" },
+            position: "relative",
+          }}>
           <Tooltip
-            title="Menú contextual"
+            title="Buscar módulos y datos… (Ctrl/⌘+K)"
             variant="soft"
+            placement="top-end"
             sx={{ zIndex: 13000 }}>
-            <MenuButton
-              slots={{ root: IconButton }}
+            <Input
+              ref={inputRootRef}
+              value={q}
+              onChange={onChangeSearch}
+              onKeyDown={onKeyDownSearch}
+              onFocus={() =>
+                q.trim().length >= 2 && results.length && setOpenSearch(true)
+              }
+              onBlur={() => setTimeout(() => setOpenSearch(false), 120)}
+              startDecorator={<SearchRoundedIcon />}
+              placeholder="Buscar módulos y datos… (Ctrl/⌘+K)"
               slotProps={{
-                root: {
-                  variant: "outlined",
-                  color: "neutral",
-                  "aria-label": "Acciones de cuenta",
-                },
-              }}>
-              <MoreVert />
-            </MenuButton>
+                input: { ref: inputRef },
+              }}
+              sx={{
+                [`& .${inputClasses.input}`]: { pr: 1 },
+              }}
+            />
           </Tooltip>
 
-          <Menu
-            placement="top-start"
-            disablePortal={false}
-            sx={{ zIndex: 13000 }}>
-            <MenuItem onClick={() => handleNavigate("/admin/mi-cuenta")}>
-              <ListItemDecorator>
-                <AccountCircleIcon fontSize="small" />
-              </ListItemDecorator>
-              Mi Perfil
-            </MenuItem>
-            {checkPermission("ver_configuraciones") && (
-              <MenuItem
-                onClick={() => handleNavigate("/admin/configuraciones")}>
-                <ListItemDecorator>
-                  <SettingsRoundedIcon fontSize="small" />
-                </ListItemDecorator>
-                Configuraciones
-              </MenuItem>
+          {openSearch && (
+            <Sheet
+              variant="outlined"
+              sx={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: "calc(100% + 8px)",
+                borderRadius: "md",
+                p: 0.5,
+                bgcolor: "background.body",
+                boxShadow: "lg",
+                zIndex: 13000,
+                maxHeight: 360,
+                overflowY: "auto",
+              }}
+              onMouseDown={(e) => e.preventDefault()}>
+              {loadingSearch ? (
+                <List sx={{ p: 0.5 }}>
+                  {[...Array(4)].map((_, i) => (
+                    <ListItem key={i}>
+                      <Typography level="body-sm">Buscando…</Typography>
+                    </ListItem>
+                  ))}
+                </List>
+              ) : results.length === 0 ? (
+                <Box sx={{ p: 1 }}>
+                  <Typography level="body-sm" color="neutral">
+                    Sin resultados
+                  </Typography>
+                </Box>
+              ) : (
+                <List sx={{ p: 0 }}>
+                  {results.map((r, idx) => {
+                    const allowed =
+                      userRole === "Admin" || !r.perm || hasPermiso(r.perm);
+                    const content = (
+                      <ListItemButton
+                        key={r.id || r.url || idx}
+                        selected={idx === activeIndex}
+                        disabled={!allowed}
+                        onClick={() => {
+                          if (allowed && r.url) {
+                            handleNavigate(r.url);
+                            setOpenSearch(false);
+                            setQ("");
+                          }
+                        }}
+                        sx={{
+                          borderRadius: "sm",
+                          "&[aria-disabled='true']": {
+                            opacity: 0.5,
+                            cursor: "not-allowed",
+                          },
+                        }}>
+                        <ListItemDecorator>
+                          {allowed ? (
+                            <KindIcon kind={r.kind} />
+                          ) : (
+                            <LockRoundedIcon fontSize="small" />
+                          )}
+                        </ListItemDecorator>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography level="title-sm" noWrap>
+                            {r.title}
+                          </Typography>
+                          {r.subtitle && (
+                            <Typography level="body-xs" color="neutral" noWrap>
+                              {r.subtitle}
+                            </Typography>
+                          )}
+                        </Box>
+                      </ListItemButton>
+                    );
+
+                    return allowed ? (
+                      <ListItem key={idx} sx={{ p: 0 }}>
+                        {content}
+                      </ListItem>
+                    ) : (
+                      <Tooltip
+                        key={idx}
+                        title="No tienes permiso para acceder"
+                        variant="soft"
+                        placement="left"
+                        sx={{ zIndex: 13000 }}>
+                        <ListItem sx={{ p: 0 }}>{content}</ListItem>
+                      </Tooltip>
+                    );
+                  })}
+                </List>
+              )}
+            </Sheet>
+          )}
+        </Box>
+
+        {/* Navegación */}
+        <Box
+          sx={{
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            flexGrow: 1,
+            display: "flex",
+            flexDirection: "column",
+            [`& .${listItemButtonClasses.root}`]: {
+              gap: 1.5,
+              borderRadius: "md",
+            },
+            [`& .${listItemButtonClasses.root}[aria-selected="true"]`]: {
+              backgroundColor: "primary.solidBg",
+              color: "primary.solidColor",
+              "&:hover": { backgroundColor: "primary.solidBg" },
+            },
+          }}>
+          <Typography
+            level="body-xs"
+            sx={{
+              pl: 2,
+              mt: 1,
+              mb: 0.5,
+              color: "text.tertiary",
+              textTransform: "uppercase",
+            }}>
+            General
+          </Typography>
+
+          <List size="sm" sx={{ gap: 1, "--List-nestedInsetStart": "30px" }}>
+            {navItems.map((item) => (
+              <NavItem
+                key={item.path}
+                path={item.path}
+                icon={item.icon}
+                label={item.label}
+                currentPath={location.pathname}
+                onNavigate={handleNavigate}
+                canView={item.canView}
+              />
+            ))}
+
+            {(checkPermission("gestionar_companias") ||
+              checkPermission("gestionar_paises") ||
+              checkPermission("gestionar_ciudades") ||
+              checkPermission("gestionar_estacionamientos")) && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": { backgroundColor: "neutral.softBg" },
+                      }}>
+                      <AdminPanelSettingsIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Gestión</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {managementItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
             )}
-            <MenuItem onClick={() => handleNavigate("/admin/help")}>
-              <ListItemDecorator>
-                <HelpCenterIcon fontSize="small" />
-              </ListItemDecorator>
-              Centro de Ayuda
-            </MenuItem>
-            <ListDivider />
-            <MenuItem color="danger" variant="soft" onClick={logout}>
-              <ListItemDecorator sx={{ color: "inherit" }}>
-                <LogoutRoundedIcon fontSize="small" />
-              </ListItemDecorator>
-              Cerrar sesión
-            </MenuItem>
-          </Menu>
-        </Dropdown> */}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" aria-label="Open menu" size="icon">
-              <MoreHorizontalIcon />
-            </Button>
-          </DropdownMenuTrigger>
+            {(checkPermission("gestionar_bodegas") ||
+              checkPermission("gestionar_activos")) && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": { backgroundColor: "neutral.softBg" },
+                      }}>
+                      <DnsRoundedIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Inventario</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {inventoryItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
 
-          <DropdownMenuPortal>
-            <DropdownMenuContent align="start" className="w-56 z-[15000]">
-              <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+            {(checkPermission("asignar_permisos") ||
+              checkPermission("gestionar_usuarios")) && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": { backgroundColor: "neutral.softBg" },
+                      }}>
+                      <SettingsRoundedIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">Sistema</Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {systemItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
 
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  onSelect={() => navigate("/admin/mi-cuenta")}
-                  className="gap-2">
-                  <AccountCircleIcon className="h-4 w-4" fontSize="small" />
-                  <span>Mi perfil</span>
-                </DropdownMenuItem>
+            {checkPermission("help_manage") && (
+              <ListItem nested>
+                <Toggler
+                  renderToggle={({ open, setOpen }) => (
+                    <ListItemButton
+                      onClick={() => setOpen(!open)}
+                      aria-expanded={open}
+                      sx={{
+                        fontWeight: "md",
+                        "&:hover": { backgroundColor: "neutral.softBg" },
+                      }}>
+                      <SupportAgentIcon />
+                      <ListItemContent>
+                        <Typography level="title-sm">
+                          Soporte y Ayuda
+                        </Typography>
+                      </ListItemContent>
+                      <KeyboardArrowDownIcon
+                        sx={{
+                          transform: open ? "rotate(180deg)" : "none",
+                          transition: "0.2s",
+                        }}
+                      />
+                    </ListItemButton>
+                  )}>
+                  {supportAndHelpItems.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      path={item.path}
+                      icon={item.icon}
+                      label={item.label}
+                      currentPath={location.pathname}
+                      onNavigate={handleNavigate}
+                      canView={item.canView}
+                    />
+                  ))}
+                </Toggler>
+              </ListItem>
+            )}
+          </List>
+        </Box>
 
-                {checkPermission("ver_configuraciones") && (
+        {/* Pie: tarjeta de usuario */}
+        <Divider />
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1.25,
+            alignItems: "center",
+            p: 1,
+            borderRadius: "md",
+            position: "relative",
+            overflow: "visible",
+          }}>
+          <Avatar
+            variant="soft"
+            size="md"
+            sx={{
+              bgcolor: "primary.softBg",
+              color: "primary.softColor",
+              fontWeight: "bold",
+              textTransform: "uppercase",
+              border: "2px solid",
+              borderColor: "primary.softColor",
+              flexShrink: 0,
+            }}>
+            {getInitials(userName)}
+          </Avatar>
+
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Tooltip
+              title={userName}
+              variant="soft"
+              placement="top"
+              sx={{ zIndex: 13000 }}>
+              <Typography level="title-md" noWrap>
+                {userName}
+              </Typography>
+            </Tooltip>
+            <Tooltip title={userEmail} variant="soft" sx={{ zIndex: 13000 }}>
+              <Typography
+                level="body-xs"
+                sx={{ color: "text.secondary" }}
+                noWrap>
+                {userEmail}
+              </Typography>
+            </Tooltip>
+          </Box>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" aria-label="Open menu" size="icon">
+                <MoreHorizontalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuPortal>
+              <DropdownMenuContent align="start" className="w-56 z-[15000]">
+                <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+
+                <DropdownMenuGroup>
                   <DropdownMenuItem
-                    onSelect={() => navigate("/admin/configuraciones")}
+                    onSelect={() => navigate("/admin/mi-cuenta")}
                     className="gap-2">
-                    <SettingsRoundedIcon className="h-4 w-4" fontSize="small" />
-                    <span>Configuraciones</span>
-                    <DropdownMenuShortcut>Ctrl+,</DropdownMenuShortcut>
+                    <AccountCircleIcon className="h-4 w-4" fontSize="small" />
+                    <span>Mi perfil</span>
                   </DropdownMenuItem>
-                )}
+
+                  {checkPermission("ver_configuraciones") && (
+                    <DropdownMenuItem
+                      onSelect={() => navigate("/admin/configuraciones")}
+                      className="gap-2">
+                      <SettingsRoundedIcon
+                        className="h-4 w-4"
+                        fontSize="small"
+                      />
+                      <span>Configuraciones</span>
+                      <DropdownMenuShortcut>Ctrl+,</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuItem
+                    onSelect={() => navigate("/admin/help")}
+                    className="gap-2">
+                    <HelpCenterIcon className="h-4 w-4" fontSize="small" />
+                    <span>Centro de ayuda</span>
+                    <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+
+                <DropdownMenuSeparator />
 
                 <DropdownMenuItem
-                  onSelect={() => navigate("/admin/help")}
-                  className="gap-2">
-                  <HelpCenterIcon className="h-4 w-4" fontSize="small" />
-                  <span>Centro de ayuda</span>
-                  <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
+                  onSelect={logout}
+                  className="
+                    gap-2
+                    text-red-600 dark:text-red-400
+                    focus:text-red-700 dark:focus:text-red-300
+                    focus:bg-red-50 dark:focus:bg-red-950
+                  ">
+                  <LogoutRoundedIcon className="h-4 w-4" fontSize="small" />
+                  <span>Cerrar sesión</span>
+                  <DropdownMenuShortcut>Ctrl+Q</DropdownMenuShortcut>
                 </DropdownMenuItem>
-              </DropdownMenuGroup>
-
-              <DropdownMenuSeparator />
-
-              {/* Destructive */}
-              <DropdownMenuItem
-                onSelect={logout}
-                className="
-          gap-2
-          text-red-600 dark:text-red-400
-          focus:text-red-700 dark:focus:text-red-300
-          focus:bg-red-50 dark:focus:bg-red-950
-        ">
-                <LogoutRoundedIcon className="h-4 w-4" fontSize="small" />
-                <span>Cerrar sesión</span>
-                <DropdownMenuShortcut>Ctrl+Q</DropdownMenuShortcut>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenuPortal>
-        </DropdownMenu>
-      </Box>
-    </Sheet>
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
+          </DropdownMenu>
+        </Box>
+      </Sheet>
+    </>
   );
 }
