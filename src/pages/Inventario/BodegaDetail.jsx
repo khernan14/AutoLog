@@ -1,6 +1,6 @@
 // src/pages/Inventario/BodegaDetail.jsx
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -56,8 +56,20 @@ import ResourceState from "../../components/common/ResourceState";
 import { getViewState } from "../../utils/viewState";
 import PaginationLite from "@/components/common/PaginationLite";
 
+// ⭐ Hook de highlight / scroll a fila
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+
+// Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
 export default function BodegaDetail() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile(768);
   const qrRef = useRef();
 
@@ -217,15 +229,16 @@ export default function BodegaDetail() {
 
   // Filtro + orden + página
   const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
-    return (activos || []).filter(
-      (a) =>
-        (a.codigo || "").toLowerCase().includes(s) ||
-        (a.nombre || "").toLowerCase().includes(s) ||
-        (a.tipo || "").toLowerCase().includes(s) ||
-        (a.modelo || "").toLowerCase().includes(s) ||
-        (a.serial_number || "").toLowerCase().includes(s)
-    );
+    const s = normalize(search);
+    return (activos || []).filter((a) => {
+      return (
+        normalize(a.codigo).includes(s) ||
+        normalize(a.nombre).includes(s) ||
+        normalize(a.tipo).includes(s) ||
+        normalize(a.modelo).includes(s) ||
+        normalize(a.serial_number).includes(s)
+      );
+    });
   }, [activos, search]);
 
   const sortedRows = useMemo(() => {
@@ -259,6 +272,38 @@ export default function BodegaDetail() {
   useEffect(() => {
     setPage(1);
   }, [search, activos.length, perPage]);
+
+  // ⭐ Hook de foco / highlight (usa el hook genérico de filas)
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: sortedRows,
+    perPage,
+    setPage,
+    matchRow: (a, token) => {
+      const t = normalize(token);
+      return (
+        String(a.id) === token ||
+        normalize(a.codigo) === t ||
+        normalize(a.serial_number) === t
+      );
+    },
+    getRowId: (a) => a.id,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar búsqueda y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Limpiamos búsqueda para asegurar que el activo sea visible
+    setSearch("");
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
 
   // ---- Estado de vista unificado ----
   const viewState = getViewState({
@@ -389,8 +434,19 @@ export default function BodegaDetail() {
               {pageRows.map((a) => (
                 <Sheet
                   key={a.id}
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "md" }}>
+                  ref={a.id === highlightId ? focusedRef : null}
+                  variant={a.id === highlightId ? "soft" : "outlined"}
+                  color={a.id === highlightId ? "primary" : "neutral"}
+                  sx={{
+                    p: 2,
+                    borderRadius: "md",
+                    boxShadow: a.id === highlightId ? "lg" : "sm",
+                    borderWidth: a.id === highlightId ? 2 : 1,
+                    borderColor:
+                      a.id === highlightId ? "primary.solidBg" : "divider",
+                    transition:
+                      "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+                  }}>
                   <Stack spacing={1}>
                     <Typography level="title-md">{a.nombre}</Typography>
                     <Typography level="body-xs" sx={{ opacity: 0.7 }}>
@@ -412,7 +468,17 @@ export default function BodegaDetail() {
                     <Chip
                       size="sm"
                       variant="soft"
-                      color={a.estatus === "Disponible" ? "success" : "neutral"}
+                      color={
+                        a.estatus === "Activo"
+                          ? "success"
+                          : a.estatus === "Arrendado"
+                          ? "primary"
+                          : a.estatus === "En Mantenimiento"
+                          ? "warning"
+                          : a.estatus === "Inactivo"
+                          ? "danger"
+                          : "neutral"
+                      }
                       sx={{ alignSelf: "flex-start" }}>
                       {a.estatus}
                     </Chip>
@@ -544,7 +610,20 @@ export default function BodegaDetail() {
                 </thead>
                 <tbody>
                   {pageRows.map((a) => (
-                    <tr key={a.id}>
+                    <tr
+                      key={a.id}
+                      ref={a.id === highlightId ? focusedRef : null}
+                      style={
+                        a.id === highlightId
+                          ? {
+                              backgroundColor: "rgba(59, 130, 246, 0.12)",
+                              boxShadow:
+                                "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                              transition:
+                                "background-color 0.25s ease, box-shadow 0.25s ease",
+                            }
+                          : undefined
+                      }>
                       <td>{a.codigo}</td>
                       <td>{a.nombre}</td>
                       <td>{a.tipo}</td>

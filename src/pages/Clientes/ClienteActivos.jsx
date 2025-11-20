@@ -1,6 +1,6 @@
 // src/pages/Inventario/ClienteActivos.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { getActivosByCliente } from "../../services/ActivosServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
 import { getBodegas } from "../../services/BodegasServices";
@@ -55,8 +55,21 @@ import { ESTATUS_COLOR } from "../../constants/inventario";
 import CatalogSelect from "../../components/forms/CatalogSelect";
 import ActivoFormModal from "@pages/Inventario/ActivoFormModal";
 
+// ⭐ hook de highlight/scroll
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+
+// Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
 export default function ClienteActivos() {
   const { id } = useParams(); // id del cliente actual
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const isMobile = useIsMobile(768);
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
@@ -146,6 +159,86 @@ export default function ClienteActivos() {
   // nombre del cliente (si viene en la consulta)
   const clienteNombre = useMemo(() => rows[0]?.cliente_nombre || "", [rows]);
 
+  // filtrado (con normalize para ignorar tildes/mayúsculas)
+  const filtered = useMemo(() => {
+    const s = normalize(search);
+    return (rows || []).filter((r) => {
+      const matchSearch =
+        normalize(r.codigo).includes(s) ||
+        normalize(r.nombre).includes(s) ||
+        normalize(r.modelo).includes(s) ||
+        normalize(r.serial_number).includes(s) ||
+        normalize(r.site_nombre).includes(s);
+
+      const matchStatus = !statusFilter || r.estatus === statusFilter;
+      const matchType = !typeFilter || r.tipo === typeFilter;
+      return matchSearch && matchStatus && matchType;
+    });
+  }, [rows, search, statusFilter, typeFilter]);
+
+  // ⭐ Hook de focus/highlight, basado en token (id/código/serie)
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: filtered,
+    matchRow: (r, token) => {
+      const t = normalize(token);
+      return (
+        String(r.id) === token ||
+        normalize(r.codigo) === t ||
+        normalize(r.serial_number) === t
+      );
+    },
+    getRowId: (r) => r.id,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar filtros y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Limpiar filtros/búsqueda para asegurar que el activo se vea
+    setSearch("");
+    setStatusFilter("");
+    setTypeFilter("");
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
+
+  // selección múltiple (ids visibles)
+  const allVisibleIds = useMemo(
+    () => (filtered || []).map((r) => r.id),
+    [filtered]
+  );
+
+  const allSelectedInPage =
+    allVisibleIds.length > 0 &&
+    allVisibleIds.every((idSite) => selectedIds.includes(idSite));
+
+  const toggleSelectOne = (idActivo) => {
+    setSelectedIds((prev) =>
+      prev.includes(idActivo)
+        ? prev.filter((x) => x !== idActivo)
+        : [...prev, idActivo]
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      if (allSelectedInPage) {
+        // quitar todos los visibles
+        return prev.filter((idActivo) => !allVisibleIds.includes(idActivo));
+      }
+      // agregar todos los visibles
+      const set = new Set(prev);
+      allVisibleIds.forEach((idActivo) => set.add(idActivo));
+      return Array.from(set);
+    });
+  };
+
   // acciones individuales
   function editActivo(row) {
     if (!canEdit)
@@ -199,53 +292,6 @@ export default function ClienteActivos() {
     if (!qrRef.current || !activoQR) return;
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
   }
-
-  // filtrado
-  const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
-    return (rows || []).filter((r) => {
-      const matchSearch =
-        (r.codigo || "").toLowerCase().includes(s) ||
-        (r.nombre || "").toLowerCase().includes(s) ||
-        (r.modelo || "").toLowerCase().includes(s) ||
-        (r.serial_number || "").toLowerCase().includes(s);
-
-      const matchStatus = !statusFilter || r.estatus === statusFilter;
-      const matchType = !typeFilter || r.tipo === typeFilter;
-      return matchSearch && matchStatus && matchType;
-    });
-  }, [rows, search, statusFilter, typeFilter]);
-
-  // selección múltiple (ids visibles)
-  const allVisibleIds = useMemo(
-    () => (filtered || []).map((r) => r.id),
-    [filtered]
-  );
-
-  const allSelectedInPage =
-    allVisibleIds.length > 0 &&
-    allVisibleIds.every((idSite) => selectedIds.includes(idSite));
-
-  const toggleSelectOne = (idActivo) => {
-    setSelectedIds((prev) =>
-      prev.includes(idActivo)
-        ? prev.filter((x) => x !== idActivo)
-        : [...prev, idActivo]
-    );
-  };
-
-  const toggleSelectAllVisible = () => {
-    setSelectedIds((prev) => {
-      if (allSelectedInPage) {
-        // quitar todos los visibles
-        return prev.filter((idActivo) => !allVisibleIds.includes(idActivo));
-      }
-      // agregar todos los visibles
-      const set = new Set(prev);
-      allVisibleIds.forEach((idActivo) => set.add(idActivo));
-      return Array.from(set);
-    });
-  };
 
   // cargar bodegas cuando abrimos el modal masivo
   useEffect(() => {
@@ -426,7 +472,7 @@ export default function ClienteActivos() {
             flexWrap="wrap"
             sx={{ width: { xs: "100%", sm: "auto" } }}>
             <Input
-              placeholder="Buscar por código, nombre, modelo o serie…"
+              placeholder="Buscar por código, nombre, modelo, serie o site…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startDecorator={<SearchRoundedIcon />}
@@ -501,8 +547,19 @@ export default function ClienteActivos() {
             {filtered.map((r) => (
               <Sheet
                 key={r.id}
-                variant="outlined"
-                sx={{ p: 2, borderRadius: "md" }}>
+                ref={r.id === highlightId ? focusedRef : null}
+                variant={r.id === highlightId ? "soft" : "outlined"}
+                color={r.id === highlightId ? "primary" : "neutral"}
+                sx={{
+                  p: 2,
+                  borderRadius: "md",
+                  boxShadow: r.id === highlightId ? "lg" : "sm",
+                  borderWidth: r.id === highlightId ? 2 : 1,
+                  borderColor:
+                    r.id === highlightId ? "primary.solidBg" : "divider",
+                  transition:
+                    "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+                }}>
                 <Stack
                   direction="row"
                   justifyContent="space-between"
@@ -642,7 +699,19 @@ export default function ClienteActivos() {
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  ref={r.id === highlightId ? focusedRef : null}
+                  style={
+                    r.id === highlightId
+                      ? {
+                          backgroundColor: "rgba(59, 130, 246, 0.12)",
+                          boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                          transition:
+                            "background-color 0.25s ease, box-shadow 0.25s ease",
+                        }
+                      : undefined
+                  }>
                   <td>
                     {canMove && (
                       <Checkbox

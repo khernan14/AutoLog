@@ -1,3 +1,4 @@
+// src/components/VehiculosForm/VehiculosTable.jsx
 import React, { useMemo, useState, useCallback } from "react";
 import {
   Box,
@@ -32,6 +33,9 @@ import useIsMobile from "@/hooks/useIsMobile";
  * - canEdit?: boolean
  * - canDelete?: boolean
  * - canRestore?: boolean
+ * - highlightId?: number | string
+ * - focusedRef?: React.RefObject
+ * - highlightStyle?: (id) => React.CSSProperties
  */
 export default function VehiculosTable({
   vehiculos = [],
@@ -41,6 +45,9 @@ export default function VehiculosTable({
   canEdit = false,
   canDelete = false,
   canRestore = false,
+  highlightId,
+  focusedRef,
+  highlightStyle,
 }) {
   const isMobile = useIsMobile(768);
 
@@ -78,6 +85,9 @@ export default function VehiculosTable({
 
   const isInactive = (v) => (v?.estado || "").toLowerCase() === "inactivo";
 
+  const getHighlightStyle = (id) =>
+    typeof highlightStyle === "function" ? highlightStyle(id) : {};
+
   // ====== MÓVIL: Tarjetas ======
   if (isMobile) {
     return (
@@ -88,11 +98,18 @@ export default function VehiculosTable({
             (canDelete && onDelete && !isInactive(v)) ||
             (canRestore && onRestore && isInactive(v));
 
+          const isHighlighted = highlightId === v.id;
+
           return (
             <Sheet
               key={v.id}
+              ref={isHighlighted ? focusedRef : null}
               variant="outlined"
-              sx={{ p: 2, borderRadius: "md" }}>
+              sx={{
+                p: 2,
+                borderRadius: "md",
+                ...getHighlightStyle(v.id),
+              }}>
               <Stack spacing={1}>
                 <Stack
                   direction="row"
@@ -211,68 +228,74 @@ export default function VehiculosTable({
         </tr>
       </thead>
       <tbody>
-        {sortedVehiculos.map((v) => (
-          <tr key={v.id}>
-            <td>{v.placa}</td>
-            <td>{v.marca}</td>
-            <td>{v.modelo}</td>
-            <td>
-              <Chip
-                size="sm"
-                variant="soft"
-                color={v.estado === "Disponible" ? "success" : "warning"}>
-                {v.estado || "—"}
-              </Chip>
-            </td>
-            <td>
-              {v.nombre_ubicacion ? (
-                <Chip size="sm" variant="soft">
-                  {v.nombre_ubicacion}
-                </Chip>
-              ) : (
-                "—"
-              )}
-            </td>
-
-            {hasActions && (
+        {sortedVehiculos.map((v) => {
+          const isHighlighted = highlightId === v.id;
+          return (
+            <tr
+              key={v.id}
+              ref={isHighlighted ? focusedRef : null}
+              style={getHighlightStyle(v.id)}>
+              <td>{v.placa}</td>
+              <td>{v.marca}</td>
+              <td>{v.modelo}</td>
               <td>
-                <Dropdown>
-                  <MenuButton
-                    slots={{ root: IconButton }}
-                    slotProps={{
-                      root: { variant: "plain", color: "neutral" },
-                    }}
-                    aria-label="Acciones">
-                    <MoreHorizRoundedIcon />
-                  </MenuButton>
-                  <Menu>
-                    {canEdit && onEdit && (
-                      <MenuItem onClick={() => onEdit(v)}>
-                        <EditRoundedIcon fontSize="small" />
-                        Editar
-                      </MenuItem>
-                    )}
-                    {isInactive(v)
-                      ? canRestore &&
-                        onRestore && (
-                          <MenuItem onClick={() => onRestore(v.id)}>
-                            <RestoreRoundedIcon fontSize="small" />
-                            Restaurar
-                          </MenuItem>
-                        )
-                      : canDelete &&
-                        onDelete && (
-                          <MenuItem onClick={() => onDelete(v.id)}>
-                            <DeleteRoundedIcon fontSize="small" />
-                            Inhabilitar
-                          </MenuItem>
-                        )}
-                  </Menu>
-                </Dropdown>
+                <Chip
+                  size="sm"
+                  variant="soft"
+                  color={v.estado === "Disponible" ? "success" : "warning"}>
+                  {v.estado || "—"}
+                </Chip>
               </td>
-            )}
-          </tr>
-        ))}
+              <td>
+                {v.nombre_ubicacion ? (
+                  <Chip size="sm" variant="soft">
+                    {v.nombre_ubicacion}
+                  </Chip>
+                ) : (
+                  "—"
+                )}
+              </td>
+
+              {hasActions && (
+                <td>
+                  <Dropdown>
+                    <MenuButton
+                      slots={{ root: IconButton }}
+                      slotProps={{
+                        root: { variant: "plain", color: "neutral" },
+                      }}
+                      aria-label="Acciones">
+                      <MoreHorizRoundedIcon />
+                    </MenuButton>
+                    <Menu>
+                      {canEdit && onEdit && (
+                        <MenuItem onClick={() => onEdit(v)}>
+                          <EditRoundedIcon fontSize="small" />
+                          Editar
+                        </MenuItem>
+                      )}
+                      {isInactive(v)
+                        ? canRestore &&
+                          onRestore && (
+                            <MenuItem onClick={() => onRestore(v.id)}>
+                              <RestoreRoundedIcon fontSize="small" />
+                              Restaurar
+                            </MenuItem>
+                          )
+                        : canDelete &&
+                          onDelete && (
+                            <MenuItem onClick={() => onDelete(v.id)}>
+                              <DeleteRoundedIcon fontSize="small" />
+                              Inhabilitar
+                            </MenuItem>
+                          )}
+                    </Menu>
+                  </Dropdown>
+                </td>
+              )}
+            </tr>
+          );
+        })}
       </tbody>
     </Table>
   );

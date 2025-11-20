@@ -1,6 +1,6 @@
 // src/pages/Inventario/ActivosList.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -48,15 +48,14 @@ import { useAuth } from "../../context/AuthContext";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 import ExportDialog from "@/components/Exports/ExportDialog";
 
-// ✅ Estado de vista unificado
 import ResourceState from "../../components/common/ResourceState";
 import { getViewState } from "../../utils/viewState";
-// ✅ Paginación ligera
 import PaginationLite from "@/components/common/PaginationLite";
 
-// 🔹 NUEVO: Select genérico de catálogos y colores centralizados
 import CatalogSelect from "@/components/forms/CatalogSelect";
 import { ESTATUS_COLOR } from "@/constants/inventario"; // mapea estatus -> color Joy
+
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
 // columnas para exportar
 const EXPORT_COLS = [
@@ -95,8 +94,17 @@ const filenameBase = `todos_los_activos_${new Date()
   .toISOString()
   .slice(0, 10)}`;
 
+//Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
 export default function ActivosList() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile(768);
   const qrRef = useRef(null);
   const { showToast } = useToast();
@@ -214,13 +222,13 @@ export default function ActivosList() {
 
   // ---- Helpers de orden/filtrado/paginación ----
   const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
+    const s = normalize(search);
     return (rows || []).filter((r) => {
       const matchSearch =
-        (r.codigo || "").toLowerCase().includes(s) ||
-        (r.nombre || "").toLowerCase().includes(s) ||
-        (r.modelo || "").toLowerCase().includes(s) ||
-        (r.serial_number || "").toLowerCase().includes(s);
+        normalize(r.codigo).includes(s) ||
+        normalize(r.nombre).includes(s) ||
+        normalize(r.modelo).includes(s) ||
+        normalize(r.serial_number).includes(s);
 
       const matchStatus = !statusFilter || r.estatus === statusFilter;
       const matchType = !typeFilter || r.tipo === typeFilter;
@@ -265,6 +273,40 @@ export default function ActivosList() {
     const start = (page - 1) * perPage;
     return sortedRows.slice(start, start + perPage);
   }, [sortedRows, page, perPage]);
+
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: sortedRows,
+    perPage,
+    setPage,
+    matchRow: (r, token) => {
+      const t = normalize(token);
+      return (
+        String(r.id) === token ||
+        normalize(r.codigo) === t ||
+        normalize(r.serial_number) === t
+      );
+    },
+    getRowId: (r) => r.id,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar filtros y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Limpiar filtros/búsqueda para asegurar que el activo se vea
+    setSearch("");
+    setStatusFilter("");
+    setTypeFilter("");
+    setUbicacionFilter("");
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
 
   function handleSort(key) {
     if (!key) return;
@@ -323,7 +365,7 @@ export default function ActivosList() {
 
     setEditing(null);
     setForm({
-      codigo: codigoAuto, // chip
+      codigo: codigoAuto,
       nombre: "",
       modelo: "",
       serial_number: "",
@@ -340,7 +382,7 @@ export default function ActivosList() {
     }
     setEditing(row);
     setForm({
-      codigo: row.codigo, // chip no editable
+      codigo: row.codigo,
       nombre: row.nombre,
       modelo: row.modelo || "",
       serial_number: row.serial_number || "",
@@ -534,8 +576,19 @@ export default function ActivosList() {
               {pageRows.map((r) => (
                 <Sheet
                   key={r.id}
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "md" }}>
+                  ref={r.id === highlightId ? focusedRef : null}
+                  variant={r.id === highlightId ? "soft" : "outlined"}
+                  color={r.id === highlightId ? "primary" : "neutral"}
+                  sx={{
+                    p: 2,
+                    borderRadius: "md",
+                    boxShadow: r.id === highlightId ? "lg" : "sm",
+                    borderWidth: r.id === highlightId ? 2 : 1,
+                    borderColor:
+                      r.id === highlightId ? "primary.solidBg" : "divider",
+                    transition:
+                      "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+                  }}>
                   <Stack spacing={0.75}>
                     <Typography level="title-md">{r.nombre}</Typography>
                     <Typography level="body-xs" sx={{ opacity: 0.7 }}>
@@ -699,7 +752,20 @@ export default function ActivosList() {
                 </thead>
                 <tbody>
                   {pageRows.map((r) => (
-                    <tr key={r.id}>
+                    <tr
+                      key={r.id}
+                      ref={r.id === highlightId ? focusedRef : null}
+                      style={
+                        r.id === highlightId
+                          ? {
+                              backgroundColor: "rgba(59, 130, 246, 0.12)",
+                              boxShadow:
+                                "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                              transition:
+                                "background-color 0.25s ease, box-shadow 0.25s ease",
+                            }
+                          : undefined
+                      }>
                       <td>{r.codigo}</td>
                       <td>{r.nombre}</td>
                       <td>{r.tipo}</td>
@@ -869,7 +935,7 @@ export default function ActivosList() {
                   </Chip>
                   {!editing && (
                     <Button
-                      size="sm"
+                      size="small"
                       variant="plain"
                       onClick={refreshNextCodigo}
                       disabled={loadingNext}>

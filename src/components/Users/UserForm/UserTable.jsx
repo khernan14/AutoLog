@@ -23,14 +23,16 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 export default function UserTable({
   users,
-  selected, // array ids seleccionados
-  setSelected, // setter
+  selected,
+  setSelected,
   onEdit,
   onDelete,
   onRestore,
   canEdit,
   canDelete,
   canRestore,
+  highlightId,
+  focusedRef,
 }) {
   const isMobile = useIsMobile(768);
 
@@ -84,11 +86,27 @@ export default function UserTable({
         {sorted.map((u) => {
           const id = u.id_usuario;
           const checked = selected.includes(id);
+          const isHighlighted = highlightId === id;
+
           return (
             <Sheet
               key={id}
+              // ⭐ asignamos el ref solo a la tarjeta destacada
+              ref={isHighlighted ? focusedRef : null}
               variant="outlined"
-              sx={{ p: 2, borderRadius: "md" }}>
+              sx={{
+                p: 2,
+                borderRadius: "md",
+                transition:
+                  "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+                ...(isHighlighted
+                  ? {
+                      backgroundColor: "rgba(59, 130, 246, 0.08)",
+                      boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6)",
+                      borderColor: "primary.solidBg",
+                    }
+                  : {}),
+              }}>
               <Stack spacing={0.5}>
                 <Stack
                   direction="row"
@@ -98,7 +116,7 @@ export default function UserTable({
                     <Checkbox
                       size="sm"
                       checked={checked}
-                      onChange={(e) => toggleSelectOne(id)}
+                      onChange={() => toggleSelectOne(id)}
                     />
                     <Typography level="title-md">{u.nombre}</Typography>
                   </Stack>
@@ -216,8 +234,23 @@ export default function UserTable({
           {sorted.map((u) => {
             const id = u.id_usuario;
             const checked = selected.includes(id);
+            const isHighlighted = highlightId === id;
+
             return (
-              <tr key={id}>
+              <tr
+                key={id}
+                // ⭐ ref solo en la fila destacada
+                ref={isHighlighted ? focusedRef : null}
+                style={
+                  isHighlighted
+                    ? {
+                        backgroundColor: "rgba(59, 130, 246, 0.12)",
+                        boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                        transition:
+                          "background-color 0.25s ease, box-shadow 0.25s ease",
+                      }
+                    : undefined
+                }>
                 <td>
                   <Checkbox
                     checked={checked}

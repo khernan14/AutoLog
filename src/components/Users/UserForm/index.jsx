@@ -1,4 +1,6 @@
+// src/pages/Configuracion/Usuarios/Users.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -15,14 +17,14 @@ import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
+import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded"; // (sigue sin usarse, pero lo dejo)
 
 import Swal from "sweetalert2";
 
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 
-// 🔧 Ajusta si tu servicio tiene otros nombres
+// 🔧 Servicios
 import {
   getUsers as getUsersService,
   createUserService,
@@ -38,6 +40,17 @@ import StatusCard from "../../../components/common/StatusCard";
 import UserToolbar from "./UserToolbar";
 import UserTable from "./UserTable";
 import UserFormModal from "./UserFormModal";
+
+// ⭐ Hook de foco/highlight reutilizable
+import useRowFocusHighlight from "../../../hooks/useRowFocusHighlight";
+
+// Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 
 export default function Users() {
   // ---- data ----
@@ -59,6 +72,8 @@ export default function Users() {
   const [openModal, setOpenModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // ---- auth/perm ----
   const { userData, checkingSession, hasPermiso } = useAuth();
@@ -94,7 +109,7 @@ export default function Users() {
     setError(null);
     try {
       const [usersRes, ciudadesRes, supervisoresRes] = await Promise.all([
-        getUsersService(), // 🔧 ajusta si se llama distinto
+        getUsersService(),
         getCiudades(),
         getUserSupervisors(),
       ]);
@@ -267,7 +282,6 @@ export default function Users() {
     if (!res.isConfirmed) return;
 
     try {
-      // Usa el mismo servicio que ya usas en "¿Olvidaste tu contraseña?"
       await sendRecoveryPassword(email);
 
       showToast(
@@ -284,7 +298,6 @@ export default function Users() {
   };
 
   const onSubmitUser = async (payload) => {
-    // payload: { id_usuario?, nombre, email, username, password?, rol, puesto, id_ciudad/ciudad, supervisor_id }
     if (payload?.id_usuario) {
       if (!canEdit)
         return showToast("No tienes permiso para editar usuarios.", "warning");
@@ -323,7 +336,6 @@ export default function Users() {
         );
         const nuevoUsuario = { ...r, ...payload, ciudad: ciudadNombre };
 
-        // Enviar correo ANTES del toast de éxito (si falla, no rompemos el flujo)
         try {
           await sendMail({
             to: nuevoUsuario.email,
@@ -365,6 +377,39 @@ export default function Users() {
       return matchesStatus && matchesSearch;
     });
   }, [users, showInactive, search]);
+
+  // ⭐ Hook de highlight (sin paginación: todo en una "página")
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: filtered,
+    perPage: filtered.length || 1,
+    setPage: () => {}, // no hay paginación aquí
+    matchRow: (u, token) => {
+      const t = normalize(token);
+      return (
+        String(u.id_usuario) === token ||
+        normalize(u.email) === t ||
+        normalize(u.username) === t
+      );
+    },
+    getRowId: (u) => u.id_usuario,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar filtros y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Aseguramos que el usuario sea visible
+    setSearch("");
+    setShowInactive(true);
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
 
   // ---- view state ----
   const viewState = checking
@@ -499,6 +544,8 @@ export default function Users() {
               canEdit={canEdit}
               canDelete={canDelete}
               canRestore={canRestore}
+              highlightId={highlightId}
+              focusedRef={focusedRef}
             />
           )}
         </Card>

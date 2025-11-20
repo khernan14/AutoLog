@@ -1,29 +1,18 @@
-// src/context/Sidebar.jsx (o donde lo tengas)
-
 import * as React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import GlobalStyles from "@mui/joy/GlobalStyles";
 import Avatar from "@mui/joy/Avatar";
 import Box from "@mui/joy/Box";
 import Divider from "@mui/joy/Divider";
-import IconButton from "@mui/joy/IconButton";
-import Input, { inputClasses } from "@mui/joy/Input";
 import List from "@mui/joy/List";
 import ListItem from "@mui/joy/ListItem";
 import ListItemButton, { listItemButtonClasses } from "@mui/joy/ListItemButton";
 import ListItemContent from "@mui/joy/ListItemContent";
 import Typography from "@mui/joy/Typography";
 import Sheet from "@mui/joy/Sheet";
-import Dropdown from "@mui/joy/Dropdown";
-import Menu from "@mui/joy/Menu";
-import MenuItem from "@mui/joy/MenuItem";
-import MenuButton from "@mui/joy/MenuButton";
-import ListItemDecorator from "@mui/joy/ListItemDecorator";
-import ListDivider from "@mui/joy/ListDivider";
 import Tooltip from "@mui/joy/Tooltip";
 import { useColorScheme } from "@mui/joy/styles";
 
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
@@ -47,7 +36,6 @@ import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
 import AnnouncementRoundedIcon from "@mui/icons-material/AnnouncementRounded";
 import FactoryRoundedIcon from "@mui/icons-material/FactoryRounded";
 import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
-import MoreVert from "@mui/icons-material/MoreVert";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
@@ -58,7 +46,7 @@ import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import SummarizeRoundedIcon from "@mui/icons-material/SummarizeRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import MarkChatUnreadIcon from "@mui/icons-material/MarkChatUnread";
-import { MoreHorizontalIcon } from "lucide-react";
+import { MoreHorizontalIcon, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -70,20 +58,27 @@ import {
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { globalSearch } from "../services/search.api"; // API /api/search
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from "@/components/ui/command";
 
+import { globalSearch } from "../services/search.api";
 import { useAuth } from "./AuthContext";
 import { closeSidebar } from "../utils/ToggleSidebar";
 import logoLight from "../assets/newLogoTecnasaBlack.png";
 import logoDark from "../assets/newLogoTecnasa.png";
 import Swal from "sweetalert2";
-import useIsMobile from "../hooks/useIsMobile"; // 👈 usar hook que ya tienes
+import useIsMobile from "../hooks/useIsMobile";
 
 /* Helpers */
 function getInitials(name) {
@@ -184,17 +179,25 @@ export default function Sidebar() {
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
   const { mode } = useColorScheme();
-  const isMobile = useIsMobile(768); // 👈 mobile detection
+  const isMobile = useIsMobile(768);
 
+  const currentPath = location.pathname;
   const userName = userData?.nombre || "Usuario";
   const userEmail = userData?.email || "usuario@test.com";
   const userRole = userData?.rol;
 
-  const checkPermission = (permiso) =>
-    userRole === "Admin" || (permiso ? hasPermiso(permiso) : true);
+  const [commandOpen, setCommandOpen] = React.useState(false);
+  const [commandQuery, setCommandQuery] = React.useState("");
+  const [commandLoading, setCommandLoading] = React.useState(false);
+  const [commandResults, setCommandResults] = React.useState([]);
+
+  const checkPermission = React.useCallback(
+    (permiso) => userRole === "Admin" || (permiso ? hasPermiso(permiso) : true),
+    [userRole, hasPermiso]
+  );
 
   // =========================
-  // Secciones (con 'perm' para búsqueda local)
+  // Secciones
   // =========================
   const navItems = [
     {
@@ -373,7 +376,7 @@ export default function Sidebar() {
     },
   ];
 
-  // Index plano para fallback local
+  // Index plano para búsqueda local
   const routeIndex = React.useMemo(() => {
     const pick = (arr) =>
       arr.filter(Boolean).map((it) => ({
@@ -391,27 +394,8 @@ export default function Sidebar() {
       ...pick(systemItems),
       ...pick(supportAndHelpItems),
     ];
-  }, [
-    navItems,
-    managementItems,
-    inventoryItems,
-    systemItems,
-    supportAndHelpItems,
-  ]);
-
-  // =========================
-  // Búsqueda universal (Joy-only)
-  // =========================
-  const [q, setQ] = React.useState("");
-  const [openSearch, setOpenSearch] = React.useState(false);
-  const [loadingSearch, setLoadingSearch] = React.useState(false);
-  const [results, setResults] = React.useState([]);
-  const [activeIndex, setActiveIndex] = React.useState(-1);
-  const containerRef = React.useRef(null);
-  const inputRootRef = React.useRef(null);
-  const inputRef = React.useRef(null);
-  const abortRef = React.useRef(null);
-  const debounceRef = React.useRef(null);
+    // deps solo en cosas que realmente cambian permisos
+  }, [userRole, hasPermiso]);
 
   const simpleLocalRouteSearch = React.useCallback(
     (text) => {
@@ -448,88 +432,63 @@ export default function Sidebar() {
     [routeIndex]
   );
 
-  const searchAll = React.useCallback(
-    async (text) => {
-      if (abortRef.current) abortRef.current.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+  const searchAll = React.useCallback(async (text) => {
+    try {
+      const data = await globalSearch(text, { limit: 10 });
+      const normalized = Array.isArray(data) ? data : [];
+      return normalized;
+    } catch (err) {
+      console.error("[Sidebar] globalSearch error:", err);
+      return [];
+    }
+  }, []);
 
-      setLoadingSearch(true);
-      try {
-        const data = await globalSearch(text, {
-          limit: 10,
-          signal: controller.signal,
-        });
-        const normalized = Array.isArray(data) ? data : [];
-        setResults(normalized);
-        setOpenSearch(true);
-      } catch (_e) {
-        const local = simpleLocalRouteSearch(text);
-        setResults(local);
-        setOpenSearch(true);
-      } finally {
-        setLoadingSearch(false);
-      }
-    },
-    [simpleLocalRouteSearch]
-  );
+  React.useEffect(() => {
+    if (!commandOpen) return;
 
-  const onChangeSearch = (e) => {
-    const value = e.target.value;
-    setQ(value);
-    setActiveIndex(-1);
-    clearTimeout(debounceRef.current);
-    if (!value || value.trim().length < 2) {
-      setOpenSearch(false);
-      setResults([]);
+    const term = commandQuery.trim();
+    if (term.length < 2) {
+      setCommandResults([]);
+      setCommandLoading(false);
       return;
     }
-    debounceRef.current = setTimeout(() => searchAll(value.trim()), 250);
-  };
 
-  const handleNavigate = (path) => {
-    navigate(path);
-    if (isMobile) {
-      closeSidebar(); // 👈 cerrar sidebar en mobile al elegir opción
-    }
-  };
+    let cancelled = false;
+    setCommandLoading(true);
 
-  const onKeyDownSearch = (e) => {
-    if (e.key === "Escape") {
-      setOpenSearch(false);
-      return;
-    }
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const term = (q || "").trim();
-      if (!term) return;
-
-      const allowed = (r) =>
-        userRole === "Admin" || !r.perm || hasPermiso(r.perm);
-      const exacts = (results || []).filter((r) => r.exact && allowed(r));
-
-      if (exacts.length === 1) {
-        navigate(exacts[0].url);
-        setOpenSearch(false);
-        setQ("");
-        return;
+    (async () => {
+      const res = await searchAll(term);
+      if (!cancelled) {
+        setCommandResults(res || []);
+        setCommandLoading(false);
       }
+    })();
 
-      navigate(`/admin/search?q=${encodeURIComponent(term)}`);
-      setOpenSearch(false);
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, [commandQuery, commandOpen, searchAll]);
 
-    if (!openSearch || !results.length) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((i) => (i + 1) % results.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((i) => (i - 1 + results.length) % results.length);
+  // Limpiar al cerrar
+  React.useEffect(() => {
+    if (!commandOpen) {
+      setCommandQuery("");
+      setCommandResults([]);
+      setCommandLoading(false);
     }
+  }, [commandOpen]);
+
+  const handleCommandNavigate = (url) => {
+    if (!url) return;
+    navigate(url);
+    if (isMobile) closeSidebar();
+    setCommandOpen(false);
   };
 
-  const logout = () => {
+  // =========================
+  // Atajos de teclado globales
+  // =========================
+  const logout = React.useCallback(() => {
     closeSidebar();
     Swal.fire({
       title: "¿Deseas cerrar sesión?",
@@ -546,9 +505,8 @@ export default function Sidebar() {
         setTimeout(() => navigate("/auth/login"), 100);
       }
     });
-  };
+  }, [navigate]);
 
-  // Ctrl/⌘ + K → enfocar buscador
   React.useEffect(() => {
     const onGlobalKey = (e) => {
       const tag = (document.activeElement?.tagName || "").toLowerCase();
@@ -562,15 +520,14 @@ export default function Sidebar() {
       const ctrlOrCmd = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
+      // 🔎 Ctrl/⌘ + K → abrir / cerrar command palette
       if (ctrlOrCmd && key === "k") {
         e.preventDefault();
-        inputRef.current?.focus();
-        setOpenSearch(
-          q.trim().length >= 2 && (results.length > 0 || loadingSearch)
-        );
+        setCommandOpen((open) => !open);
         return;
       }
 
+      // Ctrl/⌘ + , → Configuraciones
       if (ctrlOrCmd && e.key === ",") {
         e.preventDefault();
         if (checkPermission("ver_configuraciones")) {
@@ -579,13 +536,15 @@ export default function Sidebar() {
         return;
       }
 
+      // Ctrl/⌘ + H → Ayuda
       if (ctrlOrCmd && key === "h") {
         e.preventDefault();
         navigate("/admin/help");
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && key === "q") {
+      // Ctrl/⌘ + Q → Logout
+      if (ctrlOrCmd && key === "q") {
         e.preventDefault();
         logout();
         return;
@@ -594,9 +553,14 @@ export default function Sidebar() {
 
     window.addEventListener("keydown", onGlobalKey);
     return () => window.removeEventListener("keydown", onGlobalKey);
-  }, [q, results.length, loadingSearch, navigate, checkPermission, logout]);
+  }, [navigate, logout, checkPermission]);
 
-  const currentPath = location.pathname;
+  const handleNavigate = (path) => {
+    navigate(path);
+    if (isMobile) {
+      closeSidebar();
+    }
+  };
 
   // ====== swipe to close en mobile ======
   const touchStartXRef = React.useRef(null);
@@ -622,7 +586,6 @@ export default function Sidebar() {
       return;
     }
     const deltaX = (touchCurrentXRef.current || 0) - touchStartXRef.current;
-    // swipe hacia la izquierda (> 50px) → cerrar
     if (deltaX < -50) {
       closeSidebar();
     }
@@ -632,7 +595,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Overlay para mobile: cierra al tocar fuera */}
+      {/* Overlay mobile */}
       <Box className="Sidebar-overlay" onClick={closeSidebar} />
 
       <Sheet
@@ -691,141 +654,33 @@ export default function Sidebar() {
           })}
         />
 
-        {/* Logo */}
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        {/* Logo + botón de búsqueda */}
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}>
           <img
             src={mode === "dark" ? logoDark : logoLight}
             alt="Logo cliente"
-            style={{ width: 240, height: 75, objectFit: "contain" }}
+            style={{ width: 200, height: 70, objectFit: "contain" }}
           />
-        </Box>
 
-        {/* Búsqueda (solo desktop / tablet) */}
-        <Box
-          ref={containerRef}
-          sx={{
-            display: { xs: "none", sm: "block" },
-            position: "relative",
-          }}>
           <Tooltip
             title="Buscar módulos y datos… (Ctrl/⌘+K)"
             variant="soft"
-            placement="top-end"
+            placement="bottom"
             sx={{ zIndex: 13000 }}>
-            <Input
-              ref={inputRootRef}
-              value={q}
-              onChange={onChangeSearch}
-              onKeyDown={onKeyDownSearch}
-              onFocus={() =>
-                q.trim().length >= 2 && results.length && setOpenSearch(true)
-              }
-              onBlur={() => setTimeout(() => setOpenSearch(false), 120)}
-              startDecorator={<SearchRoundedIcon />}
-              placeholder="Buscar módulos y datos… (Ctrl/⌘+K)"
-              slotProps={{
-                input: { ref: inputRef },
-              }}
-              sx={{
-                [`& .${inputClasses.input}`]: { pr: 1 },
-              }}
-            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCommandOpen(true)}
+              className="hidden sm:inline-flex">
+              <Sparkles className="h-4 w-4" />
+            </Button>
           </Tooltip>
-
-          {openSearch && (
-            <Sheet
-              variant="outlined"
-              sx={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: "calc(100% + 8px)",
-                borderRadius: "md",
-                p: 0.5,
-                bgcolor: "background.body",
-                boxShadow: "lg",
-                zIndex: 13000,
-                maxHeight: 360,
-                overflowY: "auto",
-              }}
-              onMouseDown={(e) => e.preventDefault()}>
-              {loadingSearch ? (
-                <List sx={{ p: 0.5 }}>
-                  {[...Array(4)].map((_, i) => (
-                    <ListItem key={i}>
-                      <Typography level="body-sm">Buscando…</Typography>
-                    </ListItem>
-                  ))}
-                </List>
-              ) : results.length === 0 ? (
-                <Box sx={{ p: 1 }}>
-                  <Typography level="body-sm" color="neutral">
-                    Sin resultados
-                  </Typography>
-                </Box>
-              ) : (
-                <List sx={{ p: 0 }}>
-                  {results.map((r, idx) => {
-                    const allowed =
-                      userRole === "Admin" || !r.perm || hasPermiso(r.perm);
-                    const content = (
-                      <ListItemButton
-                        key={r.id || r.url || idx}
-                        selected={idx === activeIndex}
-                        disabled={!allowed}
-                        onClick={() => {
-                          if (allowed && r.url) {
-                            handleNavigate(r.url);
-                            setOpenSearch(false);
-                            setQ("");
-                          }
-                        }}
-                        sx={{
-                          borderRadius: "sm",
-                          "&[aria-disabled='true']": {
-                            opacity: 0.5,
-                            cursor: "not-allowed",
-                          },
-                        }}>
-                        <ListItemDecorator>
-                          {allowed ? (
-                            <KindIcon kind={r.kind} />
-                          ) : (
-                            <LockRoundedIcon fontSize="small" />
-                          )}
-                        </ListItemDecorator>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography level="title-sm" noWrap>
-                            {r.title}
-                          </Typography>
-                          {r.subtitle && (
-                            <Typography level="body-xs" color="neutral" noWrap>
-                              {r.subtitle}
-                            </Typography>
-                          )}
-                        </Box>
-                      </ListItemButton>
-                    );
-
-                    return allowed ? (
-                      <ListItem key={idx} sx={{ p: 0 }}>
-                        {content}
-                      </ListItem>
-                    ) : (
-                      <Tooltip
-                        key={idx}
-                        title="No tienes permiso para acceder"
-                        variant="soft"
-                        placement="left"
-                        sx={{ zIndex: 13000 }}>
-                        <ListItem sx={{ p: 0 }}>{content}</ListItem>
-                      </Tooltip>
-                    );
-                  })}
-                </List>
-              )}
-            </Sheet>
-          )}
         </Box>
 
         {/* Navegación */}
@@ -866,7 +721,7 @@ export default function Sidebar() {
                 path={item.path}
                 icon={item.icon}
                 label={item.label}
-                currentPath={location.pathname}
+                currentPath={currentPath}
                 onNavigate={handleNavigate}
                 canView={item.canView}
               />
@@ -904,7 +759,7 @@ export default function Sidebar() {
                       path={item.path}
                       icon={item.icon}
                       label={item.label}
-                      currentPath={location.pathname}
+                      currentPath={currentPath}
                       onNavigate={handleNavigate}
                       canView={item.canView}
                     />
@@ -943,7 +798,7 @@ export default function Sidebar() {
                       path={item.path}
                       icon={item.icon}
                       label={item.label}
-                      currentPath={location.pathname}
+                      currentPath={currentPath}
                       onNavigate={handleNavigate}
                       canView={item.canView}
                     />
@@ -982,7 +837,7 @@ export default function Sidebar() {
                       path={item.path}
                       icon={item.icon}
                       label={item.label}
-                      currentPath={location.pathname}
+                      currentPath={currentPath}
                       onNavigate={handleNavigate}
                       canView={item.canView}
                     />
@@ -1022,7 +877,7 @@ export default function Sidebar() {
                       path={item.path}
                       icon={item.icon}
                       label={item.label}
-                      currentPath={location.pathname}
+                      currentPath={currentPath}
                       onNavigate={handleNavigate}
                       canView={item.canView}
                     />
@@ -1140,6 +995,91 @@ export default function Sidebar() {
           </DropdownMenu>
         </Box>
       </Sheet>
+
+      {/* Command Palette shadcn (Ctrl/⌘+K) */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+        <CommandInput
+          placeholder="Buscar módulos, clientes, activos…"
+          value={commandQuery}
+          onValueChange={setCommandQuery}
+        />
+        <CommandList>
+          {!commandLoading && commandResults.length === 0 && (
+            <CommandEmpty>Sin resultados por ahora…</CommandEmpty>
+          )}
+
+          {commandLoading && (
+            <CommandGroup heading="Buscando…">
+              <CommandItem disabled>Buscando resultados…</CommandItem>
+            </CommandGroup>
+          )}
+
+          {!commandLoading && commandResults.length > 0 && (
+            <CommandGroup heading="Resultados">
+              {commandResults.map((r) => {
+                const allowed =
+                  userRole === "Admin" || !r.perm || checkPermission(r.perm);
+                return (
+                  <CommandItem
+                    key={r.id || r.url}
+                    disabled={!allowed}
+                    value={`${r.title || ""} ${r.subtitle || ""}`}
+                    onSelect={() => {
+                      if (allowed && r.url) handleCommandNavigate(r.url);
+                    }}>
+                    {allowed ? (
+                      <KindIcon kind={r.kind} />
+                    ) : (
+                      <LockRoundedIcon fontSize="small" />
+                    )}
+                    <span className="ml-2 truncate">{r.title}</span>
+                    {r.subtitle && (
+                      <span className="ml-2 text-xs text-muted-foreground truncate">
+                        {r.subtitle}
+                      </span>
+                    )}
+                    {!allowed && (
+                      <span className="ml-auto text-[11px] text-red-500">
+                        Sin permiso
+                      </span>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          )}
+
+          <CommandSeparator />
+          <CommandGroup heading="Atajos">
+            <CommandItem
+              onSelect={() => navigate("/admin/help")}
+              value="Centro de ayuda">
+              <HelpCenterIcon className="mr-2 h-4 w-4" />
+              <span>Centro de ayuda</span>
+              <CommandShortcut>Ctrl+H</CommandShortcut>
+            </CommandItem>
+
+            {checkPermission("ver_configuraciones") && (
+              <CommandItem
+                onSelect={() => navigate("/admin/configuraciones")}
+                value="Configuraciones">
+                <SettingsRoundedIcon className="mr-2 h-4 w-4" />
+                <span>Configuraciones</span>
+                <CommandShortcut>Ctrl+,</CommandShortcut>
+              </CommandItem>
+            )}
+
+            <CommandItem
+              onSelect={logout}
+              value="Cerrar sesión"
+              className="text-red-600 dark:text-red-400">
+              <LogoutRoundedIcon className="mr-2 h-4 w-4" />
+              <span>Cerrar sesión</span>
+              <CommandShortcut>Ctrl+Q</CommandShortcut>
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
     </>
   );
 }

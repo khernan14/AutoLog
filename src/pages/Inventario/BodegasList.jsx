@@ -1,5 +1,6 @@
+// src/pages/Bodegas/BodegasList.jsx
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Card,
@@ -30,7 +31,18 @@ import BodegaFormModal from "./BodegaFormModal";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import StatusCard from "../../components/common/StatusCard";
-import useIsMobile from "../../hooks/useIsMobile"; // ← ajusta la ruta si es necesario
+import useIsMobile from "../../hooks/useIsMobile";
+
+// ⭐ Hook highlight/scroll
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+
+// Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 
 export default function BodegasList() {
   // ---- state ----
@@ -45,6 +57,7 @@ export default function BodegasList() {
 
   // ---- deps ----
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
@@ -114,15 +127,41 @@ export default function BodegasList() {
 
   // ---- filter ----
   const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
+    const s = normalize(search);
     const src = Array.isArray(rows) ? rows : [];
     return src.filter(
       (r) =>
-        (r.nombre || "").toLowerCase().includes(s) ||
-        (r.ciudad || "").toLowerCase().includes(s) ||
-        (r.descripcion || "").toLowerCase().includes(s)
+        normalize(r.nombre).includes(s) ||
+        normalize(r.ciudad).includes(s) ||
+        normalize(r.descripcion).includes(s)
     );
   }, [rows, search]);
+
+  // ⭐ Highlight hook (sin paginación, usamos los rows filtrados)
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: filtered,
+    matchRow: (r, token) => {
+      const t = normalize(token);
+      return String(r.id) === token || normalize(r.nombre) === t;
+    },
+    getRowId: (r) => r.id,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar búsqueda y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // limpiar filtros/búsqueda para asegurar que la bodega esté visible
+    setSearch("");
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
 
   // ---- view state ----
   const viewState = checkingSession
@@ -312,8 +351,20 @@ export default function BodegasList() {
               {filtered.map((r) => (
                 <Sheet
                   key={r.id}
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "md", cursor: "pointer" }}
+                  ref={r.id === highlightId ? focusedRef : null}
+                  variant={r.id === highlightId ? "soft" : "outlined"}
+                  color={r.id === highlightId ? "primary" : "neutral"}
+                  sx={{
+                    p: 2,
+                    borderRadius: "md",
+                    cursor: "pointer",
+                    boxShadow: r.id === highlightId ? "lg" : "sm",
+                    borderWidth: r.id === highlightId ? 2 : 1,
+                    borderColor:
+                      r.id === highlightId ? "primary.solidBg" : "divider",
+                    transition:
+                      "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+                  }}
                   onClick={() => navigate(`${r.id}`)}>
                   <Stack spacing={1}>
                     <Typography level="title-md">{r.nombre}</Typography>
@@ -346,6 +397,7 @@ export default function BodegasList() {
                         variant="soft"
                         placement="top">
                         <span>
+                          {/* Si quieres reactivar el botón de editar en móvil, descomenta */}
                           {/* <IconButton
                             size="sm"
                             onClick={(e) => {
@@ -394,12 +446,26 @@ export default function BodegasList() {
                 {filtered.map((r) => (
                   <tr
                     key={r.id}
-                    style={{ cursor: "pointer" }}
+                    ref={r.id === highlightId ? focusedRef : null}
+                    style={{
+                      cursor: "pointer",
+                      ...(r.id === highlightId
+                        ? {
+                            backgroundColor: "rgba(59, 130, 246, 0.12)",
+                            boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                            transition:
+                              "background-color 0.25s ease, box-shadow 0.25s ease",
+                          }
+                        : null),
+                    }}
                     onClick={() => navigate(`${r.id}`)}>
                     <td>{r.nombre}</td>
                     <td>{r.ciudad || "—"}</td>
                     <td>{r.descripcion || "—"}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}>
                       <Tooltip
                         title={
                           canEdit

@@ -1,6 +1,6 @@
 // src/pages/Clientes/ClienteSites.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   getSitesByCliente,
   createSite,
@@ -46,8 +46,21 @@ import StatusCard from "../../components/common/StatusCard";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 
+// ⭐ hook highlight/scroll
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+
+// Normalizador para ignorar mayúsculas/tildes
+const normalize = (val) =>
+  (val || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
 export default function ClienteSites() {
   const { id } = useParams(); // id del cliente
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
@@ -208,15 +221,15 @@ export default function ClienteSites() {
     }
   }
 
-  // 🔎 Filtrar rows con buscador + ciudad + estado
+  // 🔎 Filtrar rows con buscador + ciudad + estado (con normalize)
   const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
+    const s = normalize(search);
 
     return (rows || []).filter((r) => {
       const matchSearch =
-        (r.nombre || "").toLowerCase().includes(s) ||
-        (r.descripcion || "").toLowerCase().includes(s) ||
-        (r.ciudad || "").toLowerCase().includes(s);
+        normalize(r.nombre).includes(s) ||
+        normalize(r.descripcion).includes(s) ||
+        normalize(r.ciudad).includes(s);
 
       const matchCity =
         !cityFilter || String(r.id_ciudad) === String(cityFilter);
@@ -233,6 +246,36 @@ export default function ClienteSites() {
       return matchSearch && matchCity && matchStatus;
     });
   }, [rows, search, cityFilter, statusFilter]);
+
+  // ⭐ Hook de focus/highlight
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: filtered,
+    matchRow: (r, token) => {
+      const t = normalize(token);
+      return (
+        String(r.id) === token || normalize(r.nombre) === t // por si se usa el nombre como token
+      );
+    },
+    getRowId: (r) => r.id,
+    highlightMs: 4000,
+  });
+
+  // Leer ?focus= de la URL, limpiar filtros y pedir foco
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Limpiar filtros para asegurar que el site se vea
+    setSearch("");
+    setCityFilter("");
+    setStatusFilter("todos");
+
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
 
   // IDs visibles según filtros
   const allVisibleIds = useMemo(
@@ -583,7 +626,19 @@ export default function ClienteSites() {
               {filtered.map((r) => {
                 const isActivo = isActivoVal(r.activo);
                 return (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    ref={r.id === highlightId ? focusedRef : null}
+                    style={
+                      r.id === highlightId
+                        ? {
+                            backgroundColor: "rgba(59, 130, 246, 0.12)",
+                            boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
+                            transition:
+                              "background-color 0.25s ease, box-shadow 0.25s ease",
+                          }
+                        : undefined
+                    }>
                     <td>
                       <Checkbox
                         checked={selectedIds.includes(r.id)}

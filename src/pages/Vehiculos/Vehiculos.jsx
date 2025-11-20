@@ -14,13 +14,12 @@ import { Box, Card, Sheet, Typography } from "@mui/joy";
 import Swal from "sweetalert2";
 import { useAuth } from "../../context/AuthContext";
 
-// ✅ utilitarios reusables
 import ResourceState from "../../components/common/ResourceState";
 import usePermissions from "../../hooks/usePermissions";
 import { getViewState } from "../../utils/viewState";
 
-// ✅ tu ToastContext
 import { useToast } from "../../context/ToastContext";
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
 export default function Vehiculos() {
   const [vehiculos, setVehiculos] = useState([]);
@@ -212,6 +211,13 @@ export default function Vehiculos() {
     });
   }, [vehiculos, showInactive, searchText]);
 
+  // ⭐ Hook de foco/resaltado basado en ?focus= (id del vehículo)
+  const { highlightId, focusedRef, highlightStyle } = useRowFocusHighlight({
+    items: filteredVehiculos,
+    getId: (v) => v.id, // por claridad, aunque por defecto ya usa .id
+    paramName: "focus",
+  });
+
   // estado de vista reutilizable
   const viewState = getViewState({
     checkingSession,
@@ -304,6 +310,9 @@ export default function Vehiculos() {
               canEdit={canEdit}
               canDelete={canDelete}
               canRestore={canRestore}
+              highlightId={highlightId}
+              focusedRef={focusedRef}
+              highlightStyle={highlightStyle}
             />
           )}
         </Card>
