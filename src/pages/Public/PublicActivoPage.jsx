@@ -22,9 +22,9 @@ const API_BASE =
   "https://autologapi-production.up.railway.app";
 
 // Soporte
-const SUPPORT_EMAIL = "micros.teh@tecnasa.com";
+const SUPPORT_EMAIL = "micros.teh@tecnasadesk.com";
 // Reemplaza por el número real en formato internacional SIN el "+" (ej: 5049xxxxxxx)
-const WHATSAPP_NUMBER = "50432898115";
+const WHATSAPP_NUMBER = "15551901292";
 
 const StatusChip = ({ estatus }) => {
   const color = useMemo(() => {
@@ -155,7 +155,9 @@ export default function PublicActivoPage() {
     asignacion_vigente,
   } = data;
 
-  // Links de soporte (correo + WhatsApp) con mensaje personalizado
+  // ========= Links de soporte (correo + WhatsApp) =========
+
+  // Correo: ticket directo
   const emailSubject = encodeURIComponent(
     `Reporte de falla - Activo ${codigo}`
   );
@@ -169,7 +171,7 @@ export default function PublicActivoPage() {
       `- Nombre: ${nombre || "—"}`,
       `- Modelo: ${modelo || "—"}`,
       `- Serie: ${serial_number || "—"}`,
-      `- Ubicación: ${ubicacion_actual?.site || "—"}`,
+      `- Ubicación / Site: ${ubicacion_actual?.site || "—"}`,
       "",
       "Descripción de la falla (favor completar):",
       "- ...............................................................",
@@ -181,10 +183,21 @@ export default function PublicActivoPage() {
   );
   const emailHref = `mailto:${SUPPORT_EMAIL}?subject=${emailSubject}&body=${emailBody}`;
 
+  // WhatsApp: consulta rápida / fallas menores
+  // ⚠️ Este texto está formateado para que el bot pueda parsear Código/Modelo/Serie/Site.
   const whatsappText = encodeURIComponent(
-    `Hola, estoy reportando una falla en el activo ${codigo} (${
-      nombre || "sin nombre"
-    } con N° de serie: ${serial_number}).\n\nPor favor su ayuda con esta gestión.\n\nDescripción de la falla: `
+    [
+      "Datos del equipo reportado:",
+      "",
+      `Código: ${codigo}`,
+      `Nombre: ${nombre || "—"}`,
+      `Modelo: ${modelo || "—"}`,
+      `Serie: ${serial_number || "—"}`,
+      `Site: ${ubicacion_actual?.site || "—"}`,
+      "",
+      "Descripción breve de la falla:",
+      "(escribe aquí lo que ocurre con el equipo)",
+    ].join("\n")
   );
 
   const whatsappHref = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappText}`;
@@ -402,8 +415,9 @@ export default function PublicActivoPage() {
                 alignItems={{ xs: "flex-start", sm: "center" }}
                 spacing={1.5}>
                 <Typography level="body-sm" color="neutral">
-                  ¿Tiene algún problema con este equipo? Contáctanos para poder
-                  resolverlo.
+                  ¿Tienes algún problema con este equipo? Para *consultas
+                  rápidas o fallas menores* puedes usar WhatsApp. Si deseas
+                  *aperturar un ticket directamente*, utiliza el correo.
                 </Typography>
                 <Stack
                   direction="row"
@@ -413,19 +427,19 @@ export default function PublicActivoPage() {
                   <Button
                     size="sm"
                     variant="soft"
-                    component="a"
-                    href={emailHref}>
-                    Enviar correo
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="soft"
                     color="success"
                     component="a"
                     href={whatsappHref}
                     target="_blank"
                     rel="noreferrer">
-                    WhatsApp
+                    WhatsApp · consulta rápida
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    component="a"
+                    href={emailHref}>
+                    Aperturar ticket por correo
                   </Button>
                 </Stack>
               </Stack>
