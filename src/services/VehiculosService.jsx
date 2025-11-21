@@ -1,5 +1,8 @@
+// src/services/VehiculosService.js
 import { endpoints } from "../config/variables";
 import { fetchConToken } from "../utils/ApiHelper";
+
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export async function obtenerVehiculos() {
   try {
@@ -109,5 +112,69 @@ export async function restoreVehiculo(id) {
   } catch (err) {
     console.error("Login error:", err);
     return null;
+  }
+}
+
+// 🔹 Obtener enlace firmado de registro para un vehículo
+export async function getRegistroLinkForVehiculo(idVehiculo) {
+  try {
+    // 👉 usamos el MISMO base que obtenerVehiculos
+    // si endpoints.getVehiculos = "http://localhost:3000/api/vehiculos/"
+    // esto queda: "http://localhost:3000/api/vehiculos/1/registro/link"
+    const res = await fetchConToken(
+      `${endpoints.getVehiculos}${idVehiculo}/registro/link`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const msg =
+        errJson?.message ||
+        "No se pudo generar el enlace de registro del vehículo";
+      throw new Error(msg);
+    }
+
+    // { url, token, expiresIn, vehiculo: { id, placa } }
+    return await res.json();
+  } catch (err) {
+    console.error("Error getRegistroLinkForVehiculo:", err);
+    throw err;
+  }
+}
+
+// 🔹 Resolver token de QR -> datos del vehículo
+export async function resolveVehiculoFromQrToken(token) {
+  try {
+    // Igual: nos colgamos del mismo base /api/vehiculos
+    // endpoints.getVehiculos = "http://localhost:3000/api/vehiculos/"
+    // => "http://localhost:3000/api/vehiculos/registro/resolve?token=..."
+    const res = await fetchConToken(
+      `${endpoints.getVehiculos}registro/resolve?token=${encodeURIComponent(
+        token
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const msg = errJson?.message || "Token de QR inválido o expirado";
+      throw new Error(msg);
+    }
+
+    // { id_vehiculo, placa, marca, modelo }
+    return await res.json();
+  } catch (err) {
+    console.error("Error resolveVehiculoFromQrToken:", err);
+    throw err;
   }
 }

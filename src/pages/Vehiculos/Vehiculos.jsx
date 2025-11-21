@@ -1,5 +1,15 @@
 // src/pages/Vehiculos/Vehiculos.jsx
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import StyledQR from "@/components/QRCode/StyledQR";
+import { getRegistroLinkForVehiculo } from "@/services/VehiculosService";
+import logoTecnasa from "@/assets/newLogoTecnasaBlack.png";
+
 import {
   obtenerVehiculos,
   deleteVehiculo,
@@ -10,7 +20,17 @@ import {
 import VehiculosTable from "../../components/VehiculosForm/VehiculosTable";
 import VehiculoModal from "../../components/VehiculosForm/VehiculosModal";
 import VehiculosToolBar from "../../components/VehiculosForm/VehiculosToolBar";
-import { Box, Card, Sheet, Typography } from "@mui/joy";
+import {
+  Box,
+  Button,
+  Card,
+  Divider,
+  Modal,
+  ModalDialog,
+  Sheet,
+  Stack,
+  Typography,
+} from "@mui/joy";
 import Swal from "sweetalert2";
 import { useAuth } from "../../context/AuthContext";
 
@@ -23,6 +43,13 @@ import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
 export default function Vehiculos() {
   const [vehiculos, setVehiculos] = useState([]);
+  const [openQR, setOpenQR] = useState(false);
+  const [vehiculoQR, setVehiculoQR] = useState(null);
+  const [registroLink, setRegistroLink] = useState("");
+  const qrRef = useRef(null);
+  const { hasPermiso, checkingSession, userData } = useAuth();
+  const isAdmin = (userData?.rol || "").toLowerCase() === "admin";
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [openModal, setOpenModal] = useState(false);
@@ -30,7 +57,6 @@ export default function Vehiculos() {
   const [showInactive, setShowInactive] = useState(false);
   const [searchText, setSearchText] = useState("");
 
-  const { checkingSession } = useAuth();
   const { canAny } = usePermissions();
   const { showToast } = useToast();
 
@@ -198,6 +224,38 @@ export default function Vehiculos() {
     }
   };
 
+  const can = useCallback(
+    (p) => isAdmin || hasPermiso(p),
+    [isAdmin, hasPermiso]
+  );
+
+  const canQR = can("crear_QR");
+
+  async function handleShowQR(vehiculo) {
+    if (!canQR) {
+      showToast("No tienes permisos para ver el QR de registro.", "warning");
+      return;
+    }
+    setVehiculoQR(vehiculo);
+    setRegistroLink("");
+    try {
+      const { url } = await getRegistroLinkForVehiculo(vehiculo.id);
+      setRegistroLink(url);
+    } catch (err) {
+      showToast(
+        err?.message || "No se pudo generar el enlace de registro.",
+        "danger"
+      );
+    } finally {
+      setOpenQR(true);
+    }
+  }
+
+  function descargarQR() {
+    if (!qrRef.current || !vehiculoQR) return;
+    qrRef.current.download("png", `QR_REGISTRO_${vehiculoQR.placa}`);
+  }
+
   // ---- filtros/búsqueda ----
   const filteredVehiculos = useMemo(() => {
     const search = searchText.toLowerCase();
@@ -307,9 +365,11 @@ export default function Vehiculos() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onRestore={handleRestore}
+              onShowQR={handleShowQR}
               canEdit={canEdit}
               canDelete={canDelete}
               canRestore={canRestore}
+              canQR={canQR}
               highlightId={highlightId}
               focusedRef={focusedRef}
               highlightStyle={highlightStyle}
@@ -328,6 +388,61 @@ export default function Vehiculos() {
         initialValues={editVehiculo || undefined}
         onSubmit={handleSubmitVehiculo}
       />
+
+      {/* Modal QR de Registro */}
+      <Modal
+        open={openQR}
+        onClose={() => {
+          setOpenQR(false);
+          setRegistroLink("");
+          setVehiculoQR(null);
+        }}>
+        <ModalDialog
+          sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
+          <Typography level="title-lg">QR de registro del vehículo</Typography>
+          <Divider sx={{ my: 1 }} />
+
+          {vehiculoQR && (
+            <Stack alignItems="center" spacing={1}>
+              <Typography level="body-md">
+                {vehiculoQR.placa} · {vehiculoQR.marca} {vehiculoQR.modelo}
+              </Typography>
+
+              <StyledQR
+                ref={qrRef}
+                text={registroLink || "about:blank"}
+                logoUrl={logoTecnasa}
+                size={220}
+              />
+
+              {registroLink && (
+                <Typography level="body-sm" sx={{ mt: 1 }}>
+                  <a href={registroLink} target="_blank" rel="noreferrer">
+                    Probar enlace de registro
+                  </a>
+                </Typography>
+              )}
+            </Stack>
+          )}
+
+          <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
+            <Button
+              variant="plain"
+              onClick={() => {
+                setOpenQR(false);
+                setRegistroLink("");
+                setVehiculoQR(null);
+              }}>
+              Cerrar
+            </Button>
+            <Button
+              onClick={descargarQR}
+              disabled={!vehiculoQR || !registroLink}>
+              Descargar PNG
+            </Button>
+          </Stack>
+        </ModalDialog>
+      </Modal>
     </Sheet>
   );
 }

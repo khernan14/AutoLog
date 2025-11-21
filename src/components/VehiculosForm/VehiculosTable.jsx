@@ -20,31 +20,20 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import QrCodeRoundedIcon from "@mui/icons-material/QrCodeRounded";
 
 import useIsMobile from "@/hooks/useIsMobile";
 
-/**
- * Presentacional.
- * Props:
- * - vehiculos: Array<{ id, placa, marca, modelo, estado, nombre_ubicacion }>
- * - onEdit?: (vehiculo) => void
- * - onDelete?: (id) => void
- * - onRestore?: (id) => void
- * - canEdit?: boolean
- * - canDelete?: boolean
- * - canRestore?: boolean
- * - highlightId?: number | string
- * - focusedRef?: React.RefObject
- * - highlightStyle?: (id) => React.CSSProperties
- */
 export default function VehiculosTable({
   vehiculos = [],
   onEdit,
   onDelete,
   onRestore,
+  onShowQR,
   canEdit = false,
   canDelete = false,
   canRestore = false,
+  canQR = false,
   highlightId,
   focusedRef,
   highlightStyle,
@@ -81,7 +70,8 @@ export default function VehiculosTable({
   const hasActions =
     (canEdit && typeof onEdit === "function") ||
     (canDelete && typeof onDelete === "function") ||
-    (canRestore && typeof onRestore === "function");
+    (canRestore && typeof onRestore === "function") ||
+    (canQR && typeof onShowQR === "function");
 
   const isInactive = (v) => (v?.estado || "").toLowerCase() === "inactivo";
 
@@ -96,7 +86,8 @@ export default function VehiculosTable({
           const showMenu =
             (canEdit && onEdit) ||
             (canDelete && onDelete && !isInactive(v)) ||
-            (canRestore && onRestore && isInactive(v));
+            (canRestore && onRestore && isInactive(v)) ||
+            (canQR && onShowQR);
 
           const isHighlighted = highlightId === v.id;
 
@@ -154,6 +145,12 @@ export default function VehiculosTable({
                                 Inactivar
                               </MenuItem>
                             )}
+                        {canQR && onShowQR && (
+                          <MenuItem onClick={() => onShowQR(v)}>
+                            <QrCodeRoundedIcon fontSize="small" />
+                            Ver QR registro
+                          </MenuItem>
+                        )}
                       </Menu>
                     </Dropdown>
                   )}
@@ -289,6 +286,12 @@ export default function VehiculosTable({
                               Inhabilitar
                             </MenuItem>
                           )}
+                      {canQR && onShowQR && (
+                        <MenuItem onClick={() => onShowQR(v)}>
+                          <QrCodeRoundedIcon fontSize="small" />
+                          Ver QR registro
+                        </MenuItem>
+                      )}
                     </Menu>
                   </Dropdown>
                 </td>

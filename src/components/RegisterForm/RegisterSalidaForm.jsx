@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ListarVehiculosEmpleado } from "../../services/VehiculosService";
 import {
   obtenerCombustibleActual,
   obtenerKmActual,
   registrarSalida,
-  SubirImagenesRegistro,
 } from "../../services/RegistrosService";
 import { sendNotificacionSalida } from "../../services/MailServices";
 import UploadImages from "./UploadImages";
@@ -19,19 +18,20 @@ import {
   Stack,
   Divider,
   Card,
-  Option,
   CardOverflow,
   CardActions,
-  Select,
   Alert,
-  CircularProgress,
 } from "@mui/joy";
-import { selectClasses } from "@mui/joy/Select";
-import { KeyboardArrowDown } from "@mui/icons-material";
+import Autocomplete from "@mui/joy/Autocomplete";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
-export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
+export default function SalidaForm({
+  vehicles,
+  usuario,
+  emailSupervisor,
+  vehiculoPreseleccionado,
+}) {
   const [vehicleSelected, setVehicleSelected] = useState("");
   const [listVehicles, setListVehicles] = useState([]);
   const [kmActual, setKmActual] = useState("");
@@ -59,6 +59,14 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
     setVehicleSelected(value);
     setErrorMessage("");
 
+    if (!value) {
+      setKmActual("");
+      setFuelActual("");
+      setKmManual(true);
+      setFuelManual(true);
+      return;
+    }
+
     try {
       const kilometraje = await obtenerKmActual(value);
       const combustible = await obtenerCombustibleActual(value);
@@ -85,91 +93,29 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
       setFuelManual(true);
     }
   };
-  //   e.preventDefault();
-  //   setErrorMessage("");
-  //   setIsSubmitting(true);
 
-  //   if (
-  //     !kmActual ||
-  //     !vehicleSelected ||
-  //     !fuelActual ||
-  //     !observations ||
-  //     !images.length
-  //   ) {
-  //     setErrorMessage("Por favor, rellena todos los campos obligatorios.");
-  //     setIsSubmitting(false);
-  //     return;
-  //   }
+  // 👉 Si viene desde QR, preseleccionamos el vehículo y cargamos km/combustible
+  useEffect(() => {
+    if (!vehiculoPreseleccionado) return;
 
-  //   const foundVehicle = vehicles.find(
-  //     (v) => v.id === parseInt(vehicleSelected)
-  //   );
+    const idFromQR =
+      vehiculoPreseleccionado.id_vehiculo ?? vehiculoPreseleccionado.id;
+    if (!idFromQR) return;
 
-  //   const payload = {
-  //     ...foundVehicle,
-  //     id_empleado: usuario.id_empleado,
-  //     id_vehiculo: foundVehicle?.id,
-  //     id_ubicacion_salida: foundVehicle?.LocationID ?? null,
-  //     km_salida: parseInt(kmActual),
-  //     combustible_salida: parseInt(fuelActual),
-  //     comentario_salida: observations,
-  //   };
+    setVehicleSelected(idFromQR);
+    handleVehicleChange(null, idFromQR);
+  }, [vehiculoPreseleccionado]);
 
-  //   try {
-  //     const register = await registrarSalida(payload);
-  //     const onlyFiles = images.map((f) => f.file);
-
-  //     if (register) {
-  //       try {
-  //         const imagesData = await SubirImagenesRegistro(
-  //           register.id_registro,
-  //           onlyFiles
-  //         );
-
-  //         Swal.fire({
-  //           title: "¡Salida registrada con éxito!",
-  //           text: "Salida registrada con éxito 🚗",
-  //           icon: "success",
-  //           confirmButtonColor: "#03624C",
-  //         }).then(() => {
-  //           navigate("/admin/panel-vehiculos", {
-  //             state: { mensaje: "Salida registrada con éxito 🚗✅" },
-  //           });
-
-  //           if (emailSupervisor?.supervisor_email) {
-  //             sendNotificacionSalida({
-  //               to: [usuario.email, emailSupervisor.supervisor_email],
-  //               employeeName: usuario.nombre,
-  //               vehicleName: foundVehicle.placa,
-  //               supervisorName: emailSupervisor.supervisor_nombre,
-  //             });
-  //           }
-  //         });
-  //       } catch (imageError) {
-  //         console.error("❌ Error al subir imágenes:", imageError);
-
-  //         Swal.fire({
-  //           title: "Error al subir imágenes",
-  //           text: imageError.message || "Error desconocido al subir imágenes.",
-  //           icon: "error",
-  //           confirmButtonColor: "#B00020",
-  //         });
-
-  //         // Opcional: acá decides si cancelar todo o no
-  //         return;
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Error al registrar la salida:", error);
-  //     Swal.fire({
-  //       title: "Error",
-  //       text: "Ocurrió un error al registrar la salida. Intenta de nuevo.",
-  //       icon: "error",
-  //     });
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
+  // Para que el Autocomplete reciba el objeto completo
+  const selectedVehiculoObj = useMemo(() => {
+    if (!vehicleSelected) return null;
+    const idNum =
+      typeof vehicleSelected === "string"
+        ? parseInt(vehicleSelected)
+        : vehicleSelected;
+    if (!idNum) return null;
+    return listVehicles.find((v) => v.id === idNum) || null;
+  }, [vehicleSelected, listVehicles]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -305,27 +251,30 @@ export default function SalidaForm({ vehicles, usuario, emailSupervisor }) {
         <Stack spacing={2}>
           <FormControl fullWidth>
             <FormLabel>Vehículo</FormLabel>
-            <Select
-              value={vehicleSelected}
-              onChange={handleVehicleChange}
-              placeholder="Selecciona Un Vehiculo..."
-              indicator={<KeyboardArrowDown />}
-              fullWidth
-              sx={{
-                [`& .${selectClasses.indicator}`]: {
-                  transition: "0.2s",
-                  [`&.${selectClasses.expanded}`]: {
-                    transform: "rotate(-180deg)",
-                  },
-                },
-              }}>
-              <Option value="">Selecciona un vehículo</Option>
-              {listVehicles?.map((v) => (
-                <Option key={v.id} value={v.id}>
-                  {v.placa} - {v.marca} {v.modelo}
-                </Option>
-              ))}
-            </Select>
+            <Autocomplete
+              placeholder="Selecciona un vehículo..."
+              options={listVehicles || []}
+              getOptionLabel={(option) =>
+                option
+                  ? `${option.placa} - ${option.marca} ${option.modelo}`
+                  : ""
+              }
+              value={selectedVehiculoObj}
+              onChange={(_, newValue) => {
+                if (!newValue) {
+                  setVehicleSelected("");
+                  setKmActual("");
+                  setFuelActual("");
+                  setKmManual(true);
+                  setFuelManual(true);
+                  return;
+                }
+                const id = newValue.id;
+                handleVehicleChange(null, id);
+              }}
+              disabled={!!vehiculoPreseleccionado}
+              sx={{ width: "100%" }}
+            />
           </FormControl>
 
           <FormControl fullWidth>
