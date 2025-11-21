@@ -1,10 +1,14 @@
+// src/routes/AppRoutes.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "../context/AuthContext"; // Tu proveedor de autenticación
+import { AuthProvider } from "../context/AuthContext";
 import { SoftRefreshProvider } from "@/context/SoftRefreshContext";
-import AuthRoutes from "./auth.routes"; // Tus rutas de autenticación
-import QrcodeRoutes from "./qrcode.routes"; // Tus rutas públicas
-import DashboardRoutes from "./dashboard.routes"; // Tus rutas protegidas
-import ExpiredSessionOverlay from "../components/ExpiredSession/ExpiredSessionOverlay"; // Tu componente de overlay
+import AuthRoutes from "./auth.routes";
+import QrcodeRoutes from "./qrcode.routes";
+import DashboardRoutes from "./dashboard.routes";
+import ExpiredSessionOverlay from "../components/ExpiredSession/ExpiredSessionOverlay";
+
+import PrivateRoute from "./PrivateRoute";
+import PublicRoute from "./PublicRoute";
 
 export default function AppRoutes() {
   return (
@@ -12,17 +16,28 @@ export default function AppRoutes() {
       <AuthProvider>
         <SoftRefreshProvider>
           <Routes>
-            {/* públicas */}
-            <Route path="/auth/*" element={<AuthRoutes />} />
+            {/* Rutas de autenticación (públicas pero bloqueadas si ya estás logueado) */}
+            <Route
+              path="/auth/*"
+              element={
+                <PublicRoute>
+                  <AuthRoutes />
+                </PublicRoute>
+              }
+            />
+
+            {/* Rutas públicas reales (QR activos, etc.) */}
             <Route path="/public/*" element={<QrcodeRoutes />} />
 
-            {/* protegidas */}
+            {/* Rutas protegidas del admin */}
             <Route
               path="/admin/*"
               element={
-                <ExpiredSessionOverlay>
-                  <DashboardRoutes />
-                </ExpiredSessionOverlay>
+                <PrivateRoute>
+                  <ExpiredSessionOverlay>
+                    <DashboardRoutes />
+                  </ExpiredSessionOverlay>
+                </PrivateRoute>
               }
             />
           </Routes>
