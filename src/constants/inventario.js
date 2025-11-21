@@ -1,8 +1,9 @@
 // Catálogos de Inventario (única fuente de verdad)
 export const ESTATUS_ACTIVO = [
   "Activo",
-  "Inactivo",
   "Arrendado",
+  "Backup",
+  "Inactivo",
   "En Mantenimiento",
   "Reciclado",
   "Propiedad del Cliente",
