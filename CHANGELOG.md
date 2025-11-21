@@ -1,3 +1,11 @@
+## v1.1.3 - 2025-11-21
+
+* chore(release): v1.1.3 (32dbb5a)
+* feat(ui): Agregar 'Backup' a ESTATUS_ACTIVO (eb58362)
+* docs(changelog): v1.1.2 (509fb81)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.1.2...v1.1.3
+
 ## v1.1.2 - 2025-11-20
 
 * chore(release): v1.1.2 (9798fb1)
@@ -80,6 +88,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
