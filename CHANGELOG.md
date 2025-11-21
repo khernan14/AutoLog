@@ -1,3 +1,13 @@
+## v1.1.2 - 2025-11-20
+
+* chore(release): v1.1.2 (9798fb1)
+* feat(ui): Se modifica la parte de login para sesiones publicas y privadas para redireccionar siempre a inicio (eb3ce5b)
+* feat(ui): Se agrega QR a cada vehiculo para poder realizar registros de uso desde el QR (450266b)
+* feat(ui): Se actualiza la vista de busqueda con Ctrl+K y se modifican estos archivos para resaltado de la busqueda (63400ef)
+* docs(changelog): v1.1.1 (9df5151)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.1.1...v1.1.2
+
 ## v1.1.1 - 2025-11-19
 
 * chore(release): v1.1.1 (24e15ed)
@@ -70,6 +80,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
