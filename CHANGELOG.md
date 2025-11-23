@@ -1,3 +1,13 @@
+## v1.1.4 - 2025-11-23
+
+* chore(release): v1.1.4 (4587285)
+* Merge pull request #15 from khernan14/fix/ui-movimientos-secuenciales (f47e657)
+* fix(ui): procesar movimientos de activos uno a uno para evitar fallos en lotes grandes (af35ac6)
+* wip(api): cambiando numero de whatsapp para chatbot test (62b6626)
+* docs(changelog): v1.1.3 (4ac5a47)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.1.3...v1.1.4
+
 ## v1.1.3 - 2025-11-21
 
 * chore(release): v1.1.3 (32dbb5a)
@@ -88,6 +98,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
