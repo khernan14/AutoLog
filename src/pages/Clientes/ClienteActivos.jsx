@@ -324,20 +324,38 @@ export default function ClienteActivos() {
     try {
       const usuario = userData?.id_usuario ?? userData?.id ?? null;
 
-      await Promise.all(
-        selectedIds.map((id_activo) =>
-          moverABodega({
+      const okIds = [];
+      const failed = [];
+
+      // opcional, ordenar para tener orden estable
+      const idsOrdenados = [...selectedIds].sort((a, b) => a - b);
+
+      for (const id_activo of idsOrdenados) {
+        try {
+          await moverABodega({
             id_activo,
             id_bodega: bulkBodega,
             motivo:
               bulkMotivo ||
               "Movimiento masivo desde cliente hacia bodega (salida)",
             usuario_responsable: usuario,
-          })
-        )
-      );
+          });
+          okIds.push(id_activo);
+        } catch (e) {
+          failed.push({ id_activo, error: e?.message || "Error desconocido" });
+        }
+      }
 
-      showToast("Activos movidos a bodega correctamente.", "success");
+      if (failed.length === 0) {
+        showToast("Activos movidos a bodega correctamente.", "success");
+      } else {
+        showToast(
+          `Algunos activos no se pudieron mover (${failed.length} fallos).`,
+          "warning"
+        );
+        console.warn("Fallos en movimiento masivo:", failed);
+      }
+
       setOpenBulkMover(false);
       setBulkBodega("");
       setBulkMotivo("");
