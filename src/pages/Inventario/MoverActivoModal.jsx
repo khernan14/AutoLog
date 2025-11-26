@@ -9,7 +9,10 @@ import {
   FormLabel,
   Input,
   Button,
-  Autocomplete, // 👈 Joy Autocomplete (type-ahead)
+  Autocomplete,
+  Drawer,
+  Sheet,
+  ModalClose,
 } from "@mui/joy";
 import { moverActivo } from "../../services/UbicacionesServices";
 import { getBodegas } from "../../services/BodegasServices";
@@ -197,12 +200,34 @@ export default function MoverActivoModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog
-        component="form"
-        onSubmit={onSubmit}
-        sx={{ width: { xs: "100%", sm: 560 } }}>
+    <Drawer
+      anchor="right"
+      size="md"
+      variant="plain"
+      open={open}
+      onClose={onClose}
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { md: 3, sm: 0 },
+            boxShadow: "none",
+          },
+        },
+      }}>
+      <Sheet
+        sx={{
+          borderRadius: "md",
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          height: "100%",
+          overflow: "auto",
+          width: { xs: "100%", sm: 520 },
+        }}>
         <Typography level="title-lg">Mover Activo</Typography>
+        <ModalClose />
         <Divider />
         <Stack spacing={1.5} mt={1}>
           {/* Tipo destino */}
@@ -349,13 +374,13 @@ export default function MoverActivoModal({
             </FormControl>
           )}
 
-          <FormControl>
+          <FormControl required>
             <FormLabel>Motivo</FormLabel>
             <Input
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               disabled={saving}
-              placeholder="(Opcional)"
+              placeholder="(ej: Cambio de equipo / salida del cliente)"
             />
           </FormControl>
         </Stack>
@@ -371,7 +396,7 @@ export default function MoverActivoModal({
             Mover
           </Button>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Sheet>
+    </Drawer>
   );
 }

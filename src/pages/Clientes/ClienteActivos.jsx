@@ -26,6 +26,9 @@ import {
   Autocomplete,
   FormControl,
   FormLabel,
+  Drawer,
+  ModalClose,
+  DialogTitle,
 } from "@mui/joy";
 
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -902,17 +905,37 @@ export default function ClienteActivos() {
       />
 
       {/* Modal mover MASIVO a Bodega */}
-      <Modal
+      <Drawer
+        anchor="right"
+        size="md"
+        variant="plain"
         open={openBulkMover}
         onClose={() => {
           if (!bulkSaving) setOpenBulkMover(false);
+        }}
+        slotProps={{
+          content: {
+            sx: {
+              bgcolor: "transparent",
+              p: { md: 3, sm: 0 },
+              boxShadow: "none",
+            },
+          },
         }}>
-        <ModalDialog
-          sx={{ width: { xs: "100%", sm: 520 } }}
-          aria-labelledby="bulk-mover-title">
-          <Typography id="bulk-mover-title" level="title-lg">
+        <Sheet
+          sx={{
+            borderRadius: "md",
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            height: "100%",
+            overflow: "auto",
+          }}>
+          <DialogTitle id="bulk-mover-title" level="title-lg">
             Mover activos seleccionados a Bodega
-          </Typography>
+          </DialogTitle>
+          <ModalClose />
           <Divider sx={{ my: 1 }} />
           <Stack spacing={1.5} mt={1}>
             <Typography level="body-sm">
@@ -938,13 +961,13 @@ export default function ClienteActivos() {
               />
             </FormControl>
 
-            <FormControl>
+            <FormControl required>
               <FormLabel>Motivo</FormLabel>
               <Input
                 value={bulkMotivo}
                 onChange={(e) => setBulkMotivo(e.target.value)}
                 disabled={bulkSaving}
-                placeholder="(Opcional, ej: Cambio de equipo / salida del cliente)"
+                placeholder="(Ej: Cambio de equipo / salida del cliente)"
               />
             </FormControl>
           </Stack>
@@ -963,8 +986,8 @@ export default function ClienteActivos() {
               Mover a Bodega
             </Button>
           </Stack>
-        </ModalDialog>
-      </Modal>
+        </Sheet>
+      </Drawer>
     </Box>
   );
 }

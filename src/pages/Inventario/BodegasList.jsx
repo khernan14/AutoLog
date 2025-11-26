@@ -472,7 +472,7 @@ export default function BodegasList() {
                             ? "Editar bodega"
                             : "No tienes permiso para editar."
                         }
-                        variant="soft"
+                        variant="plain"
                         placement="left">
                         <span>
                           <IconButton

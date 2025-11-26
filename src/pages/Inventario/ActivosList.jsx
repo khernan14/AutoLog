@@ -13,6 +13,7 @@ import {
   ModalDialog,
   FormControl,
   FormLabel,
+  FormHelperText,
   Input,
   Select,
   Option,
@@ -20,6 +21,11 @@ import {
   IconButton,
   Chip,
   Tooltip,
+  Drawer,
+  DialogTitle,
+  DialogContent,
+  ModalClose,
+  Autocomplete,
 } from "@mui/joy";
 
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -28,8 +34,22 @@ import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import QrCodeRoundedIcon from "@mui/icons-material/QrCodeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
+
+// shadcn
+import { Button as ShButton } from "@/components/ui/button";
+import { ButtonGroup as ShButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// lucide
+import { ChevronDown, Download, Keyboard } from "lucide-react";
 
 import {
   getActivosGlobal,
@@ -53,7 +73,7 @@ import { getViewState } from "../../utils/viewState";
 import PaginationLite from "@/components/common/PaginationLite";
 
 import CatalogSelect from "@/components/forms/CatalogSelect";
-import { ESTATUS_COLOR } from "@/constants/inventario"; // mapea estatus -> color Joy
+import { ESTATUS_COLOR } from "@/constants/inventario";
 
 import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
@@ -94,7 +114,7 @@ const filenameBase = `todos_los_activos_${new Date()
   .toISOString()
   .slice(0, 10)}`;
 
-//Normalizador para ignorar mayúsculas/tildes
+// Normalizador para ignorar mayúsculas/tildes
 const normalize = (val) =>
   (val || "")
     .toString()
@@ -107,6 +127,8 @@ export default function ActivosList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile(768);
   const qrRef = useRef(null);
+  const searchInputRef = useRef(null);
+
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
   const isAdmin = (userData?.rol || "").toLowerCase() === "admin";
@@ -131,16 +153,25 @@ export default function ActivosList() {
 
   // filtros
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+
+  // Filtros aplicados
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [typeFilter, setTypeFilter] = useState([]);
   const [ubicacionFilter, setUbicacionFilter] = useState("");
 
-  // modals
+  // Filtros en el Drawer (draft: no afectan la tabla hasta "Aplicar")
+  const [statusDraft, setStatusDraft] = useState([]);
+  const [typeDraft, setTypeDraft] = useState([]);
+  const [ubicacionDraft, setUbicacionDraft] = useState("");
+
+  // modals / drawers
   const [openForm, setOpenForm] = useState(false);
   const [openMover, setOpenMover] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
   const [openExport, setOpenExport] = useState(false);
+  const [openFilters, setOpenFilters] = useState(false);
+  const [openShortcuts, setOpenShortcuts] = useState(false);
 
   // form data
   const [editing, setEditing] = useState(null);
@@ -230,8 +261,11 @@ export default function ActivosList() {
         normalize(r.modelo).includes(s) ||
         normalize(r.serial_number).includes(s);
 
-      const matchStatus = !statusFilter || r.estatus === statusFilter;
-      const matchType = !typeFilter || r.tipo === typeFilter;
+      const matchStatus =
+        statusFilter.length === 0 || statusFilter.includes(r.estatus);
+
+      const matchType = typeFilter.length === 0 || typeFilter.includes(r.tipo);
+
       const matchUbicacion =
         !ubicacionFilter ||
         (ubicacionFilter === "Cliente" && r.tipo_destino === "Cliente") ||
@@ -242,6 +276,18 @@ export default function ActivosList() {
       return matchSearch && matchStatus && matchType && matchUbicacion;
     });
   }, [rows, search, statusFilter, typeFilter, ubicacionFilter]);
+
+  // Opciones disponibles según los datos cargados
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set((rows || []).map((r) => r.estatus).filter(Boolean))),
+    [rows]
+  );
+
+  const typeOptions = useMemo(
+    () => Array.from(new Set((rows || []).map((r) => r.tipo).filter(Boolean))),
+    [rows]
+  );
 
   function getDestinoText(r) {
     if (r.tipo_destino === "Cliente") {
@@ -453,6 +499,72 @@ export default function ActivosList() {
     hasData: Array.isArray(sortedRows) && sortedRows.length > 0,
   });
 
+  // 🔢 cantidad de filtros activos
+  const activeFiltersCount =
+    (statusFilter.length ? 1 : 0) +
+    (typeFilter.length ? 1 : 0) +
+    (ubicacionFilter ? 1 : 0);
+
+  //Atajos de teclado globales
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      const isTyping =
+        tag === "input" || tag === "textarea" || e.target.isContentEditable;
+
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+      // "/" → buscar
+      if (!isTyping && e.key === "/") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + F → buscar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      if (isTyping) return;
+
+      // Ctrl/⌘ + Shift + E → exportar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setOpenExport(true);
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + L → filtros (Drawer Joy)
+      // Dentro de handleGlobalKeyDown:
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        setOpenFilters((prev) => {
+          const next = !prev;
+          if (!prev) {
+            // se va a abrir → sincronizar draft
+            setStatusDraft(statusFilter);
+            setTypeDraft(typeFilter);
+            setUbicacionDraft(ubicacionFilter);
+          }
+          return next;
+        });
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   // ---- UI
   return (
     <Sheet
@@ -490,65 +602,122 @@ export default function ActivosList() {
             alignItems="center"
             flexWrap="wrap"
             sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Input
-              placeholder="Buscar por código, nombre, modelo o serie…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              startDecorator={<SearchRoundedIcon />}
-              endDecorator={
-                search && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    onClick={() => setSearch("")}
-                    aria-label="Limpiar búsqueda">
-                    <ClearIcon />
-                  </IconButton>
-                )
-              }
-              sx={{ width: { xs: "100%", sm: 280 } }}
-            />
-
-            {/* 🔹 Filtros con CatalogSelect */}
-            <CatalogSelect
-              catalog="estatusActivo"
-              value={statusFilter}
-              onChange={(v) => setStatusFilter(v || "")}
-              includeEmpty
-              emptyLabel="Todos"
-              sx={{ width: 200 }}
-            />
-
-            <CatalogSelect
-              catalog="tiposActivo"
-              value={typeFilter}
-              onChange={(v) => setTypeFilter(v || "")}
-              includeEmpty
-              emptyLabel="Todos"
-              sx={{ width: 200 }}
-            />
-
-            {/* Ubicación se queda como Select normal */}
-            <Select
-              placeholder="Ubicación"
-              value={ubicacionFilter}
-              onChange={(_, v) => setUbicacionFilter(v || "")}
-              sx={{ minWidth: 180 }}>
-              <Option value="">Todas</Option>
-              <Option value="Cliente">Clientes</Option>
-              <Option value="Bodega">Bodegas</Option>
-              <Option value="Empleado">Empleados</Option>
-              <Option value="SinUbicacion">Sin ubicación</Option>
-            </Select>
-
-            <Button
+            {/* 🔍 Buscador */}
+            <Tooltip
+              title="Buscar (/, Ctrl+Shift+F)"
               variant="soft"
-              startDecorator={<DownloadRoundedIcon />}
-              onClick={() => setOpenExport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Exportar
-            </Button>
+              placement="bottom-start">
+              <Input
+                placeholder="Buscar por código, nombre, modelo o serie…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                startDecorator={<SearchRoundedIcon />}
+                endDecorator={
+                  search && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      onClick={() => setSearch("")}
+                      aria-label="Limpiar búsqueda">
+                      <ClearIcon />
+                    </IconButton>
+                  )
+                }
+                sx={{ width: { xs: "100%", sm: 280 } }}
+                slotProps={{
+                  input: {
+                    ref: searchInputRef,
+                    onFocus: (e) => e.target.select(),
+                  },
+                }}
+              />
+            </Tooltip>
+
+            {/* 🎯 Botón Filtros → Drawer Joy */}
+            <Tooltip
+              title="Filtros (Ctrl+Shift+L)"
+              variant="soft"
+              placement="bottom">
+              <Button
+                variant={activeFiltersCount ? "soft" : "outlined"}
+                color={activeFiltersCount ? "primary" : "neutral"}
+                startDecorator={<FilterAltIcon />}
+                onClick={() => {
+                  setStatusDraft(statusFilter);
+                  setTypeDraft(typeFilter);
+                  setUbicacionDraft(ubicacionFilter);
+                  setOpenFilters(true);
+                }}
+                sx={{ borderRadius: "999px" }}>
+                Filtros
+                {activeFiltersCount > 0 && (
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color="primary"
+                    sx={{ ml: 0.75 }}>
+                    {activeFiltersCount}
+                  </Chip>
+                )}
+              </Button>
+            </Tooltip>
+
+            {/* 📤 Exportar + menú (shadcn) */}
+            <ShButtonGroup className="items-center">
+              <ShButton
+                onClick={() => setOpenExport(true)}
+                variant="ghost"
+                className={`
+                  h-9 rounded-r-none
+                  bg-[var(--joy-palette-primary-solidBg)]
+                  text-[var(--joy-palette-primary-solidColor)]
+                  hover:bg-[var(--joy-palette-primary-solidHoverBg)]
+                  active:bg-[var(--joy-palette-primary-solidActiveBg)]
+                  border border-[var(--joy-palette-primary-solidBg)]
+                  hover:text-[var(--joy-palette-primary-solidColor)]
+                `}>
+                <Download className="mr-1 h-4 w-4" />
+                <span>Exportar</span>
+              </ShButton>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <ShButton
+                    variant="outline"
+                    size="icon"
+                    className={`
+                      h-9 w-9 rounded-l-none border-l-0
+                      bg-[var(--joy-palette-primary-solidBg)]
+                      text-[var(--joy-palette-primary-solidColor)]
+                      hover:bg-[var(--joy-palette-primary-solidHoverBg)]
+                      active:bg-[var(--joy-palette-primary-solidActiveBg)]
+                      border border-[var(--joy-palette-primary-solidBg)]
+                      hover:text-[var(--joy-palette-primary-solidColor)]
+                    `}
+                    aria-label="Más acciones">
+                    <ChevronDown className="h-4 w-4" />
+                  </ShButton>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setOpenExport(true)}>
+                    <Download className="mr-2 h-4 w-4" />
+                    <span className="flex-1 text-sm">Exportar</span>
+                    <kbd className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+                      Ctrl+Shift+E
+                    </kbd>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem onClick={() => setOpenShortcuts(true)}>
+                    <Keyboard className="mr-2 h-4 w-4" />
+                    <span className="flex-1 text-sm">Atajos de teclado</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ShButtonGroup>
           </Stack>
         </Stack>
 
@@ -935,7 +1104,7 @@ export default function ActivosList() {
                   </Chip>
                   {!editing && (
                     <Button
-                      size="small"
+                      size="sm"
                       variant="plain"
                       onClick={refreshNextCodigo}
                       disabled={loadingNext}>
@@ -1078,6 +1247,187 @@ export default function ActivosList() {
           defaultTipo="Cliente"
           defaultClienteId={Number(id)}
         />
+
+        {/* Drawer Joy para Filtros */}
+        <Drawer
+          anchor="right"
+          size="md"
+          variant="plain"
+          open={openFilters}
+          onClose={() => setOpenFilters(false)}
+          slotProps={{
+            content: {
+              sx: {
+                bgcolor: "transparent",
+                p: { md: 3, sm: 0 },
+                boxShadow: "none",
+              },
+            },
+          }}>
+          <Sheet
+            sx={{
+              borderRadius: "md",
+              p: 2,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              height: "100%",
+              overflow: "auto",
+            }}>
+            <DialogTitle>Filtros</DialogTitle>
+            <ModalClose />
+
+            <DialogContent sx={{ gap: 2 }}>
+              <Typography level="body-sm" sx={{ opacity: 0.8 }}>
+                Refina la lista de activos por estatus, tipo y ubicación.
+              </Typography>
+
+              {/* Estatus (multi) */}
+              <FormControl>
+                <FormLabel>Estatus</FormLabel>
+                <Autocomplete
+                  multiple
+                  placeholder="Todos"
+                  options={statusOptions}
+                  value={statusDraft}
+                  onChange={(_, newValue) => setStatusDraft(newValue)}
+                  sx={{ mt: 0.5 }}
+                />
+                <FormHelperText>
+                  Puedes seleccionar uno o varios estatus.
+                </FormHelperText>
+              </FormControl>
+
+              {/* Tipo (multi) */}
+              <FormControl>
+                <FormLabel>Tipo</FormLabel>
+                <Autocomplete
+                  multiple
+                  placeholder="Todos"
+                  options={typeOptions}
+                  value={typeDraft}
+                  onChange={(_, newValue) => setTypeDraft(newValue)}
+                  sx={{ mt: 0.5 }}
+                />
+                <FormHelperText>
+                  También puedes combinar varios tipos.
+                </FormHelperText>
+              </FormControl>
+
+              {/* Ubicación (single) */}
+              <FormControl>
+                <FormLabel>Ubicación</FormLabel>
+                <Select
+                  placeholder="Todas"
+                  value={ubicacionDraft}
+                  onChange={(_, v) => setUbicacionDraft(v || "")}
+                  sx={{ mt: 0.5 }}>
+                  <Option value="">Todas</Option>
+                  <Option value="Cliente">Clientes</Option>
+                  <Option value="Bodega">Bodegas</Option>
+                  <Option value="Empleado">Empleados</Option>
+                  <Option value="SinUbicacion">Sin ubicación</Option>
+                </Select>
+                <FormHelperText>
+                  Estos filtros se aplican al confirmar abajo.
+                </FormHelperText>
+              </FormControl>
+            </DialogContent>
+
+            <Divider sx={{ mt: "auto" }} />
+
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ justifyContent: "space-between", mt: 1 }}>
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => {
+                  // limpiar drafts
+                  setStatusDraft([]);
+                  setTypeDraft([]);
+                  setUbicacionDraft("");
+                  // limpiar aplicados
+                  setStatusFilter([]);
+                  setTypeFilter([]);
+                  setUbicacionFilter("");
+                }}>
+                Limpiar filtros
+              </Button>
+              <Button
+                onClick={() => {
+                  // aplicar
+                  setStatusFilter(statusDraft);
+                  setTypeFilter(typeDraft);
+                  setUbicacionFilter(ubicacionDraft);
+                  setOpenFilters(false);
+                }}>
+                Aplicar
+              </Button>
+            </Stack>
+          </Sheet>
+        </Drawer>
+
+        {/* Modal Atajos de teclado */}
+        <Modal open={openShortcuts} onClose={() => setOpenShortcuts(false)}>
+          <ModalDialog sx={{ width: { xs: "100%", sm: 420 } }}>
+            <Typography level="title-lg">Atajos de teclado</Typography>
+            <Divider sx={{ my: 1 }} />
+
+            <Stack spacing={1.25} mt={1}>
+              <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                Estos atajos funcionan principalmente en escritorio.
+              </Typography>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Focar buscador</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  /
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Focar buscador</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+F
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Abrir exportar</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+E
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Abrir filtros</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+L
+                </Typography>
+              </Stack>
+            </Stack>
+
+            <Stack direction="row" justifyContent="flex-end" mt={2}>
+              <Button variant="plain" onClick={() => setOpenShortcuts(false)}>
+                Cerrar
+              </Button>
+            </Stack>
+          </ModalDialog>
+        </Modal>
 
         {/* Export */}
         <ExportDialog

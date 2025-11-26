@@ -19,6 +19,21 @@ export async function obtenerVehiculos() {
   }
 }
 
+export async function getPublicVehiculos() {
+  try {
+    const res = await fetchConToken(endpoints.getVehiculos + `public/`, {
+      method: "GET",
+    });
+
+    if (!res.ok) throw new Error("No se pudo obtener los vehículos");
+    const json = await res.json();
+    return json;
+  } catch (err) {
+    console.error("Error getVehiculos:", err);
+    throw err;
+  }
+}
+
 export async function ListarVehiculosEmpleado(id_empleado) {
   try {
     const res = await fetchConToken(

@@ -17,6 +17,7 @@ import {
   TabList,
   Tab,
   TabPanel,
+  ModalClose,
 } from "@mui/joy";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
 import * as XLSX from "xlsx";
@@ -196,38 +197,36 @@ export default function ImportarActivosDrawer({
   return (
     <Drawer
       anchor="right"
+      size="md"
+      variant="plain"
       open={open}
       onClose={onClose}
-      size="200"
-      sx={[
-        open
-          ? {
-              "--Drawer-transitionDuration": "0.4s",
-              "--Drawer-transitionFunction":
-                "cubic-bezier(0.79,0.14,0.15,0.86)",
-            }
-          : {
-              "--Drawer-transitionDuration": "0.2s",
-              "--Drawer-transitionFunction": "cubic-bezier(0.77,0,0.18,1)",
-            },
-      ]}>
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { md: 3, sm: 0 },
+            boxShadow: "none",
+          },
+        },
+      }}>
       <Sheet
         sx={{
-          width: { xs: "100dvw", sm: 480, md: 720 },
+          borderRadius: "md",
           p: 2,
           display: "flex",
           flexDirection: "column",
-          gap: 1.5,
-          height: "100dvh",
+          gap: 2,
+          height: "100%",
+          overflow: "auto",
+          width: { xs: "100%", sm: 520 },
         }}>
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="center">
           <Typography level="title-lg">Importar activos</Typography>
-          <Button size="sm" variant="plain" onClick={onClose}>
-            Cerrar
-          </Button>
+          <ModalClose />
         </Stack>
         <Divider />
 
