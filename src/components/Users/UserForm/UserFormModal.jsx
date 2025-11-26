@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Modal,
-  ModalDialog,
-  Typography,
+  Drawer,
+  Sheet,
+  DialogTitle,
+  DialogContent,
+  ModalClose,
   Divider,
   Stack,
   FormControl,
@@ -10,8 +12,10 @@ import {
   Input,
   Autocomplete,
   Button,
+  Typography,
 } from "@mui/joy";
-import CatalogSelect from "@/components/forms/CatalogSelect"; // ajusta ruta si es distinta
+
+import CatalogSelect from "@/components/forms/CatalogSelect";
 
 // 🔐 Generador de contraseña segura (12 caracteres, con mayúsculas, minúsculas, números y símbolos)
 function generateSecurePassword(length = 12) {
@@ -47,7 +51,7 @@ export default function UserFormModal({
   ciudades = [],
   supervisores = [],
   saving = false,
-  onResetPassword, // <-- nuevo callback para enviar correo de reset
+  onResetPassword, // callback que maneja SweetAlert y API en el padre
 }) {
   const isEditing = !!initialValues?.id_usuario;
 
@@ -63,7 +67,7 @@ export default function UserFormModal({
     supervisor_id: "", // id supervisor
   });
 
-  // Cuando se abre el modal, setear datos / generar password
+  // Cuando se abre el Drawer, setear datos / generar password
   useEffect(() => {
     if (!open) return;
 
@@ -91,7 +95,7 @@ export default function UserFormModal({
         nombre: "",
         email: "",
         username: "",
-        password: autoPassword, // se manda al backend y al correo, pero no se muestra
+        password: autoPassword, // se manda al backend y al correo, pero NO se muestra
         rol: "",
         puesto: "",
         ciudad: "",
@@ -104,13 +108,12 @@ export default function UserFormModal({
     if (!form.nombre.trim()) return false;
     if (!form.email.trim()) return false;
     if (!form.username.trim()) return false;
-    // ya NO validamos password, porque se genera sola para nuevos
     return true;
   }, [form]);
 
   const handleSubmit = (e) => {
     e?.preventDefault?.();
-    if (!canSubmit) return;
+    if (!canSubmit || saving) return;
 
     const payload = {
       id_usuario: form.id_usuario || undefined,
@@ -130,150 +133,197 @@ export default function UserFormModal({
 
   const handleResetClick = () => {
     if (!onResetPassword || !form.email) return;
-    onResetPassword(form.email);
+
+    onClose?.();
+
+    setTimeout(() => {
+      onResetPassword(form.email);
+    }, 0);
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog
+    <Drawer
+      open={open}
+      onClose={saving ? undefined : onClose}
+      anchor="right"
+      size="md"
+      variant="plain"
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { xs: 0, sm: 2 },
+            boxShadow: "none",
+          },
+        },
+      }}>
+      <Sheet
         component="form"
         onSubmit={handleSubmit}
-        sx={{ width: { xs: "100%", sm: 640 } }}>
-        <Typography level="title-lg">
+        sx={{
+          borderRadius: { xs: 0, sm: "md" },
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          height: "100%",
+          minWidth: { xs: "100dvw", sm: 360 },
+          bgcolor: "background.surface",
+          boxShadow: "lg",
+        }}>
+        <DialogTitle>
           {isEditing ? "Editar usuario" : "Nuevo usuario"}
-        </Typography>
+        </DialogTitle>
+        <ModalClose disabled={saving} />
         <Divider />
 
-        <Stack spacing={1.5} mt={1}>
-          <FormControl required>
-            <FormLabel>Nombre</FormLabel>
-            <Input
-              value={form.nombre}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, nombre: e.target.value }))
-              }
-              disabled={saving}
-            />
-          </FormControl>
+        <DialogContent
+          sx={{
+            p: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}>
+          <Typography level="body-xs" sx={{ opacity: 0.7, mb: 0.5 }}>
+            Los campos marcados con * son obligatorios.
+          </Typography>
 
-          <FormControl required>
-            <FormLabel>Email</FormLabel>
-            <Input
-              type="email"
-              value={form.email}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, email: e.target.value }))
-              }
-              disabled={saving}
-            />
-          </FormControl>
+          <BoxLikeGrid>
+            {/* Nombre */}
+            <FormControl required>
+              <FormLabel>Nombre</FormLabel>
+              <Input
+                size="sm"
+                value={form.nombre}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, nombre: e.target.value }))
+                }
+                disabled={saving}
+              />
+            </FormControl>
 
-          <FormControl required>
-            <FormLabel>Usuario</FormLabel>
-            <Input
-              value={form.username}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, username: e.target.value }))
-              }
-              disabled={saving}
-            />
-          </FormControl>
+            {/* Email */}
+            <FormControl required>
+              <FormLabel>Email</FormLabel>
+              <Input
+                size="sm"
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, email: e.target.value }))
+                }
+                disabled={saving}
+              />
+            </FormControl>
 
-          {/* 🔐 Ya no mostramos campo de contraseña.
-              Se genera automáticamente para nuevos usuarios y se manda en el payload. */}
+            {/* Usuario */}
+            <FormControl required>
+              <FormLabel>Usuario</FormLabel>
+              <Input
+                size="sm"
+                value={form.username}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, username: e.target.value }))
+                }
+                disabled={saving}
+              />
+            </FormControl>
 
-          {/* Rol con Autocomplete vía CatalogSelect */}
-          <FormControl>
-            <FormLabel>Rol</FormLabel>
-            <CatalogSelect
-              catalog="rolesUsuario"
-              value={form.rol || ""}
-              onChange={(v) =>
-                setForm((s) => ({
-                  ...s,
-                  rol: v || "",
-                }))
-              }
-              placeholder="Selecciona rol"
-              disabled={saving}
-              allowEmpty
-            />
-          </FormControl>
+            {/* Rol */}
+            <FormControl>
+              <FormLabel>Rol</FormLabel>
+              <CatalogSelect
+                catalog="rolesUsuario"
+                value={form.rol || ""}
+                onChange={(v) =>
+                  setForm((s) => ({
+                    ...s,
+                    rol: v || "",
+                  }))
+                }
+                placeholder="Selecciona rol"
+                disabled={saving}
+                allowEmpty
+              />
+            </FormControl>
 
-          {/* Puesto con Autocomplete vía CatalogSelect */}
-          <FormControl>
-            <FormLabel>Puesto</FormLabel>
-            <CatalogSelect
-              catalog="puestosUsuario"
-              value={form.puesto || ""}
-              onChange={(v) =>
-                setForm((s) => ({
-                  ...s,
-                  puesto: v || "",
-                }))
-              }
-              placeholder="Selecciona puesto"
-              disabled={saving}
-              allowEmpty
-            />
-          </FormControl>
+            {/* Puesto */}
+            <FormControl>
+              <FormLabel>Puesto</FormLabel>
+              <CatalogSelect
+                catalog="puestosUsuario"
+                value={form.puesto || ""}
+                onChange={(v) =>
+                  setForm((s) => ({
+                    ...s,
+                    puesto: v || "",
+                  }))
+                }
+                placeholder="Selecciona puesto"
+                disabled={saving}
+                allowEmpty
+              />
+            </FormControl>
 
-          {/* Ciudad con Autocomplete normal */}
-          <FormControl>
-            <FormLabel>Ciudad</FormLabel>
-            <Autocomplete
-              placeholder="Selecciona ciudad"
-              options={ciudades}
-              getOptionLabel={(opt) => opt?.nombre ?? opt?.ciudad ?? ""}
-              value={
-                ciudades.find(
-                  (c) =>
-                    String(c.id) === String(form.ciudad) ||
-                    String(c.id_ciudad) === String(form.ciudad)
-                ) || null
-              }
-              onChange={(_, opt) =>
-                setForm((s) => ({
-                  ...s,
-                  ciudad: opt ? String(opt.id ?? opt.id_ciudad) : "",
-                }))
-              }
-              disabled={saving}
-              clearOnBlur={false}
-            />
-          </FormControl>
+            {/* Ciudad */}
+            <FormControl>
+              <FormLabel>Ciudad</FormLabel>
+              <Autocomplete
+                size="sm"
+                placeholder="Selecciona ciudad"
+                options={ciudades}
+                getOptionLabel={(opt) => opt?.nombre ?? opt?.ciudad ?? ""}
+                value={
+                  ciudades.find(
+                    (c) =>
+                      String(c.id) === String(form.ciudad) ||
+                      String(c.id_ciudad) === String(form.ciudad)
+                  ) || null
+                }
+                onChange={(_, opt) =>
+                  setForm((s) => ({
+                    ...s,
+                    ciudad: opt ? String(opt.id ?? opt.id_ciudad) : "",
+                  }))
+                }
+                disabled={saving}
+                clearOnBlur={false}
+              />
+            </FormControl>
 
-          {/* Supervisor con Autocomplete normal */}
-          <FormControl>
-            <FormLabel>Supervisor</FormLabel>
-            <Autocomplete
-              placeholder="Selecciona supervisor"
-              options={supervisores}
-              getOptionLabel={(opt) => opt?.nombre ?? ""}
-              value={
-                supervisores.find(
-                  (sup) => String(sup.id) === String(form.supervisor_id)
-                ) || null
-              }
-              onChange={(_, opt) =>
-                setForm((s) => ({
-                  ...s,
-                  supervisor_id: opt ? String(opt.id) : "",
-                }))
-              }
-              disabled={saving}
-              clearOnBlur={false}
-            />
-          </FormControl>
-        </Stack>
+            {/* Supervisor */}
+            <FormControl>
+              <FormLabel>Supervisor</FormLabel>
+              <Autocomplete
+                size="sm"
+                placeholder="Selecciona supervisor"
+                options={supervisores}
+                getOptionLabel={(opt) => opt?.nombre ?? ""}
+                value={
+                  supervisores.find(
+                    (sup) => String(sup.id) === String(form.supervisor_id)
+                  ) || null
+                }
+                onChange={(_, opt) =>
+                  setForm((s) => ({
+                    ...s,
+                    supervisor_id: opt ? String(opt.id) : "",
+                  }))
+                }
+                disabled={saving}
+                clearOnBlur={false}
+              />
+            </FormControl>
+          </BoxLikeGrid>
+        </DialogContent>
 
-        {/* Footer con botón de reset + acciones */}
+        {/* Footer */}
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="center"
           spacing={1.25}
-          mt={2}>
+          mt={1}>
           {isEditing && onResetPassword && (
             <Button
               variant="soft"
@@ -296,7 +346,22 @@ export default function UserFormModal({
             </Button>
           </Stack>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Sheet>
+    </Drawer>
+  );
+}
+
+// Pequeño wrapper para el grid sin ensuciar arriba
+function BoxLikeGrid({ children }) {
+  return (
+    <Stack
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "1fr",
+        gap: 1.5,
+        width: "100%",
+      }}>
+      {children}
+    </Stack>
   );
 }

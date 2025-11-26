@@ -1,9 +1,10 @@
 // src/pages/Clientes/ClientesList.jsx
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   getClientes,
   createCliente,
 } from "../../services/ClientesServices.jsx";
+
 import {
   Box,
   Card,
@@ -14,8 +15,7 @@ import {
   Sheet,
   Input,
   Chip,
-  Modal,
-  ModalDialog,
+  Drawer,
   FormControl,
   FormLabel,
   Select,
@@ -23,6 +23,7 @@ import {
   Divider,
   Avatar,
   Tooltip,
+  ModalClose,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -69,6 +70,8 @@ export default function ClientesList() {
   const { showToast } = useToast();
   const { checkingSession } = useAuth();
 
+  const searchInputRef = useRef(null);
+
   // Permisos
   const { canAny } = usePermissions();
   const canView = canAny("ver_companias");
@@ -114,6 +117,47 @@ export default function ClientesList() {
     },
     [logoPreview]
   );
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      const isTyping =
+        tag === "input" || tag === "textarea" || e.target.isContentEditable;
+
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+      // "/" → buscar
+      if (!isTyping && e.key === "/") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + F → buscar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      if (isTyping) return;
+
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        if (canCreate) onNew();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   function newCliente() {
     if (!canCreate)
@@ -238,6 +282,11 @@ export default function ClientesList() {
             <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.25 }}>
               Mostrando {sortedRows.length} de {rows.length || 0}
             </Typography>
+            {/* <Typography level="body-xs" sx={{ opacity: 0.65, mt: 0.25 }}>
+              Atajos: <strong>Ctrl+F</strong> buscar,&nbsp;
+              <strong>Ctrl+Shift+N</strong> nuevo cliente,&nbsp;
+              <strong>/</strong> enfocar búsqueda
+            </Typography> */}
           </Box>
 
           <Stack
@@ -266,6 +315,8 @@ export default function ClientesList() {
               }
               sx={{ width: { xs: "100%", md: 260 } }}
               size="sm"
+              inputRef={searchInputRef}
+              onFocus={(e) => e.target.select()}
             />
 
             {/* Filtro estatus */}
@@ -489,16 +540,50 @@ export default function ClientesList() {
           )}
         </Card>
 
-        {/* Modal crear */}
-        {open && canCreate && (
-          <Modal open={open} onClose={() => setOpen(false)}>
-            <ModalDialog
+        {/* Drawer crear */}
+        {canCreate && (
+          <Drawer
+            open={open}
+            onClose={() => !saving && setOpen(false)}
+            anchor="right"
+            size="md"
+            variant="plain"
+            slotProps={{
+              content: {
+                sx: {
+                  bgcolor: "transparent",
+                  p: { xs: 0, sm: 2 },
+                  boxShadow: "none",
+                },
+              },
+            }}>
+            <Sheet
               component="form"
               onSubmit={onSubmit}
-              sx={{ width: { xs: "100%", sm: 520 } }}>
-              <Typography level="title-lg">Nuevo Cliente</Typography>
+              sx={{
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                borderRadius: { xs: 0, sm: "md" },
+                p: 2,
+                boxShadow: "lg",
+                bgcolor: "background.surface",
+                minWidth: { xs: "100dvw", sm: 420 },
+              }}>
+              {/* Header */}
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 0.5 }}>
+                <Typography level="title-lg">Nuevo Cliente</Typography>
+                <ModalClose disabled={saving} />
+              </Stack>
               <Divider />
-              <Stack spacing={1.5} mt={1}>
+
+              {/* Contenido */}
+              <Stack spacing={1.5} mt={1} sx={{ flex: 1, overflow: "auto" }}>
                 <FormControl required>
                   <FormLabel>Código</FormLabel>
                   <Input
@@ -581,11 +666,12 @@ export default function ClientesList() {
                 </Stack>
               </Stack>
 
+              {/* Footer */}
               <Stack
                 direction="row"
                 justifyContent="flex-end"
                 spacing={1}
-                mt={2}>
+                mt={1}>
                 <Button
                   variant="plain"
                   onClick={() => setOpen(false)}
@@ -596,8 +682,8 @@ export default function ClientesList() {
                   Guardar
                 </Button>
               </Stack>
-            </ModalDialog>
-          </Modal>
+            </Sheet>
+          </Drawer>
         )}
       </Box>
     </Sheet>

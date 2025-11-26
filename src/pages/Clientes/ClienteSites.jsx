@@ -27,6 +27,9 @@ import {
   Tooltip,
   CircularProgress,
   Checkbox,
+  Drawer,
+  Sheet,
+  ModalClose,
 } from "@mui/joy";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -41,12 +44,12 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import ToggleOnRoundedIcon from "@mui/icons-material/ToggleOnRounded";
 import ToggleOffRoundedIcon from "@mui/icons-material/ToggleOffRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 
 import StatusCard from "../../components/common/StatusCard";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 
-// ⭐ hook highlight/scroll
 import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
 // Normalizador para ignorar mayúsculas/tildes
@@ -82,16 +85,21 @@ export default function ClienteSites() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // filtros
+  // filtros aplicados
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("activos"); // "activos" | "inactivos" | "todos"
+
+  // Drawer de filtros
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [draftCityFilter, setDraftCityFilter] = useState(cityFilter);
+  const [draftStatusFilter, setDraftStatusFilter] = useState(statusFilter);
 
   // selección múltiple
   const [selectedIds, setSelectedIds] = useState([]);
   const hasSelection = selectedIds.length > 0;
 
-  // modal
+  // modal crear/editar
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -273,6 +281,8 @@ export default function ClienteSites() {
     setSearch("");
     setCityFilter("");
     setStatusFilter("todos");
+    setDraftCityFilter("");
+    setDraftStatusFilter("todos");
 
     focusByToken(token);
   }, [searchParams, setSearchParams, focusByToken]);
@@ -317,7 +327,10 @@ export default function ClienteSites() {
         seen.set(String(r.id_ciudad), r.ciudad);
       }
     });
-    return Array.from(seen, ([id, nombre]) => ({ id, nombre }));
+    return Array.from(seen, ([idCity, nombre]) => ({
+      id: idCity,
+      nombre,
+    }));
   }, [rows]);
 
   // Métricas
@@ -450,9 +463,39 @@ export default function ClienteSites() {
     return null;
   };
 
+  const bulkButtonIsActivate = statusFilter === "inactivos";
+
+  // Handlers Drawer filtros
+  const openFiltersDrawer = () => {
+    setDraftCityFilter(cityFilter);
+    setDraftStatusFilter(statusFilter);
+    setFilterDrawerOpen(true);
+  };
+
+  const handleCloseFiltersDrawer = () => {
+    // cerrar sin aplicar → restaurar drafts a lo que está aplicado
+    setFilterDrawerOpen(false);
+    setDraftCityFilter(cityFilter);
+    setDraftStatusFilter(statusFilter);
+  };
+
+  const handleApplyFilters = () => {
+    setCityFilter(draftCityFilter || "");
+    setStatusFilter(draftStatusFilter || "activos");
+    setFilterDrawerOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    setDraftCityFilter("");
+    setDraftStatusFilter("activos");
+    setCityFilter("");
+    setStatusFilter("activos");
+    setFilterDrawerOpen(false);
+  };
+
   return (
     <Box>
-      {/* HEADER NUEVO: título + totales arriba, filtros y acciones abajo */}
+      {/* HEADER: título + totales + filtros compactos */}
       <Stack spacing={1.5} mb={2}>
         <Box>
           <Typography level="h4">Sites del Cliente</Typography>
@@ -472,7 +515,7 @@ export default function ClienteSites() {
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
           spacing={1.25}>
-          {/* Filtros */}
+          {/* Búsqueda + botón filtros */}
           <Stack
             direction="row"
             spacing={1}
@@ -499,29 +542,13 @@ export default function ClienteSites() {
               sx={{ width: { xs: "100%", sm: 300 } }}
             />
 
-            <Select
-              placeholder="Filtrar por ciudad"
-              value={cityFilter}
-              onChange={(_, v) => setCityFilter(v || "")}
-              sx={{ minWidth: 200 }}>
-              <Option value="">Todas las ciudades</Option>
-              {availableCities.map((c) => (
-                <Option key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </Option>
-              ))}
-            </Select>
-
-            {/* Filtro por estado */}
-            <Select
-              placeholder="Estado"
-              value={statusFilter}
-              onChange={(_, v) => setStatusFilter(v || "activos")}
-              sx={{ minWidth: 160 }}>
-              <Option value="activos">Activos</Option>
-              <Option value="inactivos">Inactivos</Option>
-              <Option value="todos">Todos</Option>
-            </Select>
+            <Button
+              size="sm"
+              variant="outlined"
+              startDecorator={<TuneRoundedIcon />}
+              onClick={openFiltersDrawer}>
+              Filtros
+            </Button>
           </Stack>
 
           {/* Acciones masivas + Nuevo */}
@@ -531,47 +558,34 @@ export default function ClienteSites() {
             alignItems="center"
             justifyContent="flex-end"
             flexWrap="wrap">
-            {canEdit && (
-              <>
-                <Tooltip
-                  title={
-                    hasSelection
+            {canEdit && hasSelection && (
+              <Tooltip
+                title={
+                  bulkButtonIsActivate
+                    ? "Activar sites seleccionados"
+                    : "Inactivar sites seleccionados"
+                }
+                variant="soft">
+                <span>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    color={bulkButtonIsActivate ? "success" : "neutral"}
+                    startDecorator={
+                      bulkButtonIsActivate ? (
+                        <ToggleOnRoundedIcon />
+                      ) : (
+                        <ToggleOffRoundedIcon />
+                      )
+                    }
+                    disabled={bulkSaving}
+                    onClick={() => bulkUpdateActivo(bulkButtonIsActivate)}>
+                    {bulkButtonIsActivate
                       ? "Activar seleccionados"
-                      : "Selecciona uno o más sites"
-                  }
-                  variant="soft">
-                  <span>
-                    <Button
-                      size="sm"
-                      variant="soft"
-                      startDecorator={<ToggleOnRoundedIcon />}
-                      disabled={!hasSelection || bulkSaving}
-                      onClick={() => bulkUpdateActivo(true)}>
-                      Activar
-                    </Button>
-                  </span>
-                </Tooltip>
-
-                <Tooltip
-                  title={
-                    hasSelection
-                      ? "Inactivar seleccionados"
-                      : "Selecciona uno o más sites"
-                  }
-                  variant="soft">
-                  <span>
-                    <Button
-                      size="sm"
-                      variant="soft"
-                      color="neutral"
-                      startDecorator={<ToggleOffRoundedIcon />}
-                      disabled={!hasSelection || bulkSaving}
-                      onClick={() => bulkUpdateActivo(false)}>
-                      Inactivar
-                    </Button>
-                  </span>
-                </Tooltip>
-              </>
+                      : "Inactivar seleccionados"}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
 
             <Tooltip
@@ -689,17 +703,133 @@ export default function ClienteSites() {
         )}
       </Card>
 
-      {/* Modal para nuevo/editar */}
-      <Modal open={open} onClose={() => setOpen(false)}>
-        <ModalDialog
+      {/* Drawer de filtros */}
+      <Drawer
+        open={filterDrawerOpen}
+        onClose={handleCloseFiltersDrawer}
+        anchor="right"
+        size="md"
+        variant="plain"
+        slotProps={{
+          content: {
+            sx: {
+              bgcolor: "transparent",
+              p: { xs: 0, sm: 2 },
+              boxShadow: "none",
+            },
+          },
+        }}>
+        <Sheet
+          sx={{
+            borderRadius: { xs: 0, sm: "md" },
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+            height: "100%",
+            minWidth: { xs: "100dvw", sm: 360 },
+            bgcolor: "background.surface",
+            boxShadow: "lg",
+          }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between">
+            <Typography level="title-lg">Filtros de sites</Typography>
+            <ModalClose onClick={handleCloseFiltersDrawer} />
+          </Stack>
+          <Divider />
+
+          <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto", mt: 1 }}>
+            <FormControl>
+              <FormLabel>Ciudad</FormLabel>
+              <Select
+                placeholder="Todas las ciudades"
+                value={draftCityFilter}
+                onChange={(_, v) => setDraftCityFilter(v || "")}>
+                <Option value="">Todas las ciudades</Option>
+                {availableCities.map((c) => (
+                  <Option key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                  </Option>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel>Estado</FormLabel>
+              <Select
+                value={draftStatusFilter}
+                onChange={(_, v) => setDraftStatusFilter(v || "activos")}>
+                <Option value="activos">Activos</Option>
+                <Option value="inactivos">Inactivos</Option>
+                <Option value="todos">Todos</Option>
+              </Select>
+            </FormControl>
+
+            <Typography level="body-xs" sx={{ opacity: 0.75, mt: 1 }}>
+              Los filtros se aplican solo al presionar{" "}
+              <strong>“Aplicar filtros”</strong>.
+            </Typography>
+          </Stack>
+
+          <Divider sx={{ mt: "auto", mb: 1 }} />
+          <Stack direction="row" justifyContent="space-between" spacing={1}>
+            <Button
+              variant="outlined"
+              color="neutral"
+              onClick={handleClearFilters}>
+              Limpiar
+            </Button>
+            <Button onClick={handleApplyFilters}>Aplicar filtros</Button>
+          </Stack>
+        </Sheet>
+      </Drawer>
+      {/* Drawer para nuevo/editar */}
+      <Drawer
+        open={open}
+        onClose={() => !saving && setOpen(false)}
+        anchor="right"
+        size="md"
+        variant="plain"
+        slotProps={{
+          content: {
+            sx: {
+              bgcolor: "transparent",
+              p: { xs: 0, sm: 2 },
+              boxShadow: "none",
+            },
+          },
+        }}>
+        <Sheet
           component="form"
           onSubmit={onSubmit}
-          sx={{ width: { xs: "100%", sm: 520 } }}>
-          <Typography level="title-lg">
-            {editing ? "Editar Site" : "Nuevo Site"}
-          </Typography>
+          sx={{
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+            borderRadius: { xs: 0, sm: "md" },
+            p: 2,
+            boxShadow: "lg",
+            bgcolor: "background.surface",
+            minWidth: { xs: "100dvw", sm: 420 },
+          }}>
+          {/* Header */}
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ mb: 0.5 }}>
+            <Typography level="title-lg">
+              {editing ? "Editar Site" : "Nuevo Site"}
+            </Typography>
+            <ModalClose disabled={saving} />
+          </Stack>
           <Divider />
-          <Stack spacing={1.5} mt={1}>
+
+          {/* Contenido */}
+          <Stack spacing={1.5} mt={1} sx={{ flex: 1, overflow: "auto" }}>
             <FormControl required>
               <FormLabel>Nombre</FormLabel>
               <Input
@@ -746,7 +876,8 @@ export default function ClienteSites() {
             </FormControl>
           </Stack>
 
-          <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
+          {/* Footer */}
+          <Stack direction="row" justifyContent="flex-end" spacing={1} mt={1}>
             <Button
               variant="plain"
               onClick={() => setOpen(false)}
@@ -757,8 +888,8 @@ export default function ClienteSites() {
               Guardar
             </Button>
           </Stack>
-        </ModalDialog>
-      </Modal>
+        </Sheet>
+      </Drawer>
     </Box>
   );
 }

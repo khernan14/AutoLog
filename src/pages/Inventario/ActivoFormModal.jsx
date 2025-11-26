@@ -12,6 +12,11 @@ import {
   Input,
   Button,
   Chip,
+  Drawer,
+  Sheet,
+  DialogTitle,
+  ModalClose,
+  DialogContent,
 } from "@mui/joy";
 import { useToast } from "../../context/ToastContext";
 
@@ -73,15 +78,38 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
   const chipColor = ESTATUS_COLOR[form.estatus] || "neutral";
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog
+    <Drawer
+      anchor="right"
+      size="md"
+      variant="plain"
+      open={open}
+      onClose={onClose}
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { md: 3, sm: 0 },
+            boxShadow: "none",
+          },
+        },
+      }}>
+      <Sheet
         component="form"
         onSubmit={onSubmit}
-        sx={{ width: { xs: "100%", sm: 520 } }}>
-        <Typography level="title-lg">Editar Activo</Typography>
+        sx={{
+          borderRadius: "md",
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          height: "100%",
+          overflow: "auto",
+          width: { xs: "100%", sm: 520 },
+        }}>
+        <DialogTitle>Editar Activo en Bodega</DialogTitle>
+        <ModalClose />
         <Divider />
-        <Stack spacing={1.5} mt={1}>
-          {/* Código como label + Chip (solo lectura) */}
+        <DialogContent sx={{ gap: 2, mt: 1 }}>
           <FormControl>
             <FormLabel>Código</FormLabel>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -149,7 +177,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
               </Chip>
             </Stack>
           </FormControl>
-        </Stack>
+        </DialogContent>
 
         <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
           <Button variant="plain" onClick={onClose} disabled={saving}>
@@ -159,7 +187,7 @@ export default function ActivoFormModal({ open, onClose, editing, onSaved }) {
             Guardar
           </Button>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Sheet>
+    </Drawer>
   );
 }

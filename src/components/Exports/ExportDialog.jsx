@@ -1,8 +1,6 @@
-// src/components/export/ExportModal.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Modal,
-  ModalDialog,
+  Drawer,
   ModalClose,
   Typography,
   Sheet,
@@ -171,7 +169,7 @@ export default function ExportDialog({
     }
   };
 
-  // ====== export handlers (nota: enviamos includeGeneratedStamp como booleano)
+  // ====== export handlers
   const doCSV = () =>
     exportToCSV({
       rows: dataRows,
@@ -189,7 +187,7 @@ export default function ExportDialog({
       orientation,
       logoUrl: logo,
       footerBgHex: footerColor,
-      includeGeneratedStamp, // <- booleano
+      includeGeneratedStamp,
     });
 
   const doPDF = () =>
@@ -201,21 +199,38 @@ export default function ExportDialog({
       orientation,
       logoUrl: logo,
       footerBgHex: footerColor,
-      includeGeneratedStamp, // <- booleano
+      includeGeneratedStamp,
     });
 
   return (
-    <Modal open={open} onClose={busy ? undefined : onClose}>
-      <ModalDialog
+    <Drawer
+      anchor="right"
+      size="lg"
+      variant="plain"
+      open={open}
+      onClose={busy ? undefined : onClose}
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { md: 3, sm: 0, xs: 0 },
+            boxShadow: "none",
+          },
+        },
+      }}>
+      <Sheet
+        variant="outlined"
         sx={{
+          borderRadius: { xs: 0, md: "md" },
           width: isMobile ? "100%" : 1180,
           maxWidth: "100%",
-          p: 0,
+          height: "100dvh",
+          display: "flex",
+          flexDirection: "column",
           overflow: "hidden",
-          ...(isMobile
-            ? { borderRadius: 0, height: "100dvh" }
-            : { borderRadius: "lg", maxHeight: "90dvh" }),
+          bgcolor: "background.surface",
         }}>
+        {/* Header */}
         <Sheet
           variant="plain"
           sx={{
@@ -236,14 +251,15 @@ export default function ExportDialog({
           </Stack>
         </Sheet>
 
+        {/* Contenido principal: opciones + preview */}
         <Stack
           direction={isMobile ? "column" : "row"}
           spacing={0}
           sx={{
-            height: isMobile ? "calc(100dvh - 52px)" : "auto",
+            flex: 1,
             overflow: "hidden",
           }}>
-          {/* Opciones */}
+          {/* Panel de opciones */}
           <Sheet
             variant="soft"
             sx={{
@@ -274,14 +290,16 @@ export default function ExportDialog({
                   <FormLabel>Orientación</FormLabel>
                   <Select
                     value={orientation}
-                    onChange={(_, v) => setOrientation(v)}>
+                    onChange={(_, v) => setOrientation(v || "landscape")}>
                     <Option value="portrait">Vertical</Option>
                     <Option value="landscape">Horizontal</Option>
                   </Select>
                 </FormControl>
                 <FormControl sx={{ flex: 1 }}>
                   <FormLabel>Alcance</FormLabel>
-                  <Select value={scope} onChange={(_, v) => setScope(v)}>
+                  <Select
+                    value={scope}
+                    onChange={(_, v) => setScope(v || "all")}>
                     <Option value="all">Todo el filtro</Option>
                     <Option value="page">Página actual</Option>
                   </Select>
@@ -460,14 +478,19 @@ export default function ExportDialog({
                 {selectedCols.length}/{cols.length} columnas
               </Chip>
               <Tooltip title="Refrescar previsualización">
-                <IconButton variant="soft" size="sm" onClick={() => {}}>
+                <IconButton
+                  variant="soft"
+                  size="sm"
+                  onClick={() => {
+                    // La preview ya se reactualiza sola; el botón es decorativo/UX.
+                  }}>
                   <RefreshCw size={16} />
                 </IconButton>
               </Tooltip>
             </Stack>
           </Sheet>
 
-          {/* Preview + acciones */}
+          {/* Panel de previsualización + acciones */}
           <Sheet sx={{ flex: 1, p: 1.25, overflow: "auto" }}>
             <Typography level="title-sm" sx={{ mb: 1 }}>
               Previsualización (aprox.)
@@ -481,7 +504,11 @@ export default function ExportDialog({
                   <img
                     src={logo}
                     alt="logo"
-                    style={{ width: 140, height: "auto", objectFit: "contain" }}
+                    style={{
+                      width: 140,
+                      height: "auto",
+                      objectFit: "contain",
+                    }}
                   />
                 ) : null}
                 <Typography
@@ -555,7 +582,7 @@ export default function ExportDialog({
                   {!previewRows.length && (
                     <tr>
                       <td
-                        colSpan={selectedCols.length}
+                        colSpan={selectedCols.length || 1}
                         style={{ textAlign: "center", padding: 16 }}>
                         (Sin datos para previsualizar)
                       </td>
@@ -607,7 +634,7 @@ export default function ExportDialog({
             </Stack>
           </Sheet>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Sheet>
+    </Drawer>
   );
 }

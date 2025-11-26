@@ -15,6 +15,11 @@ import {
   Input,
   Button,
   Chip,
+  Drawer,
+  Sheet,
+  DialogTitle,
+  ModalClose,
+  DialogContent,
 } from "@mui/joy";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
@@ -41,7 +46,7 @@ export default function NuevoActivoEnBodegaModal({
   });
 
   const [saving, setSaving] = useState(false);
-  const [nextCode, setNextCode] = useState(""); // 👈 mostrará el siguiente
+  const [nextCode, setNextCode] = useState("");
   const [loadingNext, setLoadingNext] = useState(false);
   const [nextErr, setNextErr] = useState("");
 
@@ -107,14 +112,40 @@ export default function NuevoActivoEnBodegaModal({
   const chipColor = nextErr ? "neutral" : ESTATUS_COLOR[form.estatus];
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog
+    <Drawer
+      anchor="right"
+      size="md"
+      variant="plain"
+      open={open}
+      onClose={onClose}
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "transparent",
+            p: { md: 3, sm: 0 },
+            boxShadow: "none",
+          },
+        },
+      }}>
+      <Sheet
         component="form"
         onSubmit={onSubmit}
-        sx={{ width: { xs: "100%", sm: 520 } }}>
-        <Typography level="title-lg">Nuevo Activo en Bodega</Typography>
+        sx={{
+          borderRadius: "md",
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          height: "100%",
+          overflow: "auto",
+          width: { xs: "100%", sm: 520 },
+        }}>
+        <DialogTitle>Nuevo Activo en Bodega</DialogTitle>
+        <ModalClose />
+
         <Divider />
-        <Stack spacing={1.5} mt={1}>
+
+        <DialogContent sx={{ gap: 2, mt: 1 }}>
           {/* Código (solo lectura / informativo) */}
           <FormControl>
             <FormLabel>Código</FormLabel>
@@ -141,7 +172,7 @@ export default function NuevoActivoEnBodegaModal({
             />
           </FormControl>
 
-          <FormControl>
+          <FormControl required>
             <FormLabel>Modelo</FormLabel>
             <Input
               value={form.modelo}
@@ -150,7 +181,7 @@ export default function NuevoActivoEnBodegaModal({
             />
           </FormControl>
 
-          <FormControl>
+          <FormControl required>
             <FormLabel>Serie</FormLabel>
             <Input
               value={form.serial_number}
@@ -162,12 +193,12 @@ export default function NuevoActivoEnBodegaModal({
           </FormControl>
 
           {/* 🔹 Tipo desde catálogo */}
-          <FormControl>
+          <FormControl required>
             <FormLabel>Tipo</FormLabel>
             <CatalogSelect
               catalog="tiposActivo"
               value={form.tipo}
-              onChange={(_, v) => setForm({ ...form, tipo: v })}
+              onChange={(v) => setForm({ ...form, tipo: v })}
               disabled={saving}
             />
           </FormControl>
@@ -178,13 +209,15 @@ export default function NuevoActivoEnBodegaModal({
             <CatalogSelect
               catalog="estatusActivo"
               value={form.estatus}
-              onChange={(_, v) => setForm({ ...form, estatus: v })}
+              onChange={(v) => setForm({ ...form, estatus: v })}
               disabled={saving}
             />
           </FormControl>
-        </Stack>
+        </DialogContent>
 
-        <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
+        <Divider sx={{ mt: "auto" }} />
+
+        <Stack direction="row" justifyContent="flex-end" spacing={1} mt={1}>
           <Button variant="plain" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
@@ -192,7 +225,7 @@ export default function NuevoActivoEnBodegaModal({
             Guardar
           </Button>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Sheet>
+    </Drawer>
   );
 }

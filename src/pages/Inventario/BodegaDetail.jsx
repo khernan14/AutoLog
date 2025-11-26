@@ -1,6 +1,11 @@
 // src/pages/Inventario/BodegaDetail.jsx
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import {
+  useParams,
+  useSearchParams,
+  useNavigate,
+  Link,
+} from "react-router-dom";
 import {
   Box,
   Card,
@@ -8,7 +13,7 @@ import {
   Stack,
   Table,
   Sheet,
-  Button,
+  Button as JButton,
   IconButton,
   Divider,
   Input,
@@ -29,6 +34,29 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+
+// shadcn
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// lucide
+import {
+  ChevronDown,
+  Download,
+  Upload,
+  Keyboard,
+  Plus,
+  CircleFadingPlus,
+} from "lucide-react";
 
 import { getBodegaById } from "../../services/BodegasServices";
 import { getActivosByBodega } from "../../services/ActivosBodegaServices";
@@ -70,8 +98,10 @@ const normalize = (val) =>
 export default function BodegaDetail() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const isMobile = useIsMobile(768);
   const qrRef = useRef();
+  const searchInputRef = useRef(null);
 
   // datos
   const [bodega, setBodega] = useState(null);
@@ -89,14 +119,15 @@ export default function BodegaDetail() {
   const [openEdit, setOpenEdit] = useState(false);
   const [openMover, setOpenMover] = useState(false);
   const [openHist, setOpenHist] = useState(false);
-  const [openImport, setOpenImport] = useState(false);
 
   const [openQR, setOpenQR] = useState(false);
   const [activoQR, setActivoQR] = useState(null);
   const [publicLink, setPublicLink] = useState("");
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
 
+  const [openImport, setOpenImport] = useState(false);
   const [openExport, setOpenExport] = useState(false);
+  const [openShortcuts, setOpenShortcuts] = useState(false);
 
   // permisos
   const { userData, checkingSession, hasPermiso } = useAuth();
@@ -314,6 +345,63 @@ export default function BodegaDetail() {
     hasData: sortedRows.length > 0,
   });
 
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      const tag = e.target.tagName.toLowerCase();
+      const isTyping =
+        tag === "input" || tag === "textarea" || e.target.isContentEditable;
+
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+      // "/" → búsqueda (si no está escribiendo ya)
+      if (!isTyping && e.key === "/") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + F → foco en búsqueda
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+        return;
+      }
+
+      // Si está escribiendo, no seguimos con más atajos
+      if (isTyping) return;
+
+      // Ctrl/⌘ + Shift + N → Nuevo activo
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        if (canCreateAsset) onNew();
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + E → Exportar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setOpenExport(true);
+        return;
+      }
+
+      // Ctrl/⌘ + Shift + I → Importar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        setOpenImport(true);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [canCreateAsset, onNew]);
+
   // UI
   return (
     <Sheet
@@ -340,7 +428,27 @@ export default function BodegaDetail() {
           spacing={1.5}
           mb={2}>
           <Box>
-            <Typography level="h4">{bodega?.nombre || "—"}</Typography>
+            {/* Botón de regresar + título */}
+            <JButton
+              component={Link}
+              to="/admin/inventario/bodegas"
+              variant="plain"
+              size="sm"
+              startDecorator={<ArrowBackRoundedIcon />}
+              sx={{
+                alignSelf: { xs: "stretch", sm: "auto" },
+                justifyContent: { xs: "flex-start", sm: "center" },
+              }}>
+              Volver
+            </JButton>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mb: 0.5 }}>
+              <Typography level="h4">{bodega?.nombre || "—"}</Typography>
+            </Stack>
+
             <Typography level="body-sm" color="neutral">
               {bodega?.descripcion || " "}
             </Typography>
@@ -348,66 +456,116 @@ export default function BodegaDetail() {
               Total activos: {sortedRows.length}
             </Typography>
           </Box>
-
           <Stack
             direction="row"
             spacing={1}
             alignItems="center"
             sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Input
-              placeholder="Buscar por código, nombre, tipo, modelo o serie…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              startDecorator={<SearchRoundedIcon />}
-              endDecorator={
-                search && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    onClick={() => setSearch("")}
-                    aria-label="Limpiar búsqueda">
-                    <ClearIcon />
-                  </IconButton>
-                )
-              }
-              sx={{ width: { xs: "100%", sm: 360 } }}
-            />
-
             <Tooltip
-              title={
-                canCreateAsset
-                  ? "Crear activo"
-                  : "No tienes permiso para crear. Solicítalo al administrador."
-              }
-              variant="solid"
-              placement="bottom-end">
-              <span>
-                <Button
-                  startDecorator={<AddRoundedIcon />}
-                  onClick={onNew}
-                  disabled={!canCreateAsset}
-                  aria-disabled={!canCreateAsset}
-                  variant={canCreateAsset ? "solid" : "soft"}
-                  color={canCreateAsset ? "primary" : "neutral"}>
-                  Nuevo Activo
-                </Button>
-              </span>
+              title="Buscar por código, nombre, tipo, modelo o serie…"
+              variant="soft"
+              placement="bottom-start">
+              <Input
+                placeholder="/, Ctrl+Shift+F"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                startDecorator={<SearchRoundedIcon />}
+                endDecorator={
+                  search && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      onClick={() => setSearch("")}
+                      aria-label="Limpiar búsqueda">
+                      <ClearIcon />
+                    </IconButton>
+                  )
+                }
+                sx={{ width: { xs: "100%", sm: 360 } }}
+                slotProps={{
+                  input: {
+                    ref: searchInputRef,
+                    onFocus: (e) => e.target.select(),
+                  },
+                }}
+              />
             </Tooltip>
 
-            <Button
-              variant="soft"
-              startDecorator={<DownloadRoundedIcon />}
-              onClick={() => setOpenExport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Exportar
-            </Button>
-            <Button
-              variant="soft"
-              onClick={() => setOpenImport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Importar
-            </Button>
+            <ButtonGroup className="items-center">
+              <Tooltip
+                title={
+                  canCreateAsset
+                    ? "Nuevo Activo (Ctrl+Shift+N)"
+                    : "No tienes permiso para crear. Solicítalo al administrador."
+                }
+                variant="solid"
+                placement="bottom-end">
+                <span>
+                  <Button
+                    onClick={onNew}
+                    disabled={!canCreateAsset}
+                    className={`
+                      h-9 rounded-r-none
+                      bg-[var(--joy-palette-primary-solidBg)]
+                      text-[var(--joy-palette-primary-solidColor)]
+                      hover:bg-[var(--joy-palette-primary-solidHoverBg)]
+                      active:bg-[var(--joy-palette-primary-solidActiveBg)]
+                      border border-[var(--joy-palette-primary-solidBg)]
+                      hover:text-[var(--joy-palette-primary-solidColor)]
+                    `}
+                    variant="outline">
+                    <CircleFadingPlus className="mr-1 h-4 w-4" />
+                    <span>Nuevo</span>
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className={`
+                      h-9 rounded-l-none border-l-0
+                      bg-[var(--joy-palette-primary-solidBg)]
+                      text-[var(--joy-palette-primary-solidColor)]
+                      hover:bg-[var(--joy-palette-primary-solidHoverBg)]
+                      active:bg-[var(--joy-palette-primary-solidActiveBg)]
+                      border border-[var(--joy-palette-primary-solidBg)]
+                      hover:text-[var(--joy-palette-primary-solidColor)]
+                    `}
+                    aria-label="Más acciones">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setOpenExport(true)}>
+                    <Download className="mr-2 h-4 w-4" />
+                    <span className="flex-1 text-sm">Exportar</span>
+                    <kbd className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+                      Ctrl+Shift+E
+                    </kbd>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem onClick={() => setOpenImport(true)}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    <span className="flex-1 text-sm">Importar</span>
+                    <kbd className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+                      Ctrl+Shift+I
+                    </kbd>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem onClick={() => setOpenShortcuts(true)}>
+                    <Keyboard className="mr-2 h-4 w-4" />
+                    <span className="flex-1 text-sm">Atajos de teclado</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
           </Stack>
         </Stack>
 
@@ -848,7 +1006,18 @@ export default function BodegaDetail() {
                   }}>
                   Cerrar
                 </Button>
-                <Button onClick={descargarPNG}>Descargar PNG</Button>
+                <Button
+                  className={`
+                  bg-[var(--joy-palette-primary-solidBg)]
+                  text-[var(--joy-palette-primary-solidColor)]
+                  hover:bg-[var(--joy-palette-primary-solidHoverBg)]
+                  active:bg-[var(--joy-palette-primary-solidActiveBg)]
+                  border border-[var(--joy-palette-primary-solidBg)]
+                  hover:text-[var(--joy-palette-primary-solidColor)]
+                `}
+                  onClick={descargarPNG}>
+                  Descargar PNG
+                </Button>
               </Stack>
             </ModalDialog>
           </Modal>
@@ -876,6 +1045,75 @@ export default function BodegaDetail() {
             onSaved={load}
           />
         )}
+
+        <Modal open={openShortcuts} onClose={() => setOpenShortcuts(false)}>
+          <ModalDialog sx={{ width: { xs: "100%", sm: 420 } }}>
+            <Typography level="title-lg">Atajos de teclado</Typography>
+            <Divider sx={{ my: 1 }} />
+
+            <Stack spacing={1.25} mt={1}>
+              <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                Estos atajos funcionan principalmente en escritorio.
+              </Typography>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Focar buscador</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  /
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Focar buscador</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+F
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Nuevo activo</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+N
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Abrir exportar</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+E
+                </Typography>
+              </Stack>
+
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center">
+                <Typography level="body-sm">Abrir importar</Typography>
+                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
+                  Ctrl+Shift+I
+                </Typography>
+              </Stack>
+            </Stack>
+
+            <Stack direction="row" justifyContent="flex-end" mt={2}>
+              <Button variant="plain" onClick={() => setOpenShortcuts(false)}>
+                Cerrar
+              </Button>
+            </Stack>
+          </ModalDialog>
+        </Modal>
       </Box>
     </Sheet>
   );
