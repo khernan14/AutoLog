@@ -1,3 +1,12 @@
+## v1.2.0 - 2025-11-26
+
+* chore(release): v1.2.0 (62c2f96)
+* Merge pull request #16 from khernan14/feat/ui-drawers-shortcuts (49d5581)
+* feat(ui): reemplazar modales por drawers en m├│dulos principales (f32380e)
+* docs(changelog): v1.1.4 (77be3c4)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.1.4...v1.2.0
+
 ## v1.1.4 - 2025-11-23
 
 * chore(release): v1.1.4 (4587285)
@@ -98,6 +107,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
