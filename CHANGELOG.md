@@ -1,3 +1,11 @@
+## v1.2.1 - 2025-11-27
+
+* chore(release): v1.2.1 (ece4755)
+* fix(ui): habilitar guardado en drawer (Sheet component onSubmit) (cf60b70)
+* docs(changelog): v1.2.0 (0a452df)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.2.0...v1.2.1
+
 ## v1.2.0 - 2025-11-26
 
 * chore(release): v1.2.0 (62c2f96)
@@ -107,6 +115,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
