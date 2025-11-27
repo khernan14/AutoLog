@@ -216,6 +216,8 @@ export default function MoverActivoModal({
         },
       }}>
       <Sheet
+        component={"form"}
+        onSubmit={onSubmit}
         sx={{
           borderRadius: "md",
           p: 2,
