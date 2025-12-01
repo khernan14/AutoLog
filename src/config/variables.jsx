@@ -1,4 +1,8 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const DEV = import.meta.env.DEV === true;
+
+export const API_BASE_URL = DEV
+  ? "/api"
+  : import.meta.env.VITE_API_BASE_URL || "";
 
 export const endpoints = {
   searchGlobal: `${API_BASE_URL}/search`,

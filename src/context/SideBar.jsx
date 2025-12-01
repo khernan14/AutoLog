@@ -488,7 +488,9 @@ export default function Sidebar() {
   // =========================
   // Atajos de teclado globales
   // =========================
-  const logout = React.useCallback(() => {
+  const { logout: ctxLogout } = useAuth();
+
+  const logoutHandler = React.useCallback(() => {
     closeSidebar();
     Swal.fire({
       title: "¿Deseas cerrar sesión?",
@@ -501,11 +503,10 @@ export default function Sidebar() {
       cancelButtonText: "Cancelar",
     }).then((result) => {
       if (result.isConfirmed) {
-        localStorage.clear();
-        setTimeout(() => navigate("/auth/login"), 100);
+        ctxLogout();
       }
     });
-  }, [navigate]);
+  }, [ctxLogout]);
 
   React.useEffect(() => {
     const onGlobalKey = (e) => {
@@ -546,14 +547,14 @@ export default function Sidebar() {
       // Ctrl/⌘ + Q → Logout
       if (ctrlOrCmd && key === "q") {
         e.preventDefault();
-        logout();
+        logoutHandler();
         return;
       }
     };
 
     window.addEventListener("keydown", onGlobalKey);
     return () => window.removeEventListener("keydown", onGlobalKey);
-  }, [navigate, logout, checkPermission]);
+  }, [navigate, logoutHandler, checkPermission]);
 
   const handleNavigate = (path) => {
     navigate(path);
@@ -979,7 +980,7 @@ export default function Sidebar() {
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
-                  onSelect={logout}
+                  onSelect={logoutHandler}
                   className="
                     gap-2
                     text-red-600 dark:text-red-400
@@ -1070,7 +1071,7 @@ export default function Sidebar() {
             )}
 
             <CommandItem
-              onSelect={logout}
+              onSelect={logoutHandler}
               value="Cerrar sesión"
               className="text-red-600 dark:text-red-400">
               <LogoutRoundedIcon className="mr-2 h-4 w-4" />

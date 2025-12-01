@@ -1,19 +1,60 @@
 import { endpoints } from "../config/variables";
 import { fetchConToken } from "../utils/ApiHelper";
+const API_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
 
 export async function login(username, password) {
   try {
     const res = await fetch(endpoints.login, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
 
-    const data = await res.json();
-    return res.ok ? data : null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok)
+      throw new Error(data?.error || data?.message || "Login failed");
+    return data;
   } catch (err) {
     console.error("Login error:", err);
-    return null;
+    throw err;
+  }
+}
+
+export async function me() {
+  try {
+    const res = await fetch(`${API_URL}/auth/me`, {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json?.error || "No autenticado");
+    }
+    return res.json();
+  } catch (err) {
+    console.error("me error:", err);
+    throw err;
+  }
+}
+
+export async function logout() {
+  try {
+    const res = await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json?.error || "Error al cerrar sesión");
+    }
+    return res.json();
+  } catch (err) {
+    console.error("logout error:", err);
+    throw err;
   }
 }
 

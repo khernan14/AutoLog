@@ -1,39 +1,29 @@
+// src/components/ExpiredSessionOverlay.jsx  (reemplaza contenido)
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../../context/AuthContext"; // Asegúrate de que la ruta sea correcta
+import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import { STORAGE_KEYS } from "../../config/variables"; // Asegúrate de que la ruta sea correcta
-import Swal from "sweetalert2"; // Para las alertas de sesión expirada
-import { Box, CircularProgress, Typography, Button } from "@mui/joy"; // Para el spinner de carga
+import Swal from "sweetalert2";
+import { Box, CircularProgress, Typography } from "@mui/joy";
 
 export default function ExpiredSessionOverlay({ children }) {
   const { userData, checkingSession, isSessionExpired, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Estado local para controlar si la alerta de sesión expirada ya se mostró
   const [hasShownExpiredAlert, setHasShownExpiredAlert] = useState(false);
 
   useEffect(() => {
-    // Rutas que NO requieren autenticación (rutas públicas)
+    if (checkingSession) return;
+
     const publicPaths = [
       "/auth/login",
       "/auth/forgot-password",
       "/auth/reset-password",
     ];
 
-    // 1. Si la sesión aún se está verificando, no hagas nada en este useEffect.
-    // El renderizado condicional de abajo mostrará un spinner.
-    if (checkingSession) {
-      return;
-    }
+    // Ahora consideramos autenticado SÓLO si userData existe
+    const isAuthenticated = !!userData;
 
-    // 2. Lógica de redirección si el usuario NO está autenticado
-    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-    const isAuthenticated = !!userData && !!token; // Consideramos autenticado si hay userData Y token
-
-    // Si NO está autenticado Y la ruta actual NO es una ruta pública, redirige al login.
     if (!isAuthenticated && !publicPaths.includes(location.pathname)) {
-      // Solo muestra la alerta de expiración si realmente la sesión expiró
       if (isSessionExpired && !hasShownExpiredAlert) {
         Swal.fire({
           title: "Sesión Expirada",
@@ -43,29 +33,23 @@ export default function ExpiredSessionOverlay({ children }) {
           allowOutsideClick: false,
           allowEscapeKey: false,
         }).then(() => {
-          logout(); // Limpia la sesión y redirige al login
-          setHasShownExpiredAlert(true); // Marca que la alerta ya se mostró
+          logout();
+          setHasShownExpiredAlert(true);
         });
       } else if (!isSessionExpired) {
-        // Si no expiró pero no está autenticado (ej. primera carga sin token)
-        logout(); // Solo para asegurar que se limpia y redirige al login
+        // Si no hay userData y no es sesión expirada, simplemente logout
+        logout();
       }
-      return; // Detener la ejecución si se va a redirigir
+      return;
     }
 
-    // 3. Lógica de redirección si el usuario SÍ está autenticado y está en una ruta pública de autenticación
     if (isAuthenticated && publicPaths.includes(location.pathname)) {
-      // Si está autenticado y en login/forgot/reset, redirige a su home
-      // navigate("/admin/home"); // O la ruta por defecto de su rol
-      return; // Detener la ejecución si se va a redirigir
+      // Si está en ruta pública y ya autenticado, podrías redirigir si quieres
+      // navigate("/admin/home");
+      return;
     }
 
-    // Si llegamos aquí, el usuario está autenticado y en una ruta protegida,
-    // O no está autenticado pero está en una ruta pública.
-    // Resetear la bandera de alerta si el usuario está autenticado y no se mostró.
-    if (isAuthenticated && hasShownExpiredAlert) {
-      setHasShownExpiredAlert(false);
-    }
+    if (isAuthenticated && hasShownExpiredAlert) setHasShownExpiredAlert(false);
   }, [
     userData,
     checkingSession,
@@ -76,7 +60,6 @@ export default function ExpiredSessionOverlay({ children }) {
     hasShownExpiredAlert,
   ]);
 
-  // Renderizado condicional: Spinner mientras se verifica la sesión
   if (checkingSession) {
     return (
       <Box
@@ -94,6 +77,5 @@ export default function ExpiredSessionOverlay({ children }) {
     );
   }
 
-  // Si no estamos cargando y no se ha redirigido, renderiza los hijos
   return <>{children}</>;
 }

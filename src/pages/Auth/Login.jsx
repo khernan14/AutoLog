@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
-import { login } from "../../services/AuthServices"; // Asegúrate de que la ruta sea correcta
-import { STORAGE_KEYS } from "../../config/variables"; // Asegúrate de que la ruta sea correcta
-import LoginForm from "../../components/Login/LoginForm"; // Asegúrate de que la ruta sea correcta
+import { login } from "../../services/AuthServices";
+import LoginForm from "../../components/Login/LoginForm";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
@@ -13,33 +12,27 @@ export default function Login() {
   });
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const { restoreSessionFromStorage } = useAuth();
+  const { setUser, refreshUser } = useAuth();
 
-  // 👇 leemos ?redirect= de la URL (si viene de QR o sesión expirada)
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get("redirect"); // puede ser null
+  const redirectTo = searchParams.get("redirect");
 
   const handleLogin = async () => {
     setLoading(true);
     try {
+      // Llamada que crea cookie httpOnly en backend
       const data = await login(credentials.username, credentials.password);
 
-      // --- CONSOLE.LOG PARA DEPURAR (mantener para futuras depuraciones) ---
-      console.log("Respuesta completa del servicio de login:", data);
-
-      // Verificamos que el backend devolvió token y rol
-      if (!data?.token || !data?.rol) {
+      if (!data || !data.rol) {
         throw new Error(
           "Credenciales inválidas o datos de usuario incompletos."
         );
       }
 
-      // Guardar token y usuario en localStorage
-      localStorage.setItem(STORAGE_KEYS.TOKEN, data.token);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data));
-
-      // Reconstruir sesión en el contexto
-      restoreSessionFromStorage();
+      // Espera que /auth/me confirme la sesión y actualice el contexto
+      const serverUser = await refreshUser();
+      if (!serverUser)
+        throw new Error("No se pudo restaurar la sesión después del login.");
 
       Swal.fire({
         title: "¡Bienvenido!",
@@ -47,20 +40,17 @@ export default function Login() {
         icon: "success",
         confirmButtonColor: "#03624C",
       }).then(() => {
-        // 👇 PRIORIDAD 1: si hay redirect (QR o sesión expirada) volvemos allí
         if (redirectTo) {
           navigate(redirectTo, { replace: true });
           return;
         }
-
-        // 👇 PRIORIDAD 2: flujo normal -> por rol
-        redirectByRole(data.rol);
+        redirectByRole(serverUser.rol || data.rol);
       });
     } catch (error) {
-      console.error("Login error (en catch):", error); // Log para depuración
+      console.error("Login error (en catch):", error);
       Swal.fire(
         "Error",
-        error.message || "Correo o contraseña incorrectos.",
+        error?.message || "Usuario o contraseña incorrectos.",
         "error"
       );
     } finally {

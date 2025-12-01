@@ -62,16 +62,20 @@ export default function RegisterRegresoForm({
   }, []);
 
   useEffect(() => {
-    if (!usuario?.id_empleado || !registro?.id_vehiculo) return;
+    // resuelve idEmpleado e idVehiculo de forma robusta
+    const idEmpleado =
+      usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
+    const idVehiculo =
+      registro?.id_vehiculo ?? registro?.id ?? registro?.idVehiculo ?? null;
+
+    if (!idEmpleado || !idVehiculo) return;
 
     const loadKmActual = async () => {
       try {
-        const data = await obtenerKmActual(registro.id_vehiculo);
-        if (data?.km_regreso !== undefined) {
-          setKmAnterior(data.km_regreso.toString());
-        } else {
-          setKmAnterior("0");
-        }
+        const data = await obtenerKmActual(idVehiculo);
+        setKmAnterior(
+          data?.km_regreso !== undefined ? String(data.km_regreso) : "0"
+        );
       } catch (error) {
         console.error("Error al obtener km actual:", error);
       }
@@ -79,9 +83,6 @@ export default function RegisterRegresoForm({
 
     loadKmActual();
   }, [usuario, registro]);
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
   //   setIsSubmitting(true); // nuevo cambio
 
   //   if (
@@ -178,6 +179,48 @@ export default function RegisterRegresoForm({
       return;
     }
 
+    const idEmpleado =
+      usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
+
+    // fallback: intenta leer del localStorage (por si el RegisterForm no pasó userData por props)
+    if (!idEmpleado) {
+      try {
+        const stored =
+          localStorage.getItem("user") ||
+          localStorage.getItem("USER") ||
+          localStorage.getItem("usuario");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          idEmpleado =
+            parsed?.id_empleado ??
+            parsed?.id ??
+            parsed?.id_usuario ??
+            idEmpleado;
+        }
+      } catch (err) {
+        console.warn("No se pudo parsear user de localStorage:", err);
+      }
+    }
+
+    if (!idEmpleado) {
+      setErrorMessage(
+        "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
+    // igual para registro
+    const idRegistro =
+      registro?.id_registro ?? registro?.id ?? registro?.id_registro;
+    if (!idRegistro) {
+      setErrorMessage(
+        "Datos de registro inválidos. Refresca e intenta de nuevo."
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     if (parseInt(km_regreso) < parseInt(kmAnterior)) {
       setErrorMessage(
         "El kilometraje de regreso no puede ser menor al de salida."
@@ -187,8 +230,8 @@ export default function RegisterRegresoForm({
     }
 
     const formData = new FormData();
-    formData.append("id_registro", registro.id_registro);
-    formData.append("id_empleado", usuario.id_empleado);
+    formData.append("id_registro", idRegistro);
+    formData.append("id_empleado", idEmpleado);
     formData.append("id_ubicacion_regreso", id_ubicacion_regreso);
     formData.append("km_regreso", parseInt(km_regreso));
     formData.append("combustible_regreso", parseInt(fuel));

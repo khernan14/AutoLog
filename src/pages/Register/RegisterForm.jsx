@@ -1,8 +1,8 @@
+// src/pages/RegisterForm.jsx
 import { useEffect, useState } from "react";
 import { Box, Typography, CircularProgress } from "@mui/joy";
 import { useSearchParams } from "react-router-dom";
 import { obtenerRegistroActivo } from "../../services/RegistrosService";
-import { STORAGE_KEYS } from "../../config/variables";
 import Swal from "sweetalert2";
 import SalidaForm from "../../components/RegisterForm/RegisterSalidaForm";
 import {
@@ -11,9 +11,15 @@ import {
 } from "../../services/VehiculosService";
 import RegresoForm from "../../components/RegisterForm/RegisterRegresoForm";
 import { getEmailSupervisor } from "../../services/AuthServices";
+import { useAuth } from "../../context/AuthContext";
 
+/**
+ * RegisterForm - Página que decide si mostrar formulario de salida o de regreso.
+ * Normaliza registroActivo para evitar falsos negativos/positivos.
+ */
 export default function RegisterForm() {
-  const [usuario, setUsuario] = useState(null);
+  const { userData, checkingSession } = useAuth();
+
   const [emailSupervisor, setEmailSupervisor] = useState(null);
   const [registroActivo, setRegistroActivo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,28 +29,50 @@ export default function RegisterForm() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
+  // Helper para extraer id usable por la API
+  const getUserIdForApi = () =>
+    userData?.id_empleado ?? userData?.id ?? userData?.id_usuario ?? null;
 
-    if (!storedUser) {
-      console.warn("Usuario no encontrado en localStorage");
+  // Normalizador: devuelve true si el objeto parece un "registro pendiente"
+  const isValidRegistro = (r) => {
+    if (!r) return false;
+    // el backend puede devolver diferentes shape: id_registro, id, idRegistro...
+    return (
+      !!r.id_registro ||
+      !!r.id ||
+      !!r.idRegistro ||
+      !!r.id_vehiculo ||
+      !!r.idVehiculo
+    );
+  };
+
+  useEffect(() => {
+    // Espera a que Auth termine de comprobar
+    if (checkingSession) return;
+
+    const userId = getUserIdForApi();
+    if (!userId) {
+      console.warn(
+        "[RegisterForm] Usuario no autenticado o falta id en userData"
+      );
       setLoading(false);
       return;
     }
 
-    const parsedUser = JSON.parse(storedUser);
-    setUsuario(parsedUser);
+    setLoading(true);
 
     const loadAll = async () => {
       try {
-        // Si tu endpoint de obtenerRegistroActivo espera id_empleado,
-        // cámbialo aquí a parsedUser.id_empleado
         const [registro, vehs, vehFromToken] = await Promise.all([
-          obtenerRegistroActivo(parsedUser.id),
+          // obtenerRegistroActivo espera un id (ajusta si tu API necesita otro campo)
+          obtenerRegistroActivo(userId),
           obtenerVehiculos(),
           token
             ? resolveVehiculoFromQrToken(token).catch((err) => {
-                console.error("Error al resolver token de QR:", err);
+                console.error(
+                  "[RegisterForm] resolveVehiculoFromQrToken error:",
+                  err
+                );
                 Swal.fire({
                   title: "Código no válido",
                   text: "El código QR es inválido o ha expirado. Selecciona el vehículo manualmente.",
@@ -56,48 +84,67 @@ export default function RegisterForm() {
             : Promise.resolve(null),
         ]);
 
-        if (registro) {
-          setRegistroActivo(registro);
+        // Normalizamos: si registro viene vacío o con estructura inesperada lo ponemos en null
+        const normalizedRegistro = isValidRegistro(registro) ? registro : null;
+
+        if (normalizedRegistro) {
+          // Guardamos tal cual (puedes normalizar más si quieres)
+          setRegistroActivo(normalizedRegistro);
+
+          // Aviso al usuario (mantienes tu SweetAlert)
           Swal.fire({
             title: "Tienes un registro pendiente",
             text: "Debes registrar el regreso del vehículo antes de hacer otra salida.",
             icon: "info",
             confirmButtonText: "Entendido",
           });
+        } else {
+          setRegistroActivo(null);
         }
 
         setVehicles(Array.isArray(vehs) ? vehs : []);
 
         if (vehFromToken) {
-          // { id_vehiculo, placa, marca, modelo }
           setVehiculoQR(vehFromToken);
         }
       } catch (error) {
-        console.error("Error al cargar datos de registro:", error);
+        console.error(
+          "[RegisterForm] Error al cargar datos de registro:",
+          error
+        );
       } finally {
         setLoading(false);
       }
     };
 
     loadAll();
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingSession, token, userData]);
 
+  // Cargar email del supervisor
   useEffect(() => {
     const loadEmailSupervisor = async () => {
-      if (!usuario?.id_empleado) return;
+      const userId = getUserIdForApi();
+      if (!userId) return;
 
       try {
-        const data = await getEmailSupervisor(usuario.id_empleado);
+        const data = await getEmailSupervisor(userId);
         setEmailSupervisor(data);
       } catch (error) {
-        console.error("Error al obtener el email del supervisor:", error);
+        console.error(
+          "[RegisterForm] Error al obtener el email del supervisor:",
+          error
+        );
       }
     };
 
-    loadEmailSupervisor();
-  }, [usuario]);
+    if (!checkingSession && userData) {
+      loadEmailSupervisor();
+    }
+  }, [checkingSession, userData]);
 
-  if (loading) {
+  // Spinner mientras auth o datos cargan
+  if (checkingSession || loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
         <CircularProgress />
@@ -105,24 +152,49 @@ export default function RegisterForm() {
     );
   }
 
+  // Si no está autenticado
+  if (!userData) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography level="h5">No autenticado</Typography>
+        <Typography level="body-sm">
+          Inicia sesión para registrar salidas/regresos.
+        </Typography>
+      </Box>
+    );
+  }
+
+  // DEBUG: mostrar en consola la decisión antes de render
+  console.log("[RegisterForm] registroActivo:", registroActivo);
+
+  // Determina explícitamente si debemos mostrar el formulario de regreso
+  const isRegreso = Boolean(
+    registroActivo &&
+      (registroActivo.id_registro ||
+        registroActivo.id ||
+        registroActivo.idRegistro ||
+        registroActivo.id_vehiculo ||
+        registroActivo.idVehiculo)
+  );
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography level="h4" mb={2}>
-        {registroActivo
+        {isRegreso
           ? "Registrar regreso de vehículo"
           : "Registrar salida de vehículo"}
       </Typography>
 
-      {registroActivo ? (
+      {isRegreso ? (
         <RegresoForm
           registro={registroActivo}
-          usuario={usuario}
+          usuario={userData}
           emailSupervisor={emailSupervisor}
         />
       ) : (
         <SalidaForm
           vehicles={vehicles}
-          usuario={usuario}
+          usuario={userData}
           emailSupervisor={emailSupervisor}
           vehiculoPreseleccionado={vehiculoQR}
         />

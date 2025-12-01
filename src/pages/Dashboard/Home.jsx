@@ -1,4 +1,3 @@
-// src/pages/Dashboard/Home.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -41,17 +40,9 @@ import {
 } from "@/services/ReportServices";
 
 import { getPinnedChangelogs, statusToJoyColor } from "@/services/help.api";
+import { useAuth } from "@/context/AuthContext";
 
 const MotionCard = motion(Card);
-
-const getUserName = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user"));
-    return user?.nombre || "Usuario";
-  } catch {
-    return "Usuario";
-  }
-};
 
 const getFormattedDate = () => {
   const now = new Date();
@@ -73,7 +64,9 @@ function pickStableItem(arr) {
 }
 
 export default function Home() {
-  const userName = getUserName();
+  const { userData } = useAuth();
+  const userName = (userData?.nombre && String(userData.nombre)) || "Usuario";
+
   const today = getFormattedDate();
   const navigate = useNavigate();
 

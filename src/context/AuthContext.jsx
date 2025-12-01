@@ -1,60 +1,54 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { STORAGE_KEYS } from "../config/variables"; // Asegúrate de que tenga TOKEN y USER definidos
+import * as AuthServices from "../services/AuthServices";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const userDataString = localStorage.getItem(STORAGE_KEYS.USER);
-    // console.log("AuthContext: UserData string from localStorage:", userDataString); // Debugging
-    try {
-      return userDataString ? JSON.parse(userDataString) : null;
-    } catch (e) {
-      console.error("Error parsing user data from localStorage:", e);
-      return null;
-    }
-  });
-
-  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-    if (!token || isExpired(token)) {
-      setIsSessionExpired(true);
-      // Opcional: Si la sesión expiró, limpia el usuario para forzar re-login
-      if (user) {
+    // Al montar, reconstruimos sesión desde /auth/me (cookie httpOnly)
+    const init = async () => {
+      try {
+        const serverUser = await AuthServices.me();
+        setUser(serverUser);
+      } catch (e) {
         setUser(null);
-        localStorage.removeItem(STORAGE_KEYS.USER);
+      } finally {
+        setCheckingSession(false);
       }
-    }
-    setCheckingSession(false);
-  }, [user]); // Añadir 'user' como dependencia para re-evaluar si el usuario cambia
+    };
+    init();
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    setUser(null);
-    setIsSessionExpired(false);
-    navigate("/auth/login");
+  const refreshUser = async () => {
+    try {
+      const serverUser = await AuthServices.me();
+      setUser(serverUser);
+      return serverUser;
+    } catch (e) {
+      setUser(null);
+      return null;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await AuthServices.logout();
+    } catch (e) {
+      console.error("logout error", e);
+    } finally {
+      setUser(null);
+      navigate("/auth/login");
+    }
   };
 
   const hasPermiso = (permisoNombre) => {
-    // console.log(`Checking permission for ${permisoNombre}. User permissions:`, user?.permisos); // Debugging
     return user?.permisos?.includes(permisoNombre);
-  };
-
-  const restoreSessionFromStorage = () => {
-    const userDataString = localStorage.getItem(STORAGE_KEYS.USER);
-    try {
-      const parsedUser = userDataString ? JSON.parse(userDataString) : null;
-      setUser(parsedUser);
-    } catch (e) {
-      console.error("Error restoring user from localStorage:", e);
-      setUser(null);
-    }
   };
 
   return (
@@ -62,12 +56,10 @@ export const AuthProvider = ({ children }) => {
       value={{
         userData: user,
         setUser,
-        isSessionExpired,
-        setIsSessionExpired,
         logout,
         checkingSession,
         hasPermiso,
-        restoreSessionFromStorage, // 👈 agregado aquí
+        refreshUser,
       }}>
       {children}
     </AuthContext.Provider>
@@ -75,13 +67,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-
-const isExpired = (token) => {
-  try {
-    const [, payload] = token.split(".");
-    const decoded = JSON.parse(atob(payload));
-    return decoded.exp * 1000 < Date.now();
-  } catch {
-    return true;
-  }
-};

@@ -26,11 +26,18 @@ import Autocomplete from "@mui/joy/Autocomplete";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
+/**
+ * SalidaForm robusto:
+ * - resuelve id_empleado desde props.usuario o desde localStorage (fallback)
+ * - maneja preselección vía vehiculoPreseleccionado (QR)
+ * - logs para depuración
+ */
+
 export default function SalidaForm({
-  vehicles,
-  usuario,
-  emailSupervisor,
-  vehiculoPreseleccionado,
+  vehicles = [],
+  usuario = null,
+  emailSupervisor = null,
+  vehiculoPreseleccionado = null,
 }) {
   const [vehicleSelected, setVehicleSelected] = useState("");
   const [listVehicles, setListVehicles] = useState([]);
@@ -45,21 +52,63 @@ export default function SalidaForm({
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!usuario?.id_empleado) return;
+  // Helper para resolver idEmpleado de forma robusta
+  const resolveIdEmpleado = () => {
+    let id = usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
 
-    const loadListVehicles = async () => {
-      const data = await ListarVehiculosEmpleado(usuario.id_empleado);
-      if (data) setListVehicles(data);
+    if (!id) {
+      try {
+        const stored =
+          localStorage.getItem("user") ||
+          localStorage.getItem("USER") ||
+          localStorage.getItem("usuario");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          id = parsed?.id_empleado ?? parsed?.id ?? parsed?.id_usuario ?? id;
+        }
+      } catch (err) {
+        console.warn("No se pudo parsear user de localStorage:", err);
+      }
+    }
+    return id;
+  };
+
+  // Cargar la lista de vehículos asignados al empleado
+  useEffect(() => {
+    const load = async () => {
+      const idEmpleado = resolveIdEmpleado();
+      console.log(
+        "[SalidaForm] resolveIdEmpleado:",
+        idEmpleado,
+        "usuario:",
+        usuario
+      );
+      if (!idEmpleado) {
+        // no hacemos nada — el componente padre debe controlar la autenticación
+        return;
+      }
+
+      try {
+        const data = await ListarVehiculosEmpleado(idEmpleado);
+        setListVehicles(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error al listar vehículos del empleado:", err);
+        setListVehicles([]);
+      }
     };
-    loadListVehicles();
+
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
 
+  // Manejar cambio/selección de vehículo (id)
   const handleVehicleChange = async (_, value) => {
-    setVehicleSelected(value);
+    // value puede ser id (number) o null
+    const id = value ?? null;
+    setVehicleSelected(id);
     setErrorMessage("");
 
-    if (!value) {
+    if (!id) {
       setKmActual("");
       setFuelActual("");
       setKmManual(true);
@@ -68,17 +117,18 @@ export default function SalidaForm({
     }
 
     try {
-      const kilometraje = await obtenerKmActual(value);
-      const combustible = await obtenerCombustibleActual(value);
+      const kilometraje = await obtenerKmActual(id);
+      const combustible = await obtenerCombustibleActual(id);
 
-      const km = kilometraje?.km_regreso || 0;
-      const combustibleActual = combustible?.combustible_regreso || 0;
+      const km = kilometraje?.km_regreso ?? kilometraje?.km ?? 0;
+      const combustibleActual =
+        combustible?.combustible_regreso ?? combustible?.combustible ?? 0;
 
-      if (km > 0 && combustibleActual > 0) {
-        setKmActual(km.toString());
-        setKmManual(false);
-        setFuelActual(combustibleActual.toString());
-        setFuelManual(false);
+      if (km > 0 || combustibleActual > 0) {
+        setKmActual(km ? String(km) : "");
+        setKmManual(!km);
+        setFuelActual(combustibleActual ? String(combustibleActual) : "");
+        setFuelManual(!combustibleActual);
       } else {
         setKmActual("");
         setKmManual(true);
@@ -86,7 +136,7 @@ export default function SalidaForm({
         setFuelManual(true);
       }
     } catch (error) {
-      console.error("Error obteniendo datos:", error);
+      console.error("Error obteniendo datos de km/combustible:", error);
       setKmActual("");
       setKmManual(true);
       setFuelActual("");
@@ -94,24 +144,30 @@ export default function SalidaForm({
     }
   };
 
-  // 👉 Si viene desde QR, preseleccionamos el vehículo y cargamos km/combustible
+  // Si viene desde QR (vehiculoPreseleccionado), preseleccionarlo
   useEffect(() => {
     if (!vehiculoPreseleccionado) return;
 
     const idFromQR =
-      vehiculoPreseleccionado.id_vehiculo ?? vehiculoPreseleccionado.id;
+      vehiculoPreseleccionado.id_vehiculo ??
+      vehiculoPreseleccionado.id ??
+      vehiculoPreseleccionado?.vehiculoId ??
+      null;
     if (!idFromQR) return;
 
+    // fijamos vehicleSelected y cargamos km/combustible
     setVehicleSelected(idFromQR);
+    // llamamos handleVehicleChange para cargar km/combustible
     handleVehicleChange(null, idFromQR);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehiculoPreseleccionado]);
 
-  // Para que el Autocomplete reciba el objeto completo
+  // Para que Autocomplete reciba el objeto completo
   const selectedVehiculoObj = useMemo(() => {
     if (!vehicleSelected) return null;
     const idNum =
       typeof vehicleSelected === "string"
-        ? parseInt(vehicleSelected)
+        ? parseInt(vehicleSelected, 10)
         : vehicleSelected;
     if (!idNum) return null;
     return listVehicles.find((v) => v.id === idNum) || null;
@@ -122,6 +178,7 @@ export default function SalidaForm({
     setErrorMessage("");
     setIsSubmitting(true);
 
+    // Validaciones básicas
     if (
       !kmActual ||
       !vehicleSelected ||
@@ -134,9 +191,8 @@ export default function SalidaForm({
       return;
     }
 
-    // Validaciones adicionales
-    const kmParsed = parseInt(kmActual);
-    const fuelParsed = parseInt(fuelActual);
+    const kmParsed = parseInt(kmActual, 10);
+    const fuelParsed = parseInt(fuelActual, 10);
 
     if (
       isNaN(kmParsed) ||
@@ -152,16 +208,60 @@ export default function SalidaForm({
       return;
     }
 
-    const foundVehicle = vehicles.find(
-      (v) => v.id === parseInt(vehicleSelected)
-    );
+    // resolver id empleado robustamente
+    let idEmpleado = resolveIdEmpleado();
+    if (!idEmpleado) {
+      setErrorMessage(
+        "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+      );
+      setIsSubmitting(false);
+      return;
+    }
 
+    // resolver vehiculo
+    const selectedId =
+      typeof vehicleSelected === "string"
+        ? parseInt(vehicleSelected, 10)
+        : vehicleSelected;
+    let foundVehicle =
+      vehicles.find((v) => v.id === selectedId) ||
+      listVehicles.find((v) => v.id === selectedId) ||
+      null;
+
+    // si no encontramos el vehículo, tratamos de usar el objeto preseleccionado
+    if (!foundVehicle && vehiculoPreseleccionado) {
+      const idFromQR =
+        vehiculoPreseleccionado.id_vehiculo ??
+        vehiculoPreseleccionado.id ??
+        null;
+      if (idFromQR === selectedId) {
+        foundVehicle = {
+          id: idFromQR,
+          placa: vehiculoPreseleccionado.placa,
+          marca: vehiculoPreseleccionado.marca,
+          modelo: vehiculoPreseleccionado.modelo,
+          LocationID: vehiculoPreseleccionado.LocationID ?? null,
+        };
+      }
+    }
+
+    if (!foundVehicle) {
+      setErrorMessage("Vehículo no válido. Selecciona un vehículo existente.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Construir formData
     const formData = new FormData();
-    formData.append("id_empleado", usuario.id_empleado);
-    formData.append("id_vehiculo", foundVehicle?.id);
-    formData.append("id_ubicacion_salida", foundVehicle?.LocationID ?? null);
-    formData.append("km_salida", parseInt(kmActual));
-    formData.append("combustible_salida", parseInt(fuelActual));
+    formData.append("id_empleado", idEmpleado);
+    formData.append("id_vehiculo", foundVehicle.id);
+    // LocationID puede llamarse distinto; si no existe dejamos null
+    formData.append(
+      "id_ubicacion_salida",
+      foundVehicle?.LocationID ?? foundVehicle?.locationId ?? ""
+    );
+    formData.append("km_salida", kmParsed);
+    formData.append("combustible_salida", fuelParsed);
     formData.append("comentario_salida", observations);
 
     images.forEach((file) => {
@@ -169,6 +269,13 @@ export default function SalidaForm({
     });
 
     try {
+      console.log("[SalidaForm] enviando registro:", {
+        id_empleado: idEmpleado,
+        id_vehiculo: foundVehicle.id,
+        km_salida: kmParsed,
+        combustible_salida: fuelParsed,
+      });
+
       const register = await registrarSalida(formData);
 
       if (register) {
@@ -182,27 +289,33 @@ export default function SalidaForm({
             state: { mensaje: "Salida registrada con éxito 🚗✅" },
           });
 
-          if (emailSupervisor?.supervisor_email) {
-            sendNotificacionSalida({
-              to: [usuario.email, emailSupervisor.supervisor_email],
-              employeeName: usuario.nombre,
-              vehicleName: foundVehicle.placa,
-              supervisorName: emailSupervisor.supervisor_nombre,
-            });
+          try {
+            if (emailSupervisor?.supervisor_email) {
+              sendNotificacionSalida({
+                to: [usuario?.email, emailSupervisor.supervisor_email].filter(
+                  Boolean
+                ),
+                employeeName: usuario?.nombre,
+                vehicleName: foundVehicle.placa,
+                supervisorName: emailSupervisor.supervisor_nombre,
+              });
+            }
+          } catch (err) {
+            console.warn("No se pudo enviar notificación de salida:", err);
           }
         });
       }
     } catch (error) {
       console.error("Error al registrar la salida:", error);
 
-      const errorMessage =
-        error?.response?.data?.error || // si usas axios
-        error?.message || // mensaje de JS
+      const errMsg =
+        error?.response?.data?.error ||
+        error?.message ||
         "Ocurrió un error al registrar la salida. Intenta de nuevo.";
 
       Swal.fire({
         title: "Error",
-        text: errorMessage,
+        text: errMsg,
         icon: "error",
       });
     } finally {
@@ -270,6 +383,7 @@ export default function SalidaForm({
                   return;
                 }
                 const id = newValue.id;
+                setVehicleSelected(id);
                 handleVehicleChange(null, id);
               }}
               disabled={!!vehiculoPreseleccionado}

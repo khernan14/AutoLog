@@ -1,3 +1,4 @@
+// src/pages/Dashboard/MyAccountProfile.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
@@ -14,9 +15,12 @@ import {
   Chip,
 } from "@mui/joy";
 import { getUsersById } from "../../../services/AuthServices.jsx";
+import { useAuth } from "../../../context/AuthContext"; // <- usamos el contexto
+import Swal from "sweetalert2";
 
 // Vista de perfil (solo lectura) con layout vertical
 export default function MyAccountProfile() {
+  const { userData } = useAuth(); // fuente de verdad
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -25,17 +29,25 @@ export default function MyAccountProfile() {
 
   const theme = useTheme();
 
-  const storedUser = useMemo(() => {
+  /**
+   * Resolve id_usuario:
+   * - Preferimos userData (lo que venga desde /auth/me o login)
+   * - Si no hay userData, hacemos un fallback mínimo a localStorage (solo una lectura)
+   */
+  const id_usuario = useMemo(() => {
+    if (userData?.id_usuario) return userData.id_usuario;
+    if (userData?.id) return userData.id;
+    // fallback limpio: solo una lectura segura de localStorage (si existe)
     try {
-      const userString = localStorage.getItem("user");
-      return userString ? JSON.parse(userString) : null;
-    } catch (error) {
-      console.error("Error al parsear el usuario del localStorage:", error);
+      const s = localStorage.getItem("user");
+      if (!s) return null;
+      const parsed = JSON.parse(s);
+      return parsed?.id_usuario || parsed?.id || null;
+    } catch (e) {
+      console.warn("No se pudo parsear localStorage fallback user:", e);
       return null;
     }
-  }, []);
-
-  const id_usuario = storedUser?.id_usuario || storedUser?.id;
+  }, [userData]);
 
   const showSnackbar = (message, color = "neutral") => {
     setSnackbarMessage(message);
@@ -55,12 +67,17 @@ export default function MyAccountProfile() {
     if (!id_usuario) {
       showSnackbar("No se pudo identificar el usuario.", "danger");
       setLoading(false);
+      setUser(null);
       return;
     }
     try {
       const data = await getUsersById(id_usuario);
+      // tu endpoint devuelve array con perfil en la posición 0 (según tu controller)
       if (Array.isArray(data) && data.length > 0) {
         setUser(data[0]);
+      } else if (data && typeof data === "object") {
+        // por si devuelve directamente objeto
+        setUser(data);
       } else {
         showSnackbar("Usuario no encontrado.", "warning");
         setUser(null);
@@ -175,13 +192,14 @@ export default function MyAccountProfile() {
                 spacing={2}
                 alignItems={{ xs: "center", sm: "flex-start" }}>
                 <Avatar sx={{ "--Avatar-size": "96px", fontSize: 32 }}>
-                  {getInitials(user?.nombre || "")}
+                  {getInitials(user?.nombre || user?.nombre_completo || "")}
                 </Avatar>
                 <Stack
                   spacing={0.5}
                   sx={{ textAlign: { xs: "center", sm: "left" } }}>
                   <Typography level="h3">
                     {`${user?.nombre || ""} ${user?.apellido || ""}`.trim() ||
+                      user?.nombre_completo ||
                       "Usuario"}
                   </Typography>
                   <Typography level="body-sm" color="neutral">
