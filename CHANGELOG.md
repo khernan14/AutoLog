@@ -1,3 +1,11 @@
+## v2.0.0 - 2025-12-08
+
+* chore(release): v2.0.0 (e908307)
+* feat(security): implement 2FA flow and login alerts feat(settings): replace Profile section with new Home dashboard fix(auth): handle 2FA requirement in login flow (b31dbdc)
+* docs(changelog): v1.3.0 (63d4bf6)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v1.3.0...v2.0.0
+
 ## v1.3.0 - 2025-12-01
 
 * chore(release): v1.3.0 (366052d)
@@ -123,6 +131,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
