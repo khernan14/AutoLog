@@ -153,6 +153,12 @@ export const endpoints = {
   viaticosCiudades: `${API_BASE_URL}/viaticos/ciudades`,
   viaticosLiquidaciones: `${API_BASE_URL}/viaticos/liquidaciones`,
   viaticosComprobantes: `${API_BASE_URL}/viaticos/comprobantes`,
+
+  // ajustes / settings
+  getSettings: `${API_BASE_URL}/settings/`,
+  getSection: `${API_BASE_URL}/settings/`,
+  patchSection: `${API_BASE_URL}/settings/`,
+  getSectionHistory: `${API_BASE_URL}/settings/`,
 };
 
 // src/js/config/variables.js
