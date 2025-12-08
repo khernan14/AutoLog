@@ -19,80 +19,87 @@ import {
 } from "@mui/joy";
 import { Shield, Smartphone, AlertTriangle } from "lucide-react";
 import { SectionHeader } from "./_shared/SectionHeader.jsx";
-// Asegúrate de crear este archivo en el paso 3
 import TwoFactorSetupModal from "./modals/TwoFactorSetupModal.jsx";
 import usePermissions from "../../../hooks/usePermissions.js";
+import { useSettings } from "../../../context/SettingsContext.jsx"; // 👈 IMPORTANTE: Importar hook
 
 export default function Seguridad({ initialData = {}, onSave }) {
   const perms = usePermissions();
+  const { reload } = useSettings(); // 👈 Obtenemos reload del contexto
   const canEdit = perms.has("editar_configuraciones") || perms.isAdmin;
 
-  // Estados para manejar la UI
   const [tfaEnabled, setTfaEnabled] = useState(false);
   const [setupModalOpen, setSetupModalOpen] = useState(false);
-  const [setupData, setSetupData] = useState(null); // Aquí guardamos el QR y el secret
+  const [setupData, setSetupData] = useState(null);
   const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
 
-  // Sincronizar estado inicial
   useEffect(() => {
+    // Aseguramos leer el valor booleano correcto
     setTfaEnabled(Boolean(initialData?.tfa_enabled));
   }, [initialData]);
 
-  // Manejar el click en el Switch
   const handleToggleTfa = async (event) => {
-    const isChecking = event.target.checked; // ¿El usuario quiere activar (true) o desactivar (false)?
-
+    const isChecking = event.target.checked;
     if (isChecking) {
       // --- ACTIVAR ---
       try {
         setLoadingAction(true);
-        // Pedimos al backend que inicie el proceso (nos debe devolver el QR)
         const res = await onSave({ tfa_enroll_init: true });
-
-        // Si el backend responde con datos, abrimos el modal
-        // La estructura de 'res' depende de cómo la devuelve 'saveSection' en SettingsContext
-        // Normalmente viene en res.data o res directamente.
         const data = res.data || res;
 
         if (data?.qr_image) {
           setSetupData(data);
-          setSetupModalOpen(true); // ¡ABRIR MODAL!
+          setSetupModalOpen(true);
         } else {
-          console.warn("No se recibió código QR del backend:", res);
+          // Si el backend activó directo (raro), recargamos para estar seguros
+          await reload();
         }
       } catch (error) {
         console.error("Error iniciando 2FA", error);
+        // Si falla, recargamos para revertir el switch visual
+        reload();
       } finally {
         setLoadingAction(false);
       }
     } else {
       // --- DESACTIVAR ---
-      setConfirmDisableOpen(true); // Pedir confirmación antes de apagar
+      setConfirmDisableOpen(true);
     }
   };
 
-  // Verificar el código que ingresa el usuario en el modal
   const handleVerifyCode = async (code) => {
-    const res = await onSave({
-      tfa_enroll_verify: true,
-      token: code,
-      secret: setupData?.secret,
-    });
-    // Si no da error, asumimos éxito
-    setTfaEnabled(true);
-    setSetupModalOpen(false);
-    setSetupData(null);
-    return res;
+    try {
+      const res = await onSave({
+        tfa_enroll_verify: true,
+        token: code,
+        secret: setupData?.secret,
+      });
+      setSetupModalOpen(false);
+      setSetupData(null);
+      // Éxito: El estado local se actualizará solo via initialData,
+      // pero podemos forzar reload para asegurar limpieza.
+      await reload();
+      return res;
+    } catch (error) {
+      throw error; // El modal manejará el error visual
+    }
   };
 
-  // Confirmar desactivación
+  // 🟢 NUEVO: Manejar cierre del modal (Cancelar)
+  const handleCloseModal = () => {
+    setSetupModalOpen(false);
+    setSetupData(null);
+    // Si cancela, recargamos para borrar el estado 'tfa_enroll_init' y recuperar las alertas reales
+    reload();
+  };
+
   const handleConfirmDisable = async () => {
     try {
       setLoadingAction(true);
       await onSave({ tfa_enabled: false });
-      setTfaEnabled(false);
       setConfirmDisableOpen(false);
+      await reload(); // Asegurar sincronía
     } catch (error) {
       console.error(error);
     } finally {
@@ -150,20 +157,22 @@ export default function Seguridad({ initialData = {}, onSave }) {
                 Recibe un email ante accesos nuevos.
               </Typography>
             </ListItemContent>
-            {/* Este switch controla 'login_alerts' directamente */}
+            {/* Controlado directamente por initialData */}
             <Switch
               checked={!!initialData?.login_alerts}
               disabled={!canEdit}
-              onChange={(e) => onSave({ login_alerts: e.target.checked })}
+              onChange={async (e) => {
+                // Pequeño truco: esperamos a que termine y recargamos si queremos estar 100% seguros
+                await onSave({ login_alerts: e.target.checked });
+              }}
             />
           </ListItem>
         </List>
       </Card>
 
-      {/* Modales */}
       <TwoFactorSetupModal
         open={setupModalOpen}
-        onClose={() => setSetupModalOpen(false)}
+        onClose={handleCloseModal} // 🟢 Usamos el nuevo handler
         setupData={setupData}
         onVerify={handleVerifyCode}
       />
