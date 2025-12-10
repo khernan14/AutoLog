@@ -30,6 +30,7 @@ import RestoreFromTrashRoundedIcon from "@mui/icons-material/RestoreFromTrashRou
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import SecurityRoundedIcon from "@mui/icons-material/Security";
 
 import Swal from "sweetalert2";
 
@@ -44,6 +45,8 @@ import {
   restoreUser as restoreUserService,
   getUserSupervisors,
 } from "../../services/AuthServices";
+import UserPermissionsDrawer from "../../components/Users/Permissions/UserPermissionsDrawer";
+
 import { getCiudades } from "../../services/RegistrosService";
 import { sendMail, sendRecoveryPassword } from "../../services/MailServices";
 
@@ -83,6 +86,9 @@ export default function Users() {
   const [saving, setSaving] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const [permDrawerOpen, setPermDrawerOpen] = useState(false);
+  const [permUser, setPermUser] = useState(null);
 
   // ---- auth/perm ----
   const { userData, checkingSession, hasPermiso } = useAuth();
@@ -304,6 +310,14 @@ export default function Users() {
         "danger"
       );
     }
+  };
+
+  const onManagePermissions = (user) => {
+    if (!isAdmin && !hasPermiso("asignar_permisos")) {
+      return showToast("No tienes permiso para gestionar accesos.", "warning");
+    }
+    setPermUser(user);
+    setPermDrawerOpen(true);
   };
 
   const onSubmitUser = async (payload) => {
@@ -779,6 +793,16 @@ export default function Users() {
                             </span>
                           </Tooltip>
 
+                          <Tooltip title="Gestionar permisos" variant="soft">
+                            <IconButton
+                              size="sm"
+                              color="warning" // Un color distintivo
+                              variant="soft"
+                              onClick={() => onManagePermissions(u)}>
+                              <SecurityRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+
                           {/* Inactivar / Restaurar */}
                           {!isInactive && (
                             <Tooltip
@@ -844,6 +868,19 @@ export default function Users() {
             onResetPassword={onResetPassword}
           />
         )}
+
+        <UserPermissionsDrawer
+          open={permDrawerOpen}
+          onClose={() => {
+            setPermDrawerOpen(false);
+            setPermUser(null);
+          }}
+          user={permUser}
+          onUpdateSuccess={() => {
+            // Opcional: si necesitas recargar la lista de usuarios, llama a load()
+            // load();
+          }}
+        />
       </Box>
     </Sheet>
   );

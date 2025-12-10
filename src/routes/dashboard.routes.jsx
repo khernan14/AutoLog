@@ -15,7 +15,7 @@ import Reservas from "@/pages/Register/Reservas";
 import Countries from "@/pages/Administration/Locations/Countries";
 import Cities from "@/pages/Administration/Locations/Cities";
 import Parkings from "@/pages/Administration/Parkings/Parkings";
-import Permissions from "@/pages/Administration/Permissions/Permissions";
+// import Permissions from "@/pages/Administration/Permissions/Permissions";
 import NotificationGroupsPage from "@/pages/Administration/NotificationGroups/NotificationGroupsPage";
 // import Reports from "@/pages/Reports/ReportsPage.jsx";
 import ReportsRouter from "@/pages/Reports/ReportsRouter.jsx";
@@ -83,7 +83,7 @@ export default function DashboardRoutes() {
         <Route path="countries" element={<Countries />} />
         <Route path="cities" element={<Cities />} />
         <Route path="parkings" element={<Parkings />} />
-        <Route path="permissions" element={<Permissions />} />
+        {/* <Route path="permissions" element={<Permissions />} /> */}
         <Route
           path="notificacion-grupos"
           element={<NotificationGroupsPage />}

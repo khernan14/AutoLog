@@ -3,59 +3,47 @@ import {
   Box,
   Card,
   Typography,
-  Select,
-  Option,
   Button,
-  Input,
   Divider,
   Skeleton,
-  Sheet,
-  CircularProgress,
   Stack,
-  Tooltip,
-  IconButton,
+  Autocomplete,
+  AutocompleteOption,
+  Snackbar,
+  CircularProgress,
+  Chip,
+  Alert,
 } from "@mui/joy";
 
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import ClearIcon from "@mui/icons-material/Clear";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
-import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
 import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
-import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
-import { toast } from "react-toastify";
-import { useAuth } from "../../../context/AuthContext";
-
-import PermissionsTable from "../../../components/Administration/PermissionForms/PermissionsTable";
+import { useAuth } from "../../../context/AuthContext"; // Ajusta la ruta si es necesario
+import PermissionsTable from "../../../components/Administration/PermissionForms/PermissionsTable"; // Ajusta la ruta
 import {
   getAllUsers,
   getUserPermissions,
   updateUserPermissions,
-} from "../../../services/PermissionsServices";
+} from "../../../services/PermissionsServices"; // Ajusta la ruta
 
-import StatusCard from "../../../components/common/StatusCard";
+import StatusCard from "../../../components/common/StatusCard"; // Ajusta la ruta
 
-// --- Skeleton tabla de permisos ---
+// --- Skeleton para carga ---
 function PermissionsTableSkeleton() {
   return (
-    <Box
-      sx={{
-        mt: 2,
-        p: 2,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: "md",
-      }}>
-      {[...Array(6)].map((_, i) => (
+    <Box sx={{ mt: 2 }}>
+      {[...Array(3)].map((_, i) => (
         <Skeleton
           key={i}
           variant="rectangular"
           width="100%"
-          height={40}
-          sx={{ mb: i === 5 ? 0 : 1 }}
+          height={60}
+          sx={{ mb: 1, borderRadius: "md" }}
         />
       ))}
     </Box>
@@ -63,21 +51,17 @@ function PermissionsTableSkeleton() {
 }
 
 export default function Permissions() {
-  // ---- auth/perm ----
-  const { userData, checkingSession, hasPermiso } = useAuth();
+  // ---- Auth ----
+  const { userData, hasPermiso } = useAuth();
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
-
-  // Ajusta estos nombres si en tu API son distintos:
   const canView = isAdmin || hasPermiso("asignar_permisos");
-  const canEdit =
-    isAdmin || hasPermiso("asignar_permisos") || hasPermiso("asignar_permisos");
+  const canEdit = isAdmin || hasPermiso("asignar_permisos");
 
-  // ---- state principal ----
+  // ---- Estados ----
   const [usuarios, setUsuarios] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [usersError, setUsersError] = useState(null);
+  const [usuarioObj, setUsuarioObj] = useState(null); // Objeto completo del usuario seleccionado
 
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState("");
   const [loadingPerms, setLoadingPerms] = useState(false);
   const [permsError, setPermsError] = useState(null);
 
@@ -85,28 +69,36 @@ export default function Permissions() {
   const [permisosAsignados, setPermisosAsignados] = useState([]);
   const [permisosOriginales, setPermisosOriginales] = useState([]);
 
-  const [busqueda, setBusqueda] = useState("");
+  // ---- Snackbar (Reemplazo de Toast) ----
+  const [snack, setSnack] = useState({
+    open: false,
+    msg: "",
+    color: "neutral",
+    icon: null,
+  });
 
-  // ---- carga de usuarios ----
+  const showSnack = (msg, color = "success") => {
+    setSnack({
+      open: true,
+      msg,
+      color,
+      icon:
+        color === "success" ? <CheckCircleIcon /> : <ErrorOutlineRoundedIcon />,
+    });
+  };
+
+  // ---- Cargar Usuarios ----
   const loadUsuarios = useCallback(async () => {
     if (!canView) {
       setLoadingUsers(false);
-      setUsersError(null); // estado controlado por la tarjeta "sin permisos"
       return;
     }
-
     setLoadingUsers(true);
-    setUsersError(null);
     try {
       const res = await getAllUsers();
       setUsuarios(Array.isArray(res) ? res : []);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
-      setUsersError(
-        /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No se pudieron cargar los usuarios."
-      );
+      showSnack("Error al cargar lista de usuarios", "danger");
     } finally {
       setLoadingUsers(false);
     }
@@ -116,15 +108,22 @@ export default function Permissions() {
     loadUsuarios();
   }, [loadUsuarios]);
 
-  // ---- carga de permisos del usuario seleccionado ----
+  // ---- Cargar Permisos (Se ejecuta al seleccionar usuario) ----
   const loadPermisosUsuario = useCallback(async () => {
-    if (!usuarioSeleccionado) return;
+    if (!usuarioObj) {
+      setTodosLosPermisos({});
+      setPermisosAsignados([]);
+      return;
+    }
+
     setLoadingPerms(true);
     setPermsError(null);
     try {
-      const res = await getUserPermissions(usuarioSeleccionado);
-      // res.permisos esperado como { grupo: [ { nombre, asignado }, ... ], ... }
+      // Usamos el ID del objeto seleccionado
+      const res = await getUserPermissions(usuarioObj.id_usuario);
+
       const permisosObj = res?.permisos || {};
+      // Aplanamos la estructura para tener solo los nombres asignados
       const asignados = Object.values(permisosObj)
         .flat()
         .filter((p) => p?.asignado)
@@ -134,291 +133,217 @@ export default function Permissions() {
       setPermisosAsignados(asignados);
       setPermisosOriginales(asignados);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
-      setPermsError(
-        /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No tienes permisos para ver los permisos de este usuario."
-      );
+      console.error(err);
+      setPermsError("No se pudieron obtener los permisos.");
     } finally {
       setLoadingPerms(false);
     }
-  }, [usuarioSeleccionado]);
+  }, [usuarioObj]);
 
   useEffect(() => {
     loadPermisosUsuario();
   }, [loadPermisosUsuario]);
 
-  // ---- acciones ----
+  // ---- Detectar Cambios ----
   const hayCambios = useMemo(() => {
     const a = [...permisosAsignados].sort();
     const b = [...permisosOriginales].sort();
     return JSON.stringify(a) !== JSON.stringify(b);
   }, [permisosAsignados, permisosOriginales]);
 
+  // ---- Guardar ----
   const handleGuardarPermisos = async () => {
-    if (!canEdit) {
-      toast.warn("No tienes permiso para modificar permisos.");
-      return;
-    }
-    if (!usuarioSeleccionado) return;
+    if (!canEdit || !usuarioObj) return;
+
     try {
-      await updateUserPermissions(usuarioSeleccionado, permisosAsignados);
-      toast.success("Permisos actualizados correctamente");
-      // sincrono el baseline
+      await updateUserPermissions(usuarioObj.id_usuario, permisosAsignados);
+
+      showSnack("Permisos actualizados correctamente", "success");
+
+      // Actualizamos el estado "original" para deshabilitar el botón
       setPermisosOriginales(permisosAsignados);
+
+      // Opcional: Recargar los permisos para asegurar sincronía
+      // await loadPermisosUsuario();
     } catch (err) {
-      toast.error(err?.message || "Error al guardar permisos");
+      showSnack(err?.message || "Error al guardar cambios", "danger");
     }
   };
 
-  // ---- view state ----
-  const pageState = checkingSession
-    ? "checking"
-    : !canView
-    ? "no-permission"
-    : usersError
-    ? "error-users"
-    : loadingUsers
-    ? "loading-users"
-    : usuarios.length === 0
-    ? "empty-users"
-    : "data";
-
-  const renderPageState = () => {
-    if (pageState === "checking") {
-      return (
-        <StatusCard
-          icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
-        />
-      );
-    }
-    if (pageState === "no-permission") {
-      return (
+  // ---- Renderizado: Sin Permisos ----
+  if (!canView) {
+    return (
+      <Box p={4} display="flex" justifyContent="center">
         <StatusCard
           color="danger"
           icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para gestionar permisos"
-          description="Consulta con un administrador para obtener acceso."
+          title="Acceso Denegado"
+          description="No tienes permisos para gestionar roles."
         />
-      );
-    }
-    if (pageState === "error-users") {
-      const isNetwork = /conexión|fetch/i.test(usersError || "");
-      return (
-        <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork
-              ? "Problema de conexión"
-              : "No se pudo cargar la lista de usuarios"
-          }
-          description={usersError}
-          actions={
+      </Box>
+    );
+  }
+
+  // ---- Renderizado: UI Principal ----
+  return (
+    <Box
+      sx={{ width: "100%", maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
+      {/* Título y Descripción */}
+      <Box sx={{ mb: 3 }}>
+        <Typography
+          level="h2"
+          startDecorator={
+            <ManageAccountsIcon fontSize="xl2" sx={{ color: "primary.500" }} />
+          }>
+          Gestión de Permisos
+        </Typography>
+        <Typography level="body-md" color="neutral" sx={{ mt: 1 }}>
+          Configura los accesos y privilegios de los usuarios del sistema.
+        </Typography>
+      </Box>
+
+      <Stack spacing={3}>
+        {/* Tarjeta de Selección (Buscador) */}
+        <Card
+          variant="outlined"
+          sx={{
+            borderRadius: "lg",
+            boxShadow: "sm",
+            bgcolor: "background.surface",
+          }}>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            gap={2}
+            alignItems="flex-end">
+            <Box sx={{ flex: 1, width: "100%" }}>
+              <Typography level="title-sm" mb={1}>
+                Buscar Usuario
+              </Typography>
+              <Autocomplete
+                placeholder="Busca por nombre, rol o email..."
+                options={usuarios}
+                loading={loadingUsers}
+                getOptionLabel={(option) => `${option.nombre} (${option.rol})`}
+                isOptionEqualToValue={(option, value) =>
+                  option.id_usuario === value.id_usuario
+                }
+                value={usuarioObj}
+                onChange={(_, newValue) => setUsuarioObj(newValue)}
+                startDecorator={<PersonSearchIcon />}
+                endDecorator={
+                  loadingUsers ? <CircularProgress size="sm" /> : null
+                }
+                renderOption={(props, option) => (
+                  <AutocompleteOption {...props}>
+                    <Stack>
+                      <Typography level="title-sm">{option.nombre}</Typography>
+                      <Typography level="body-xs">
+                        {option.rol} • {option.email}
+                      </Typography>
+                    </Stack>
+                  </AutocompleteOption>
+                )}
+                sx={{ width: "100%" }}
+              />
+            </Box>
+
+            {/* Botón Guardar */}
             <Button
-              startDecorator={<RestartAltRoundedIcon />}
-              onClick={loadUsuarios}
-              variant="soft">
-              Reintentar
-            </Button>
-          }
-        />
-      );
-    }
-    if (pageState === "loading-users") {
-      return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando usuarios…</Typography>
-          </Stack>
-        </Sheet>
-      );
-    }
-    if (pageState === "empty-users") {
-      return (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="Sin usuarios"
-          description="Aún no hay usuarios registrados."
-        />
-      );
-    }
-    return null;
-  };
-
-  // --- filtro rápido (permiso) con botón limpiar ---
-  const searchInput = (
-    <Input
-      placeholder="Buscar permiso…"
-      value={busqueda}
-      onChange={(e) => setBusqueda(e.target.value)}
-      startDecorator={<SearchRoundedIcon />}
-      endDecorator={
-        busqueda ? (
-          <IconButton
-            size="sm"
-            variant="plain"
-            color="neutral"
-            onClick={() => setBusqueda("")}
-            aria-label="Limpiar búsqueda">
-            <ClearIcon />
-          </IconButton>
-        ) : null
-      }
-      sx={{ width: { xs: "100%", sm: 320 } }}
-      disabled={!usuarioSeleccionado}
-    />
-  );
-
-  // --- contenido cuando sí hay usuarios (pageState === 'data') ---
-  const content = (
-    <>
-      {/* Selector de usuario */}
-      <Typography level="body-md" mb={0.75}>
-        Selecciona un usuario:
-      </Typography>
-      <Select
-        placeholder="Seleccionar usuario"
-        value={usuarioSeleccionado || ""}
-        onChange={(_, value) => setUsuarioSeleccionado(value || "")}
-        sx={{ mb: 2, width: { xs: "100%", sm: 380 } }}>
-        {usuarios.map((u) => (
-          <Option key={u.id_usuario} value={u.id_usuario}>
-            {u.nombre} {u.rol ? `(${u.rol})` : ""}
-          </Option>
-        ))}
-      </Select>
-
-      {/* Buscador y acciones */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1.25}
-        alignItems={{ xs: "stretch", sm: "center" }}
-        justifyContent="space-between"
-        sx={{ mb: 1.5 }}>
-        {searchInput}
-
-        <Tooltip
-          title={
-            !usuarioSeleccionado
-              ? "Selecciona un usuario"
-              : !canEdit
-              ? "No tienes permisos para modificar"
-              : !hayCambios
-              ? "No hay cambios por guardar"
-              : "Guardar cambios"
-          }
-          variant="soft">
-          <span>
-            <Button
-              onClick={handleGuardarPermisos}
+              size="lg"
+              color="primary"
               startDecorator={<SaveIcon />}
-              disabled={
-                !usuarioSeleccionado || !canEdit || !hayCambios || loadingPerms
-              }
-              loading={loadingPerms}>
-              Guardar cambios
+              onClick={handleGuardarPermisos}
+              disabled={!usuarioObj || !hayCambios || loadingPerms}
+              loading={loadingPerms}
+              sx={{ width: { xs: "100%", md: "auto" } }}>
+              Guardar Cambios
             </Button>
-          </span>
-        </Tooltip>
-      </Stack>
+          </Stack>
+        </Card>
 
-      <Divider sx={{ mb: 2 }} />
-
-      {/* Estado de permisos del usuario */}
-      {!usuarioSeleccionado ? (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="Selecciona un usuario"
-          description="Elige un usuario para ver y editar sus permisos."
-        />
-      ) : loadingPerms ? (
-        <PermissionsTableSkeleton />
-      ) : permsError ? (
-        (() => {
-          const isNetwork = /conexión|fetch/i.test(permsError || "");
-          return (
+        {/* Área de Permisos */}
+        <Card
+          variant="outlined"
+          sx={{ minHeight: 400, borderRadius: "lg", boxShadow: "sm" }}>
+          {!usuarioObj ? (
+            // Estado Vacío
+            <Stack
+              alignItems="center"
+              justifyContent="center"
+              height="100%"
+              spacing={2}
+              py={8}
+              sx={{ opacity: 0.5 }}>
+              <PersonSearchIcon sx={{ fontSize: 64, color: "neutral.400" }} />
+              <Typography level="h4" textColor="neutral.500">
+                Selecciona un usuario
+              </Typography>
+              <Typography textColor="neutral.400">
+                Usa el buscador de arriba para comenzar.
+              </Typography>
+            </Stack>
+          ) : loadingPerms ? (
+            // Skeleton de Carga
+            <PermissionsTableSkeleton />
+          ) : permsError ? (
+            // Error
             <StatusCard
-              color={isNetwork ? "warning" : "danger"}
-              icon={
-                isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-              }
-              title={
-                isNetwork
-                  ? "Problema de conexión"
-                  : "No se pudieron cargar los permisos"
-              }
+              color="danger"
+              icon={<ErrorOutlineRoundedIcon />}
+              title="Error al cargar permisos"
               description={permsError}
               actions={
                 <Button
-                  startDecorator={<RestartAltRoundedIcon />}
+                  variant="soft"
                   onClick={loadPermisosUsuario}
-                  variant="soft">
+                  startDecorator={<RestartAltRoundedIcon />}>
                   Reintentar
                 </Button>
               }
             />
-          );
-        })()
-      ) : Object.keys(todosLosPermisos || {}).length === 0 ? (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="Sin permisos configurados"
-          description="Este usuario no tiene grupos de permisos disponibles."
-        />
-      ) : (
-        <PermissionsTable
-          permisosAsignados={permisosAsignados}
-          todosLosPermisos={todosLosPermisos}
-          onUpdate={setPermisosAsignados}
-          busquedaGlobal={busqueda}
-        />
-      )}
-    </>
-  );
+          ) : (
+            // Contenido Real
+            <>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}>
+                <Box>
+                  <Typography level="title-lg">
+                    Permisos de {usuarioObj.nombre}
+                  </Typography>
+                  <Typography level="body-xs">{usuarioObj.email}</Typography>
+                </Box>
+                <Chip variant="soft" color={hayCambios ? "warning" : "success"}>
+                  {hayCambios ? "Cambios sin guardar" : "Sincronizado"}
+                </Chip>
+              </Stack>
+              <Divider sx={{ mb: 2 }} />
 
-  // ---- UI ----
-  return (
-    <Box display="flex" justifyContent="center" mt={4} px={{ xs: 2, md: 4 }}>
-      <Card
-        sx={{
-          width: "100%",
-          maxWidth: 1000,
-          p: 3,
-          borderRadius: "lg",
-          boxShadow: "lg",
-          bgcolor: "background.body",
-        }}>
-        <Typography level="h3" mb={1}>
-          Gestión de Permisos
-        </Typography>
-        <Typography level="body-sm" color="neutral" sx={{ mb: 1.5 }}>
-          Asigna o revoca permisos por usuario. Usa el buscador para filtrar
-          rápidamente.
-        </Typography>
+              {/* Tu componente de tabla existente */}
+              <PermissionsTable
+                permisosAsignados={permisosAsignados}
+                todosLosPermisos={todosLosPermisos}
+                onUpdate={setPermisosAsignados}
+                busquedaGlobal=""
+              />
+            </>
+          )}
+        </Card>
+      </Stack>
 
-        {pageState !== "data" ? (
-          <Box mt={1.5}>{renderPageState()}</Box>
-        ) : (
-          content
-        )}
-      </Card>
+      {/* Notificaciones */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack({ ...snack, open: false })}
+        color={snack.color}
+        variant="soft"
+        startDecorator={snack.icon}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+        {snack.msg}
+      </Snackbar>
     </Box>
   );
 }

@@ -318,20 +318,11 @@ export default function Sidebar() {
       group: "Sistema",
     },
     {
-      path: "/admin/permissions",
-      icon: <VpnKeyIcon />,
-      label: "Roles y Permisos",
-      perm: "asignar_permisos",
-      canView: checkPermission("asignar_permisos"),
-      kind: "sistema",
-      group: "Sistema",
-    },
-    {
       path: "/admin/notificaciones",
       icon: <MarkChatUnreadIcon />,
       label: "Notificaciones",
-      perm: "ver_configuraciones",
-      canView: checkPermission("ver_configuraciones"),
+      perm: "ver_notificaciones",
+      canView: checkPermission("ver_notificaciones"),
       kind: "notificaciones",
       group: "Sistema",
     },
@@ -809,6 +800,7 @@ export default function Sidebar() {
             )}
 
             {(checkPermission("asignar_permisos") ||
+              checkPermission("ver_notificaciones") ||
               checkPermission("gestionar_usuarios")) && (
               <ListItem nested>
                 <Toggler
