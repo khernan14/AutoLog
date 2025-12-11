@@ -9,39 +9,47 @@ import ExpiredSessionOverlay from "../components/ExpiredSession/ExpiredSessionOv
 
 import PrivateRoute from "./PrivateRoute";
 import PublicRoute from "./PublicRoute";
+import ThemeSynchronizer from "@/components/common/ThemeSynchronizer";
+import { SettingsProvider } from "@/context/SettingsContext";
+import { AppThemeProvider } from "@/context/AppThemeContext";
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <SoftRefreshProvider>
-          <Routes>
-            {/* Rutas de autenticación (públicas pero bloqueadas si ya estás logueado) */}
-            <Route
-              path="/auth/*"
-              element={
-                <PublicRoute>
-                  <AuthRoutes />
-                </PublicRoute>
-              }
-            />
+        <SettingsProvider>
+          <AppThemeProvider>
+            <SoftRefreshProvider>
+              <ThemeSynchronizer />
+              <Routes>
+                {/* Rutas de autenticación (públicas pero bloqueadas si ya estás logueado) */}
+                <Route
+                  path="/auth/*"
+                  element={
+                    <PublicRoute>
+                      <AuthRoutes />
+                    </PublicRoute>
+                  }
+                />
 
-            {/* Rutas públicas reales (QR activos, etc.) */}
-            <Route path="/public/*" element={<QrcodeRoutes />} />
+                {/* Rutas públicas reales (QR activos, etc.) */}
+                <Route path="/public/*" element={<QrcodeRoutes />} />
 
-            {/* Rutas protegidas del admin */}
-            <Route
-              path="/admin/*"
-              element={
-                <PrivateRoute>
-                  <ExpiredSessionOverlay>
-                    <DashboardRoutes />
-                  </ExpiredSessionOverlay>
-                </PrivateRoute>
-              }
-            />
-          </Routes>
-        </SoftRefreshProvider>
+                {/* Rutas protegidas del admin */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <PrivateRoute>
+                      <ExpiredSessionOverlay>
+                        <DashboardRoutes />
+                      </ExpiredSessionOverlay>
+                    </PrivateRoute>
+                  }
+                />
+              </Routes>
+            </SoftRefreshProvider>
+          </AppThemeProvider>
+        </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

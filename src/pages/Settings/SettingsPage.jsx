@@ -1,5 +1,6 @@
 // src/pages/Settings/SettingsPage.jsx
 import React, { useState, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Card,
@@ -51,32 +52,49 @@ const lazyLoaders = {
   acerca: () => import("./sections/Acerca.jsx"),
 };
 
-const NAV = [
-  { key: "inicio", label: "Inicio", icon: <Home size={16} /> },
-  { key: "seguridad", label: "Seguridad", icon: <Lock size={16} /> },
-  { key: "apariencia", label: "Apariencia", icon: <Paintbrush size={16} /> },
-  { key: "idioma", label: "Idioma & Región", icon: <Globe size={16} /> },
-  {
-    key: "accesibilidad",
-    label: "Accesibilidad",
-    icon: <AccessibilityIcon size={16} />,
-  },
-  { key: "integraciones", label: "Integraciones", icon: <Plug size={16} /> },
-  {
-    key: "privacidad",
-    label: "Datos & Privacidad",
-    icon: <Shield size={16} />,
-  },
-  { key: "backups", label: "Respaldo & Backups", icon: <Database size={16} /> },
-  { key: "acerca", label: "Acerca de", icon: <Info size={16} /> },
-];
-
 function SettingsInner() {
   const [active, setActive] = useState("inicio");
   const { settings, loading, saveSection, savingMap } = useSettings();
+  const { t } = useTranslation();
 
   const ActiveSection = Sections[active] || Sections.inicio;
   const initialData = settings?.[active] ?? {};
+
+  const NAV = [
+    { key: "inicio", label: t("settings.inicio"), icon: <Home size={16} /> },
+    {
+      key: "seguridad",
+      label: t("settings.seguridad"),
+      icon: <Lock size={16} />,
+    },
+    {
+      key: "apariencia",
+      label: t("settings.apariencia"),
+      icon: <Paintbrush size={16} />,
+    },
+    { key: "idioma", label: t("settings.idioma"), icon: <Globe size={16} /> },
+    {
+      key: "accesibilidad",
+      label: t("settings.accesibilidad"),
+      icon: <AccessibilityIcon size={16} />,
+    },
+    {
+      key: "integraciones",
+      label: t("settings.integraciones"),
+      icon: <Plug size={16} />,
+    },
+    {
+      key: "privacidad",
+      label: t("settings.privacidad"),
+      icon: <Shield size={16} />,
+    },
+    {
+      key: "backups",
+      label: t("settings.backups"),
+      icon: <Database size={16} />,
+    },
+    { key: "acerca", label: t("settings.acerca"), icon: <Info size={16} /> },
+  ];
 
   const handleSave = async (data) => {
     try {
@@ -164,6 +182,7 @@ function SettingsInner() {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   return (
     <Box
       sx={{
@@ -173,9 +192,9 @@ export default function SettingsPage() {
         overflow: "auto",
       }}>
       <Box sx={{ maxWidth: 1200, mx: "auto", px: 2, pt: 2, pb: 1 }}>
-        <Typography level="h3">Configuración</Typography>
+        <Typography level="h3">{t("settings.title")}</Typography>
         <Typography level="body-sm" color="neutral">
-          Administra tu perfil y preferencias de la aplicación.
+          {t("settings.description")}
         </Typography>
       </Box>
 

@@ -12,6 +12,7 @@ import Typography from "@mui/joy/Typography";
 import Sheet from "@mui/joy/Sheet";
 import Tooltip from "@mui/joy/Tooltip";
 import { useColorScheme } from "@mui/joy/styles";
+import { useTranslation } from "react-i18next";
 
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
@@ -121,11 +122,19 @@ function NavItem({
   externalLink,
 }) {
   if (!canView) return null;
+
+  const isActive =
+    currentPath === path ||
+    (path !== "/admin/home" && currentPath.startsWith(path));
+
   const Tag = externalLink ? "a" : ListItemButton;
+
   return (
     <ListItem>
       <Tag
-        selected={currentPath === path && !externalLink}
+        variant={isActive ? "soft" : "plain"}
+        color={isActive ? "primary" : "neutral"}
+        selected={isActive}
         onClick={() => !externalLink && onNavigate(path)}
         {...(externalLink && {
           href: path,
@@ -133,20 +142,15 @@ function NavItem({
           rel: "noopener noreferrer",
         })}
         sx={{
-          backgroundColor: currentPath === path ? "primary.solidBg" : "inherit",
-          color: currentPath === path ? "primary.solidColor" : "text.primary",
-          "&:hover": {
-            backgroundColor:
-              currentPath === path ? "primary.solidBg" : "neutral.softBg",
-            color:
-              currentPath === path
-                ? "primary.solidColor"
-                : "neutral.plainColor",
-          },
+          borderRadius: "md",
+          gap: 1.5,
+          py: 1,
         }}>
         {icon}
         <ListItemContent>
-          <Typography level="title-sm">{label}</Typography>
+          <Typography level="title-sm" fontWeight={isActive ? "lg" : "md"}>
+            {label}
+          </Typography>
         </ListItemContent>
       </Tag>
     </ListItem>
@@ -175,6 +179,7 @@ function KindIcon({ kind }) {
 }
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { hasPermiso, userData } = useAuth();
@@ -199,173 +204,188 @@ export default function Sidebar() {
   // =========================
   // Secciones
   // =========================
-  const navItems = [
-    {
-      path: "/admin/home",
-      icon: <HomeRoundedIcon />,
-      label: "Inicio",
-      perm: null,
-      canView: true,
-      kind: "general",
-      group: "General",
-    },
-    {
-      path: "/admin/dashboard",
-      icon: <DashboardRoundedIcon />,
-      label: "Dashboard",
-      perm: "ver_dashboard",
-      canView: checkPermission("ver_dashboard"),
-      kind: "general",
-      group: "General",
-    },
-    {
-      path: "/admin/vehiculos",
-      icon: <LocalShippingIcon />,
-      label: "Vehículos",
-      perm: "gestionar_vehiculos",
-      canView: checkPermission("gestionar_vehiculos"),
-      kind: "vehicle",
-      group: "General",
-    },
-    {
-      path: "/admin/panel-vehiculos",
-      icon: <AppRegistrationIcon />,
-      label: "Registros",
-      perm: "registrar_uso",
-      canView: checkPermission("registrar_uso"),
-      kind: "record",
-      group: "General",
-    },
-    {
-      path: "/admin/reports",
-      icon: <AssessmentIcon />,
-      label: "Reportes",
-      perm: "ver_reportes",
-      canView: checkPermission("ver_reportes"),
-      kind: "reporte",
-      group: "General",
-    },
-  ];
+  const navItems = React.useMemo(
+    () => [
+      {
+        path: "/admin/home",
+        icon: <HomeRoundedIcon />,
+        label: t("sidebar.inicio"),
+        perm: null,
+        canView: true,
+        kind: "general",
+        group: "General",
+      },
+      {
+        path: "/admin/dashboard",
+        icon: <DashboardRoundedIcon />,
+        label: t("sidebar.dashboard"),
+        perm: "ver_dashboard",
+        canView: checkPermission("ver_dashboard"),
+        kind: "general",
+        group: "General",
+      },
+      {
+        path: "/admin/vehiculos",
+        icon: <LocalShippingIcon />,
+        label: t("sidebar.vehiculos"),
+        perm: "gestionar_vehiculos",
+        canView: checkPermission("gestionar_vehiculos"),
+        kind: "vehicle",
+        group: "General",
+      },
+      {
+        path: "/admin/panel-vehiculos",
+        icon: <AppRegistrationIcon />,
+        label: t("sidebar.registros"),
+        perm: "registrar_uso",
+        canView: checkPermission("registrar_uso"),
+        kind: "record",
+        group: "General",
+      },
+      {
+        path: "/admin/reports",
+        icon: <AssessmentIcon />,
+        label: t("sidebar.reportes"),
+        perm: "ver_reportes",
+        canView: checkPermission("ver_reportes"),
+        kind: "reporte",
+        group: "General",
+      },
+    ],
+    [t, checkPermission]
+  );
 
-  const managementItems = [
-    {
-      path: "/admin/clientes",
-      icon: <GroupRoundedIcon />,
-      label: "Compañías",
-      perm: "gestionar_companias",
-      canView: checkPermission("gestionar_companias"),
-      kind: "company",
-      group: "Gestión",
-    },
-    {
-      path: "/admin/countries",
-      icon: <PublicIcon />,
-      label: "Países",
-      perm: "gestionar_paises",
-      canView: checkPermission("gestionar_paises"),
-      kind: "country",
-      group: "Gestión",
-    },
-    {
-      path: "/admin/cities",
-      icon: <LocationCityIcon />,
-      label: "Ciudades",
-      perm: "gestionar_ciudades",
-      canView: checkPermission("gestionar_ciudades"),
-      kind: "city",
-      group: "Gestión",
-    },
-    {
-      path: "/admin/parkings",
-      icon: <LocalParkingIcon />,
-      label: "Estacionamientos",
-      perm: "gestionar_estacionamientos",
-      canView: checkPermission("gestionar_estacionamientos"),
-      kind: "parking",
-      group: "Gestión",
-    },
-  ];
+  const managementItems = React.useMemo(
+    () => [
+      {
+        path: "/admin/clientes",
+        icon: <GroupRoundedIcon />,
+        label: t("sidebar.companias"),
+        perm: "gestionar_companias",
+        canView: checkPermission("gestionar_companias"),
+        kind: "company",
+        group: "Gestión",
+      },
+      {
+        path: "/admin/countries",
+        icon: <PublicIcon />,
+        label: t("sidebar.paises"),
+        perm: "gestionar_paises",
+        canView: checkPermission("gestionar_paises"),
+        kind: "country",
+        group: "Gestión",
+      },
+      {
+        path: "/admin/cities",
+        icon: <LocationCityIcon />,
+        label: t("sidebar.ciudades"),
+        perm: "gestionar_ciudades",
+        canView: checkPermission("gestionar_ciudades"),
+        kind: "city",
+        group: "Gestión",
+      },
+      {
+        path: "/admin/parkings",
+        icon: <LocalParkingIcon />,
+        label: t("sidebar.estacionamientos"),
+        perm: "gestionar_estacionamientos",
+        canView: checkPermission("gestionar_estacionamientos"),
+        kind: "parking",
+        group: "Gestión",
+      },
+    ],
+    [t, checkPermission]
+  );
 
-  const inventoryItems = [
-    {
-      path: "/admin/inventario/bodegas",
-      icon: <FactoryRoundedIcon />,
-      label: "Bodegas",
-      perm: "gestionar_bodegas",
-      canView: checkPermission("gestionar_bodegas"),
-      kind: "warehouse",
-      group: "Inventario",
-    },
-    {
-      path: "/admin/inventario/activos",
-      icon: <DnsRoundedIcon />,
-      label: "Activos",
-      perm: "gestionar_activos",
-      canView: checkPermission("gestionar_activos"),
-      kind: "asset",
-      group: "Inventario",
-    },
-  ];
+  const inventoryItems = React.useMemo(
+    () => [
+      {
+        path: "/admin/inventario/bodegas",
+        icon: <FactoryRoundedIcon />,
+        label: t("sidebar.bodegas"),
+        perm: "gestionar_bodegas",
+        canView: checkPermission("gestionar_bodegas"),
+        kind: "warehouse",
+        group: "Inventario",
+      },
+      {
+        path: "/admin/inventario/activos",
+        icon: <DnsRoundedIcon />,
+        label: t("sidebar.activos"),
+        perm: "gestionar_activos",
+        canView: checkPermission("gestionar_activos"),
+        kind: "asset",
+        group: "Inventario",
+      },
+    ],
+    [t, checkPermission]
+  );
 
-  const systemItems = [
-    {
-      path: "/admin/usuarios",
-      icon: <SupervisorAccountIcon />,
-      label: "Gestionar Usuarios",
-      perm: "gestionar_usuarios",
-      canView: checkPermission("gestionar_usuarios"),
-      kind: "sistema",
-      group: "Sistema",
-    },
-    {
-      path: "/admin/notificaciones",
-      icon: <MarkChatUnreadIcon />,
-      label: "Notificaciones",
-      perm: "ver_notificaciones",
-      canView: checkPermission("ver_notificaciones"),
-      kind: "notificaciones",
-      group: "Sistema",
-    },
-  ];
+  const systemItems = React.useMemo(
+    () => [
+      {
+        path: "/admin/usuarios",
+        icon: <SupervisorAccountIcon />,
+        label: t("sidebar.gestion_usuarios"),
+        perm: "gestionar_usuarios",
+        canView: checkPermission("gestionar_usuarios"),
+        kind: "sistema",
+        group: "Sistema",
+      },
+      {
+        path: "/admin/notificaciones",
+        icon: <MarkChatUnreadIcon />,
+        label: t("sidebar.notificaciones"),
+        perm: "ver_notificaciones",
+        canView: checkPermission("ver_notificaciones"),
+        kind: "notificaciones",
+        group: "Sistema",
+      },
+    ],
+    [t, checkPermission]
+  );
 
-  const supportAndHelpItems = [
-    {
-      path: "/admin/support/faqs",
-      icon: <QuestionAnswerRoundedIcon />,
-      label: "Gestionar FAQs",
-      perm: "help_manage",
-      canView: checkPermission("help_manage"),
-      kind: "soporte",
-      group: "Soporte y Ayuda",
-    },
-    {
-      path: "/admin/support/tutorials",
-      icon: <VideoLibraryRoundedIcon />,
-      label: "Gestionar Tutoriales",
-      perm: "help_manage",
-      canView: checkPermission("help_manage"),
-      kind: "soporte",
-      group: "Soporte y Ayuda",
-    },
-    {
-      path: "/admin/support/changelogs",
-      icon: <AnnouncementRoundedIcon />,
-      label: "Gestionar Novedades",
-      perm: "help_manage",
-      canView: checkPermission("help_manage"),
-      kind: "soporte",
-      group: "Soporte y Ayuda",
-    },
-    {
-      path: "/admin/support/services",
-      icon: <DnsRoundedIcon />,
-      label: "Estado de Servicios",
-      perm: "help_manage",
-      canView: checkPermission("help_manage"),
-      kind: "soporte",
-      group: "Soporte y Ayuda",
-    },
-  ];
+  const supportAndHelpItems = React.useMemo(
+    () => [
+      {
+        path: "/admin/support/faqs",
+        icon: <QuestionAnswerRoundedIcon />,
+        label: t("sidebar.gestionar_faqs"),
+        perm: "help_manage",
+        canView: checkPermission("help_manage"),
+        kind: "soporte",
+        group: "Soporte y Ayuda",
+      },
+      {
+        path: "/admin/support/tutorials",
+        icon: <VideoLibraryRoundedIcon />,
+        label: t("sidebar.gestionar_tutoriales"),
+        perm: "help_manage",
+        canView: checkPermission("help_manage"),
+        kind: "soporte",
+        group: "Soporte y Ayuda",
+      },
+      {
+        path: "/admin/support/changelogs",
+        icon: <AnnouncementRoundedIcon />,
+        label: t("sidebar.gestionar_novedades"),
+        perm: "help_manage",
+        canView: checkPermission("help_manage"),
+        kind: "soporte",
+        group: "Soporte y Ayuda",
+      },
+      {
+        path: "/admin/support/services",
+        icon: <DnsRoundedIcon />,
+        label: t("sidebar.estado_de_servicios"),
+        perm: "help_manage",
+        canView: checkPermission("help_manage"),
+        kind: "soporte",
+        group: "Soporte y Ayuda",
+      },
+    ],
+    [t, checkPermission]
+  );
 
   // Index plano para búsqueda local
   const routeIndex = React.useMemo(() => {
@@ -735,7 +755,9 @@ export default function Sidebar() {
                       }}>
                       <AdminPanelSettingsIcon />
                       <ListItemContent>
-                        <Typography level="title-sm">Gestión</Typography>
+                        <Typography level="title-sm">
+                          {t("sidebar.gestion")}
+                        </Typography>
                       </ListItemContent>
                       <KeyboardArrowDownIcon
                         sx={{
@@ -774,7 +796,9 @@ export default function Sidebar() {
                       }}>
                       <DnsRoundedIcon />
                       <ListItemContent>
-                        <Typography level="title-sm">Inventario</Typography>
+                        <Typography level="title-sm">
+                          {t("sidebar.inventario")}
+                        </Typography>
                       </ListItemContent>
                       <KeyboardArrowDownIcon
                         sx={{
@@ -814,7 +838,9 @@ export default function Sidebar() {
                       }}>
                       <SettingsRoundedIcon />
                       <ListItemContent>
-                        <Typography level="title-sm">Sistema</Typography>
+                        <Typography level="title-sm">
+                          {t("sidebar.sistema")}
+                        </Typography>
                       </ListItemContent>
                       <KeyboardArrowDownIcon
                         sx={{
@@ -853,7 +879,7 @@ export default function Sidebar() {
                       <SupportAgentIcon />
                       <ListItemContent>
                         <Typography level="title-sm">
-                          Soporte y Ayuda
+                          {t("sidebar.ayuda")}
                         </Typography>
                       </ListItemContent>
                       <KeyboardArrowDownIcon

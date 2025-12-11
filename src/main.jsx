@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
+import "./config/i18n";
 // import { CssBaseline, CssVarsProvider, extendTheme } from "@mui/joy/";
 import { AppThemeProvider } from "./context/AppThemeContext.jsx";
 

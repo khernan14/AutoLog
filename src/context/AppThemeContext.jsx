@@ -4,12 +4,12 @@ import React, {
   useMemo,
   useState,
   useLayoutEffect,
+  useEffect,
 } from "react";
 import { CssVarsProvider, CssBaseline } from "@mui/joy";
 import { createAppTheme } from "../theme/createAppTheme";
 import TailwindDarkSync from "@/theme/TailwindDarkSync";
 
-// helpers persistentes
 const getLS = (k, d) => {
   try {
     const v = localStorage.getItem(k);
@@ -27,25 +27,28 @@ const setLS = (k, v) => {
 const AppThemeCtx = createContext(null);
 
 export function AppThemeProvider({ children }) {
-  const [brand, setBrand] = useState(getLS("ui:brand", "default")); // default | indigo | teams
+  const [brand, setBrand] = useState(getLS("ui:brand", "default"));
   const [font, setFont] = useState(getLS("ui:font", "Poppins, sans-serif"));
 
-  // aplica la fuente también al <body> (afecta Tailwind/utilidades)
   useLayoutEffect(() => {
     document.documentElement.style.setProperty("--app-font", font);
+  }, [font]);
+  useEffect(() => {
+    setLS("ui:brand", brand);
+  }, [brand]);
+  useEffect(() => {
+    setLS("ui:font", font);
   }, [font]);
 
   const theme = useMemo(() => createAppTheme({ brand, font }), [brand, font]);
 
-  // NOTA: defaultMode='light' para NO respetar 'system' a menos que lo elija el usuario.
   return (
     <AppThemeCtx.Provider value={{ brand, setBrand, font, setFont }}>
       <CssVarsProvider
         theme={theme}
         defaultMode="light"
-        modeStorageKey="ui:mode" // evita interferencia de otros sitios/libs
-        disableTransitionOnChange // sin parpadeo al cambiar
-      >
+        modeStorageKey="ui:mode"
+        disableTransitionOnChange>
         <TailwindDarkSync />
         <CssBaseline />
         {children}
@@ -54,4 +57,12 @@ export function AppThemeProvider({ children }) {
   );
 }
 
-export const useAppTheme = () => useContext(AppThemeCtx);
+export const useAppTheme = () => {
+  const ctx = useContext(AppThemeCtx);
+  if (!ctx) {
+    throw new Error(
+      "useAppTheme debe usarse dentro de <AppThemeProvider>. ¿Estás importando el hook desde otra copia del archivo?"
+    );
+  }
+  return ctx;
+};
