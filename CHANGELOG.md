@@ -1,3 +1,11 @@
+## v2.1.0 - 2025-12-11
+
+* chore(release): v2.1.0 (c4dab5b)
+* feat(ui): overhaul theme engine and finalize appearance settings - feat(settings): add live PreviewPanel and font application logic to Apariencia - refactor(theme): rewrite createAppTheme to support instant CSS variable updates - fix(sidebar): styling for active NavItems using dynamic theme variables - fix(sync): update TailwindDarkSync to inject RGB channels for transparency support (2529edd)
+* fix(auth): resolve session persistence and revamp permissions UI - fix(api): inject auth_token in headers to support mobile sessions - fix(permissions): add timestamp to GET requests to prevent browser caching - feat(ui): replace Permissions page with cascading UserPermissionsDrawer (92f1ec6)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v2.0.1...v2.1.0
+
 ## v2.0.0 - 2025-12-08
 
 * chore(release): v2.0.0 (e908307)
@@ -131,6 +139,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
