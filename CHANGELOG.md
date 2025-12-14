@@ -1,3 +1,11 @@
+## v2.2.0 - 2025-12-14
+
+* chore(release): v2.2.0 (256ded4)
+* feat: global i18n rollout & UI modernization - Implementaci├│n de i18n (ES/EN) en Dashboard, Settings, Users y Support. - Refactorizaci├│n de SettingsContext para manejo robusto de configuraci├│n. - Redise├▒o completo de Home (Reloj en vivo) y Dashboard (KPIs y Gr├íficos). - Nuevos formularios con validaci├│n Yup en 'Mi Cuenta' y 'Seguridad'. - UI mejorada con Drawers para FAQs y Tutoriales, Vehiculos, Activos, Compa├▒ias, Ubicaciones, Ciudades y Paises. (0632917)
+* docs(changelog): v2.1.0 (e87e7fb)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v2.1.0...v2.2.0
+
 ## v2.1.0 - 2025-12-11
 
 * chore(release): v2.1.0 (c4dab5b)
@@ -139,6 +147,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
