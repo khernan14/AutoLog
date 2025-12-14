@@ -13,6 +13,13 @@ import ThemeSynchronizer from "@/components/common/ThemeSynchronizer";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { AppThemeProvider } from "@/context/AppThemeContext";
 
+import { useAccessibility } from "../hooks/useAccessibility";
+
+const AccessibilityManager = () => {
+  useAccessibility();
+  return null;
+};
+
 export default function AppRoutes() {
   return (
     <BrowserRouter>
@@ -21,6 +28,8 @@ export default function AppRoutes() {
           <AppThemeProvider>
             <SoftRefreshProvider>
               <ThemeSynchronizer />
+              <AccessibilityManager />
+
               <Routes>
                 {/* Rutas de autenticación (públicas pero bloqueadas si ya estás logueado) */}
                 <Route

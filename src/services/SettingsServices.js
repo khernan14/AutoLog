@@ -11,29 +11,6 @@ function withParams(url, params = {}) {
   return u.toString().replace(window.location.origin, "");
 }
 
-/**
- * Nota sobre endpoints esperados (ajusta en config/variables):
- * endpoints.getSettings         -> '/api/settings'
- * endpoints.getSection         -> '/api/settings/' (se concatena el :section)
- * endpoints.patchSection       -> '/api/settings/' (se concatena el :section)
- * endpoints.getSectionHistory  -> '/api/settings/' (se concatena `${section}/history`)
- *
- * Ejemplo:
- *   getSection('seguridad') -> GET /api/settings/seguridad
- *   patchSection('perfil', { nombre: 'Perrin' }) -> PATCH /api/settings/perfil
- */
-
-/* ---------------------------
-   Lectura de settings
-   --------------------------- */
-
-/**
- * Obtener todas las secciones para el usuario actual.
- * Si eres Admin y pasas { userId }, el backend debe permitirlo.
- *
- * @param {{ userId?: number }} opts
- * @returns {Promise<object>} json.data
- */
 export async function getAllSettings(opts = {}) {
   const url = withParams(endpoints.getSettings, { user_id: opts.userId });
   const res = await fetchConToken(url);
@@ -43,11 +20,6 @@ export async function getAllSettings(opts = {}) {
   return json.data ?? json;
 }
 
-/**
- * Obtener una sección concreta (ej: 'seguridad')
- * @param {string} section
- * @param {{ userId?: number }} opts
- */
 export async function getSection(section, opts = {}) {
   if (!section) throw new Error("section es requerido");
   const base = `${endpoints.getSettings.replace(
@@ -66,13 +38,6 @@ export async function getSection(section, opts = {}) {
    Escritura (PATCH / merge parcial)
    --------------------------- */
 
-/**
- * Patch / merge parcial de una sección.
- * @param {string} section
- * @param {object} partialPayload
- * @param {{ userId?: number }} opts
- * @returns {Promise<object>} data actualizado (payload)
- */
 export async function patchSection(section, partialPayload = {}, opts = {}) {
   const base = `${endpoints.getSettings.replace(
     /\/$/,
@@ -97,11 +62,6 @@ export async function patchSection(section, partialPayload = {}, opts = {}) {
    Historial
    --------------------------- */
 
-/**
- * Obtener historial de una sección
- * @param {string} section
- * @param {{ userId?: number, limit?: number, offset?: number }} opts
- */
 export async function getSectionHistory(section, opts = {}) {
   if (!section) throw new Error("section es requerido");
   const base = `${endpoints.getSettings.replace(
@@ -121,6 +81,57 @@ export async function getSectionHistory(section, opts = {}) {
 }
 
 /* ---------------------------
+   Seguridad y Sesiones (NUEVO)
+   --------------------------- */
+
+/**
+ * Obtiene sesiones activas y logs de actividad en paralelo
+ */
+export async function getSecurityData() {
+  try {
+    // Ejecutamos ambas peticiones al mismo tiempo para ser más rápidos
+    const [resSessions, resLogs] = await Promise.all([
+      fetchConToken(endpoints.sessions),
+      fetchConToken(endpoints.activityLogs),
+    ]);
+
+    // Parseamos respuestas
+    const sessionsJson = await resSessions.json();
+    const logsJson = await resLogs.json();
+
+    if (!resSessions.ok)
+      throw new Error(sessionsJson.message || "Error cargando sesiones");
+    if (!resLogs.ok) throw new Error(logsJson.message || "Error cargando logs");
+
+    // Retornamos estructura unificada (ajusta .data si tu backend envuelven en { data: ... })
+    return {
+      sessions: Array.isArray(sessionsJson)
+        ? sessionsJson
+        : sessionsJson.data || [],
+      logs: Array.isArray(logsJson) ? logsJson : logsJson.data || [],
+    };
+  } catch (error) {
+    console.error("SettingsService: Error en getSecurityData", error);
+    // Retornamos arrays vacíos para que la UI no rompa, pero lanzamos el error
+    throw error;
+  }
+}
+
+/**
+ * Cierra todas las sesiones excepto la actual
+ */
+export async function revokeOtherSessions() {
+  const res = await fetchConToken(endpoints.revokeSessions, {
+    method: "POST",
+  });
+  const json = await res.json();
+
+  if (!res.ok) throw new Error(json.message || "Error al revocar sesiones");
+
+  return json;
+}
+
+/* ---------------------------
    Exports por defecto
    --------------------------- */
 const SettingsService = {
@@ -128,6 +139,9 @@ const SettingsService = {
   getSection,
   patchSection,
   getSectionHistory,
+  // Nuevos exports
+  getSecurityData,
+  revokeOtherSessions,
 };
 
 export default SettingsService;
