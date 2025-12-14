@@ -1,3 +1,12 @@
+## v2.3.0 - 2025-12-14
+
+* chore(release): v2.3.0 (d255efe)
+* Merge pull request #17 from khernan14/feat/secctions-settings (a1a7ff8)
+* feat(settings): redise├▒o completo del m├│dulo de configuraci├│n y seguridad (c2dd8a1)
+* docs(changelog): v2.2.0 (6d16301)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v2.2.0...v2.3.0
+
 ## v2.2.0 - 2025-12-14
 
 * chore(release): v2.2.0 (256ded4)
@@ -147,6 +156,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
