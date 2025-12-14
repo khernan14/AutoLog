@@ -1,14 +1,5 @@
 import * as React from "react";
-import {
-  Stack,
-  Box,
-  Input,
-  Button,
-  Tooltip,
-  Chip,
-  IconButton,
-  Typography,
-} from "@mui/joy";
+import { Stack, Box, Input, Button, Tooltip, Chip } from "@mui/joy";
 import AddIcon from "@mui/icons-material/Add";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -16,10 +7,10 @@ import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import ClearIcon from "@mui/icons-material/Clear";
 
 /**
- * Presentacional (sin lógica de permisos interna).
  * Props:
- * - searchText?: string              // (opcional) para modo controlado
- * - onSearch?: (text: string) => void
+ * - t: function translation (i18next)
+ * - searchText?: string
+ * - onSearch?: (text) => void
  * - showInactive: boolean
  * - setShowInactive: (bool) => void
  * - canAdd: boolean
@@ -27,6 +18,7 @@ import ClearIcon from "@mui/icons-material/Clear";
  * - addDisabledReason?: string
  */
 export default function VehiculosToolBar({
+  t,
   searchText,
   onSearch,
   showInactive = false,
@@ -35,7 +27,6 @@ export default function VehiculosToolBar({
   onAdd,
   addDisabledReason,
 }) {
-  // Mantener editable aunque el padre no pase searchText (fallback no controlado)
   const [localSearch, setLocalSearch] = React.useState(searchText ?? "");
   React.useEffect(() => {
     if (typeof searchText === "string") setLocalSearch(searchText);
@@ -63,34 +54,13 @@ export default function VehiculosToolBar({
       sx={{ mb: 2 }}>
       {/* Búsqueda */}
       <Box sx={{ flex: 1 }}>
-        {/* <Input
-          placeholder="Buscar por placa, marca, modelo o ubicación…"
-          startDecorator={<SearchRoundedIcon />}
-          endDecorator={
-            value ? (
-              <IconButton
-                size="sm"
-                variant="plain"
-                onClick={clearSearch}
-                aria-label="Limpiar búsqueda"
-              >
-                <CloseRoundedIcon />
-              </IconButton>
-            ) : null
-          }
-          value={value}
-          onChange={handleSearchChange}
-          aria-label="Buscar vehículos"
-          // Ancho moderno y responsivo
-          sx={{
-            width: { xs: "100%", sm: 320, md: 380 },
-          }}
-          size="md"
-          variant="soft"
-        /> */}
-        <Tooltip title="Buscar por placa, marca, modelo o ubicación…">
+        <Tooltip
+          title={t?.(
+            "vehiculos.search_tooltip",
+            "Buscar por placa, marca, modelo o ubicación…"
+          )}>
           <Input
-            placeholder="Buscar…"
+            placeholder={t?.("vehiculos.search_placeholder", "Buscar…")}
             value={value}
             onChange={handleSearchChange}
             startDecorator={<SearchRoundedIcon />}
@@ -100,7 +70,7 @@ export default function VehiculosToolBar({
                   size="sm"
                   variant="plain"
                   color="neutral"
-                  onClick={() => setSearch("")}
+                  onClick={clearSearch}
                   sx={{ minWidth: "auto", px: 0.5 }}>
                   <ClearIcon fontSize="small" />
                 </Button>
@@ -114,23 +84,24 @@ export default function VehiculosToolBar({
 
       {/* Controles derechos */}
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-        {/* Toggle de inactivos como pill */}
         <Chip
           onClick={() => setShowInactive?.(!showInactive)}
           variant={showInactive ? "solid" : "soft"}
           color={showInactive ? "warning" : "neutral"}
           startDecorator={<Inventory2RoundedIcon />}
           sx={{ cursor: "pointer" }}>
-          Ver inactivos
+          {t?.("vehiculos.show_inactive", "Ver inactivos")}
         </Chip>
 
-        {/* Agregar */}
         <Tooltip
           title={
             canAdd
-              ? "Agregar vehículo"
+              ? t?.("vehiculos.add_vehicle", "Agregar vehículo")
               : addDisabledReason ||
-                "No tienes permiso para crear. Solicítalo al administrador."
+                t?.(
+                  "vehiculos.request_permission",
+                  "No tienes permiso para crear. Solicítalo al administrador."
+                )
           }
           variant="soft"
           placement="top">
@@ -142,7 +113,7 @@ export default function VehiculosToolBar({
               aria-disabled={!canAdd}
               variant={canAdd ? "solid" : "soft"}
               color={canAdd ? "primary" : "neutral"}>
-              Agregar
+              {t?.("vehiculos.add_button", "Agregar")}
             </Button>
           </span>
         </Tooltip>

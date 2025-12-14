@@ -3,13 +3,23 @@ import { Box, Input, Button, Stack, IconButton, Tooltip } from "@mui/joy";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
 import ClearIcon from "@mui/icons-material/Clear";
+import { useTranslation } from "react-i18next";
 
+/**
+ * SearchBar
+ * props:
+ *  - onSearch: (text) => void
+ *  - onAdd: () => void
+ *  - canAdd: boolean
+ *  - inputMaxWidth: number or css
+ */
 export default function SearchBar({
   onSearch,
   onAdd,
   canAdd = true,
-  inputMaxWidth = 360, // 👈 control externo del ancho
+  inputMaxWidth = 360,
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
 
   const handleSearch = useCallback(
@@ -24,14 +34,12 @@ export default function SearchBar({
 
   return (
     <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1,
-        flexWrap: "wrap",
-      }}>
+      sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
       <Input
-        placeholder="Buscar por placa, marca o modelo…"
+        placeholder={t(
+          "vehiculos.search.placeholder",
+          "Buscar por placa, marca o modelo…"
+        )}
         value={search}
         onChange={(e) => handleSearch(e.target.value)}
         startDecorator={<SearchRoundedIcon />}
@@ -42,7 +50,10 @@ export default function SearchBar({
               variant="plain"
               color="neutral"
               onClick={clear}
-              aria-label="Limpiar búsqueda">
+              aria-label={t(
+                "vehiculos.search.clear_label",
+                "Limpiar búsqueda"
+              )}>
               <ClearIcon />
             </IconButton>
           ) : null
@@ -59,8 +70,11 @@ export default function SearchBar({
           variant="soft"
           title={
             canAdd
-              ? "Registrar uso de vehículo"
-              : "No tienes permiso para registrar uso"
+              ? t("vehiculos.search.add_tooltip", "Registrar uso de vehículo")
+              : t(
+                  "vehiculos.search.add_tooltip_disabled",
+                  "No tienes permiso para registrar uso"
+                )
           }
           placement="bottom-end">
           <span>
@@ -71,8 +85,8 @@ export default function SearchBar({
               onClick={onAdd}
               disabled={!canAdd}
               aria-disabled={!canAdd}
-              aria-label="Registrar uso de vehículo">
-              Registrar Uso
+              aria-label={t("vehiculos.search.add_button", "Registrar Uso")}>
+              {t("vehiculos.search.add_button", "Registrar Uso")}
             </Button>
           </span>
         </Tooltip>

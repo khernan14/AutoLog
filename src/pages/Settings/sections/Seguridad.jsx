@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   Stack,
@@ -21,11 +22,12 @@ import { Shield, Smartphone, AlertTriangle } from "lucide-react";
 import { SectionHeader } from "./_shared/SectionHeader.jsx";
 import TwoFactorSetupModal from "./modals/TwoFactorSetupModal.jsx";
 import usePermissions from "../../../hooks/usePermissions.js";
-import { useSettings } from "../../../context/SettingsContext.jsx"; // 👈 IMPORTANTE: Importar hook
+import { useSettings } from "../../../context/SettingsContext.jsx";
 
 export default function Seguridad({ initialData = {}, onSave }) {
+  const { t } = useTranslation(); // 👈 Hook
   const perms = usePermissions();
-  const { reload } = useSettings(); // 👈 Obtenemos reload del contexto
+  const { reload } = useSettings();
   const canEdit = perms.has("editar_configuraciones") || perms.isAdmin;
 
   const [tfaEnabled, setTfaEnabled] = useState(false);
@@ -35,14 +37,12 @@ export default function Seguridad({ initialData = {}, onSave }) {
   const [loadingAction, setLoadingAction] = useState(false);
 
   useEffect(() => {
-    // Aseguramos leer el valor booleano correcto
     setTfaEnabled(Boolean(initialData?.tfa_enabled));
   }, [initialData]);
 
   const handleToggleTfa = async (event) => {
     const isChecking = event.target.checked;
     if (isChecking) {
-      // --- ACTIVAR ---
       try {
         setLoadingAction(true);
         const res = await onSave({ tfa_enroll_init: true });
@@ -52,18 +52,15 @@ export default function Seguridad({ initialData = {}, onSave }) {
           setSetupData(data);
           setSetupModalOpen(true);
         } else {
-          // Si el backend activó directo (raro), recargamos para estar seguros
           await reload();
         }
       } catch (error) {
         console.error("Error iniciando 2FA", error);
-        // Si falla, recargamos para revertir el switch visual
         reload();
       } finally {
         setLoadingAction(false);
       }
     } else {
-      // --- DESACTIVAR ---
       setConfirmDisableOpen(true);
     }
   };
@@ -77,20 +74,16 @@ export default function Seguridad({ initialData = {}, onSave }) {
       });
       setSetupModalOpen(false);
       setSetupData(null);
-      // Éxito: El estado local se actualizará solo via initialData,
-      // pero podemos forzar reload para asegurar limpieza.
       await reload();
       return res;
     } catch (error) {
-      throw error; // El modal manejará el error visual
+      throw error;
     }
   };
 
-  // 🟢 NUEVO: Manejar cierre del modal (Cancelar)
   const handleCloseModal = () => {
     setSetupModalOpen(false);
     setSetupData(null);
-    // Si cancela, recargamos para borrar el estado 'tfa_enroll_init' y recuperar las alertas reales
     reload();
   };
 
@@ -99,7 +92,7 @@ export default function Seguridad({ initialData = {}, onSave }) {
       setLoadingAction(true);
       await onSave({ tfa_enabled: false });
       setConfirmDisableOpen(false);
-      await reload(); // Asegurar sincronía
+      await reload();
     } catch (error) {
       console.error(error);
     } finally {
@@ -111,8 +104,8 @@ export default function Seguridad({ initialData = {}, onSave }) {
     <Stack spacing={2}>
       <Card variant="outlined" sx={{ borderRadius: 16, boxShadow: "sm" }}>
         <SectionHeader
-          title="Seguridad de la Cuenta"
-          subtitle="Gestiona cómo inicias sesión y proteges tus datos."
+          title={t("settings.security.title")}
+          subtitle={t("settings.security.subtitle")}
         />
 
         <List sx={{ "--ListItem-paddingY": "1rem" }}>
@@ -130,14 +123,14 @@ export default function Seguridad({ initialData = {}, onSave }) {
             </ListItemDecorator>
             <ListItemContent>
               <Typography level="title-sm">
-                Autenticación en dos pasos (2FA)
+                {t("settings.security.2fa.title")}
               </Typography>
               <Typography level="body-sm" color="neutral">
-                Protege tu cuenta con Google Authenticator.
+                {t("settings.security.2fa.desc")}
               </Typography>
               {tfaEnabled && (
                 <Chip size="sm" color="success" variant="soft" sx={{ mt: 1 }}>
-                  Activo
+                  {t("common.status.active")}
                 </Chip>
               )}
             </ListItemContent>
@@ -151,18 +144,16 @@ export default function Seguridad({ initialData = {}, onSave }) {
             </ListItemDecorator>
             <ListItemContent>
               <Typography level="title-sm">
-                Alertas de inicio de sesión
+                {t("settings.security.alerts.title")}
               </Typography>
               <Typography level="body-sm">
-                Recibe un email ante accesos nuevos.
+                {t("settings.security.alerts.desc")}
               </Typography>
             </ListItemContent>
-            {/* Controlado directamente por initialData */}
             <Switch
               checked={!!initialData?.login_alerts}
               disabled={!canEdit}
               onChange={async (e) => {
-                // Pequeño truco: esperamos a que termine y recargamos si queremos estar 100% seguros
                 await onSave({ login_alerts: e.target.checked });
               }}
             />
@@ -172,7 +163,7 @@ export default function Seguridad({ initialData = {}, onSave }) {
 
       <TwoFactorSetupModal
         open={setupModalOpen}
-        onClose={handleCloseModal} // 🟢 Usamos el nuevo handler
+        onClose={handleCloseModal}
         setupData={setupData}
         onVerify={handleVerifyCode}
       />
@@ -182,11 +173,11 @@ export default function Seguridad({ initialData = {}, onSave }) {
         onClose={() => setConfirmDisableOpen(false)}>
         <ModalDialog variant="outlined" role="alertdialog">
           <DialogTitle>
-            <AlertTriangle /> ¿Desactivar 2FA?
+            <AlertTriangle /> {t("settings.security.disable_modal.title")}
           </DialogTitle>
           <Divider />
           <DialogContent>
-            Tu cuenta será menos segura sin la autenticación de dos pasos.
+            {t("settings.security.disable_modal.desc")}
           </DialogContent>
           <DialogActions>
             <Button
@@ -194,13 +185,13 @@ export default function Seguridad({ initialData = {}, onSave }) {
               color="danger"
               onClick={handleConfirmDisable}
               loading={loadingAction}>
-              Sí, desactivar
+              {t("settings.security.disable_modal.confirm")}
             </Button>
             <Button
               variant="plain"
               color="neutral"
               onClick={() => setConfirmDisableOpen(false)}>
-              Cancelar
+              {t("common.actions.cancel")}
             </Button>
           </DialogActions>
         </ModalDialog>

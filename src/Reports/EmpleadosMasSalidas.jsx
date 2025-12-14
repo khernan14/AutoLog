@@ -10,22 +10,25 @@ import {
   Input,
   CircularProgress,
   Alert,
-  Dropdown,
-  Menu,
-  MenuButton,
-  MenuItem,
+  IconButton,
   Chip,
+  Divider,
 } from "@mui/joy";
+import { useTranslation } from "react-i18next"; // 👈 Hook i18n
+import { useNavigate, useLocation } from "react-router-dom";
+
+// Iconos
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { useNavigate, useLocation } from "react-router-dom";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
+import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 
+// Componentes
 import PaginationLite from "@/components/common/PaginationLite";
-import { getEmpleadosMasSalidasReport } from "@/services/ReportServices";
-import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
 import ExportDialog from "@/components/Exports/ExportDialog";
+import { getEmpleadosMasSalidasReport } from "@/services/ReportServices";
 
 /* === Helpers === */
 const debounced = (fn, ms = 250) => {
@@ -49,33 +52,26 @@ const addDays = (date, days) => {
 };
 
 export default function EmpleadosMasSalidas() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { search } = useLocation();
   const qs = useMemo(() => new URLSearchParams(search), [search]);
 
-  // texto búsqueda
+  // Estados
   const [query, setQuery] = useState(qs.get("q") || "");
-
-  // rango de fechas (por defecto: "all")
-  // 'all' | 'today' | '7d' | 'month' | 'custom'
   const [range, setRange] = useState(qs.get("range") || "all");
-
-  // from/to (solo visibles en 'custom')
   const [from, setFrom] = useState(qs.get("from") || "");
   const [to, setTo] = useState(qs.get("to") || "");
 
-  // paginación
   const [page, setPage] = useState(Number(qs.get("p") || 1));
   const [rowsPerPage] = useState(10);
 
-  // data
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-
   const [openExport, setOpenExport] = useState(false);
 
-  // sync URL (no escribimos 'all' para mantener limpia)
+  // Sync URL
   useEffect(() => {
     const params = new URLSearchParams(search);
     query ? params.set("q", query) : params.delete("q");
@@ -87,7 +83,7 @@ export default function EmpleadosMasSalidas() {
     window.history.replaceState(null, "", s ? `?${s}` : "");
   }, [query, page, range, from, to, search]);
 
-  // presets rango
+  // Presets de rango
   useEffect(() => {
     if (range === "custom") return;
     if (range === "all") {
@@ -110,7 +106,7 @@ export default function EmpleadosMasSalidas() {
     setPage(1);
   }, [range]);
 
-  // load (si tu service acepta {from,to}, los mandamos; si no, ignora y filtramos en front)
+  // Carga de datos
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -120,18 +116,17 @@ export default function EmpleadosMasSalidas() {
           from: from || undefined,
           to: to || undefined,
         });
-        // esperado: [{ nombre_empleado, puesto, total_salidas }]
         setRaw(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error(e);
-        setErr("No se pudo cargar el reporte de empleados con más salidas.");
+        setErr(t("reports.errors.load_failed"));
       } finally {
         setLoading(false);
       }
     })();
-  }, [from, to]);
+  }, [from, to, t]);
 
-  // búsqueda (debounce)
+  // Búsqueda
   const onChangeQuery = useRef(
     debounced((v) => {
       setPage(1);
@@ -139,7 +134,7 @@ export default function EmpleadosMasSalidas() {
     }, 250)
   ).current;
 
-  // filtro por texto
+  // Filtrado
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return raw;
@@ -150,7 +145,7 @@ export default function EmpleadosMasSalidas() {
     );
   }, [raw, query]);
 
-  // paginación
+  // Paginación
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const pageSafe = Math.min(Math.max(page, 1), totalPages);
   const pageItems = useMemo(() => {
@@ -158,230 +153,206 @@ export default function EmpleadosMasSalidas() {
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, pageSafe, rowsPerPage]);
 
-  // columnas export (para utils/exporters)
+  // Columnas exportación
   const columnsExport = [
     {
       label: "#",
       key: "__rownum",
-      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1, // o solo i+1 si quieres reiniciar
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
     },
-    { label: "Empleado", key: "nombre_empleado" },
-    { label: "Puesto", key: "puesto" },
-    {
-      label: "Total de salidas",
-      key: "total_salidas" /* type sugerido: number */,
-    },
+    { label: t("reports.columns.employee"), key: "nombre_empleado" },
+    { label: t("reports.columns.position"), key: "puesto" },
+    { label: t("reports.columns.total_exits"), key: "total_salidas" },
   ];
-  const filenameBase = `empleados_mas_salidas_${from || "all"}_a_${
-    to || "all"
-  }`;
 
+  const filenameBase = `empleados_top_${from || "all"}_${to || "all"}`;
+
+  // --- Renderizado ---
   if (loading) {
     return (
       <Box
         sx={{
-          minHeight: "70vh",
-          display: "grid",
-          placeItems: "center",
-          gap: 1,
-          background:
-            "linear-gradient(180deg, var(--joy-palette-background-level1), transparent 40%)",
-          borderRadius: "xl",
+          py: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
         }}>
-        <CircularProgress size="lg" />
-        <Typography>Cargando reporte…</Typography>
+        <CircularProgress size="lg" thickness={3} />
+        <Typography level="body-md" color="neutral">
+          {t("common.loading")}
+        </Typography>
       </Box>
     );
   }
 
   if (err) {
     return (
-      <Alert color="danger" variant="soft">
-        <Typography>{err}</Typography>
-      </Alert>
+      <Box sx={{ maxWidth: 1200, mx: "auto", p: 2 }}>
+        <Alert color="danger" variant="soft">
+          {err}
+        </Alert>
+      </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        background:
-          "radial-gradient(1200px 200px at 50% -20%, var(--joy-palette-primary-softBg), transparent), radial-gradient(1200px 200px at 50% 120%, var(--joy-palette-neutral-softBg), transparent)",
-        borderRadius: "xl",
-        p: { xs: 1.5, md: 2 },
-      }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, md: 4 }, py: 3 }}>
+      {/* --- HEADER --- */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        alignItems={{ md: "center" }}
+        justifyContent="space-between"
+        mb={3}
+        spacing={2}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton
+            onClick={() => navigate("/admin/reports")}
+            variant="plain"
+            color="neutral">
+            <ArrowBackRoundedIcon />
+          </IconButton>
+          <Box>
+            <Typography level="h2" fontSize="lg" fontWeight="lg">
+              {t("reports.report_items.empleados_actividad.title")}
+            </Typography>
+            <Typography level="body-sm" color="neutral">
+              {t("reports.total_records", { count: filtered.length })}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={2}>
+          <Input
+            startDecorator={<SearchRoundedIcon />}
+            placeholder={t("reports.search_placeholder")}
+            defaultValue={query}
+            onChange={(e) => onChangeQuery(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 260 } }}
+          />
+          <Button
+            variant="solid"
+            color="primary"
+            startDecorator={<DownloadRoundedIcon />}
+            onClick={() => setOpenExport(true)}
+            disabled={filtered.length === 0}>
+            {t("reports.actions.export")}
+          </Button>
+        </Stack>
+      </Stack>
+
+      {/* --- DATA TABLE --- */}
       <Sheet
         variant="outlined"
         sx={{
-          p: 2,
-          borderRadius: "xl",
-          borderColor: "neutral.outlinedBorder",
+          borderRadius: "lg",
           boxShadow: "sm",
-          backgroundColor: "background.body",
+          overflow: "hidden",
+          bgcolor: "background.surface",
         }}>
-        {/* Header */}
-        <Stack
-          direction={{ xs: "column", lg: "row" }}
-          spacing={1}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", lg: "center" }}
-          sx={{ mb: 1.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              startDecorator={<ArrowBackRoundedIcon />}
-              variant="soft"
-              onClick={() => navigate("/admin/reports")}
-              sx={{ borderRadius: "999px" }}>
-              Regresar
-            </Button>
-            <Typography level="h3" sx={{ fontWeight: 800, ml: 0.5 }}>
-              Empleados con más salidas
-            </Typography>
-          </Stack>
-
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={1}
-            alignItems="center">
-            {/* Presets rango */}
-            <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
-              <Chip
-                variant={range === "all" ? "solid" : "soft"}
-                onClick={() => setRange("all")}
-                sx={{ borderRadius: "999px" }}>
-                Todos
-              </Chip>
-              <Chip
-                variant={range === "today" ? "solid" : "soft"}
-                onClick={() => setRange("today")}
-                sx={{ borderRadius: "999px" }}>
-                Hoy
-              </Chip>
-              <Chip
-                variant={range === "7d" ? "solid" : "soft"}
-                onClick={() => setRange("7d")}
-                sx={{ borderRadius: "999px" }}>
-                Últimos 7 días
-              </Chip>
-              <Chip
-                variant={range === "month" ? "solid" : "soft"}
-                onClick={() => setRange("month")}
-                sx={{ borderRadius: "999px" }}>
-                Este mes
-              </Chip>
-              <Chip
-                variant={range === "custom" ? "solid" : "soft"}
-                onClick={() => setRange("custom")}
-                sx={{ borderRadius: "999px" }}>
-                Personalizado
-              </Chip>
-            </Stack>
-
-            {/* Fechas: solo en 'custom' */}
-            {range === "custom" && (
-              <Stack direction="row" spacing={0.75} alignItems="center">
-                <Input
-                  type="date"
-                  value={from || ""}
-                  onChange={(e) => {
-                    setFrom(e.target.value);
-                    setPage(1);
-                  }}
-                  slotProps={{ input: { max: to || undefined } }}
-                  sx={{ minWidth: 160 }}
-                />
-                <Typography level="body-sm">a</Typography>
-                <Input
-                  type="date"
-                  value={to || ""}
-                  onChange={(e) => {
-                    setTo(e.target.value);
-                    setPage(1);
-                  }}
-                  slotProps={{ input: { min: from || undefined } }}
-                  sx={{ minWidth: 160 }}
-                />
-              </Stack>
-            )}
-
-            {/* Búsqueda */}
-            <Input
-              startDecorator={<SearchRoundedIcon />}
-              placeholder="Buscar: empleado o puesto…"
-              onChange={(e) => onChangeQuery(e.target.value)}
-              defaultValue={query}
-              sx={{ minWidth: { xs: 220, md: 260 } }}
-            />
-
-            {/* Exportar */}
-            <Button
-              variant="soft"
-              startDecorator={<DownloadRoundedIcon />}
-              onClick={() => setOpenExport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Exportar
-            </Button>
-          </Stack>
-        </Stack>
-
-        {/* Tabla */}
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "neutral.outlinedBorder",
-            borderRadius: "lg",
-            overflow: "hidden",
-          }}>
+        <Box sx={{ overflowX: "auto" }}>
           <Table
-            aria-label="Tabla de empleados con más salidas"
-            stickyHeader
+            aria-label={t("reports.report_items.empleados_actividad.title")}
             hoverRow
+            stickyHeader
             sx={{
-              "--TableCell-paddingX": "12px",
-              "--TableCell-paddingY": "10px",
+              "--TableCell-paddingX": "16px",
+              "--TableCell-paddingY": "12px",
               "& thead th": {
                 bgcolor: "background.level1",
-                fontWeight: 700,
-                color: "text.primary",
-                borderBottom: "1px solid",
-                borderColor: "divider",
-                whiteSpace: "nowrap",
-              },
-              "& tbody tr:nth-of-type(odd)": {
-                bgcolor: "background.level2",
-              },
-              "& tbody td": {
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.05em",
                 borderBottom: "1px solid",
                 borderColor: "divider",
               },
+              "& tbody tr:last-child td": { borderBottom: 0 },
             }}>
             <thead>
               <tr>
-                <th style={{ width: 56 }}>#</th>
-                <th>Empleado</th>
-                <th>Puesto</th>
-                <th style={{ textAlign: "right" }}>Total de salidas</th>
+                <th style={{ width: 60, textAlign: "center" }}>#</th>
+                <th>{t("reports.columns.employee")}</th>
+                <th>{t("reports.columns.position")}</th>
+                <th style={{ textAlign: "right", width: 180 }}>
+                  {t("reports.columns.total_exits")}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {pageItems.map((r, i) => (
-                <tr key={`${r.nombre_empleado}-${i}`}>
-                  <td>{(pageSafe - 1) * rowsPerPage + i + 1}</td>
-                  <td>{r.nombre_empleado ?? "—"}</td>
-                  <td>{r.puesto ?? "—"}</td>
-                  <td style={{ textAlign: "right", fontWeight: 700 }}>
-                    {Number(r.total_salidas ?? 0)}
-                  </td>
-                </tr>
-              ))}
-              {pageItems.length === 0 && (
+              {pageItems.length > 0 ? (
+                pageItems.map((r, i) => {
+                  const globalIndex = (pageSafe - 1) * rowsPerPage + i + 1;
+                  const isTop3 = globalIndex <= 3;
+
+                  return (
+                    <tr key={`${r.nombre_empleado}-${i}`}>
+                      <td
+                        style={{
+                          textAlign: "center",
+                          color: "var(--joy-palette-text-tertiary)",
+                        }}>
+                        {isTop3 ? (
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={globalIndex === 1 ? "warning" : "neutral"}>
+                            {globalIndex}
+                          </Chip>
+                        ) : (
+                          globalIndex
+                        )}
+                      </td>
+                      <td>
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center">
+                          <Box
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              bgcolor: "neutral.100",
+                              display: "grid",
+                              placeItems: "center",
+                              color: "neutral.500",
+                            }}>
+                            <PersonRoundedIcon fontSize="small" />
+                          </Box>
+                          <Typography fontWeight="md">
+                            {r.nombre_empleado || "—"}
+                          </Typography>
+                        </Stack>
+                      </td>
+                      <td>{r.puesto || "—"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <Typography fontWeight="lg" color="primary">
+                          {Number(r.total_salidas ?? 0)}
+                        </Typography>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
                 <tr>
-                  <td colSpan={4}>
-                    <Alert variant="soft" color="neutral">
+                  <td
+                    colSpan={4}
+                    style={{ textAlign: "center", padding: "40px" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 1,
+                        color: "neutral.400",
+                      }}>
+                      <FilterListOffRoundedIcon sx={{ fontSize: 40 }} />
                       <Typography level="body-sm">
-                        No hay registros para ese rango/búsqueda.
+                        {t("reports.no_data_desc")}
                       </Typography>
-                    </Alert>
+                    </Box>
                   </td>
                 </tr>
               )}
@@ -389,41 +360,49 @@ export default function EmpleadosMasSalidas() {
           </Table>
         </Box>
 
-        {/* Footer */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mt: 1.25, gap: 1 }}>
-          <Typography level="body-sm" color="neutral">
-            Mostrando{" "}
-            <b>
-              {pageItems.length} de {filtered.length}
-            </b>{" "}
-            empleados
-          </Typography>
-
-          <PaginationLite
-            page={pageSafe}
-            count={totalPages}
-            onChange={setPage}
-            size="sm"
-            showFirstLast
-          />
-        </Stack>
-        <ExportDialog
-          open={openExport}
-          onClose={() => setOpenExport(false)}
-          rows={filtered} // todo el filtro
-          pageRows={pageItems} // página actual
-          columns={columnsExport}
-          defaultTitle="Empleados con Más Salidas"
-          defaultSheetName="empleados_mas_salidas"
-          defaultFilenameBase={filenameBase}
-          defaultOrientation="portrait"
-          logoUrl="/newLogoTecnasa.png"
-        />
+        {/* --- FOOTER PAGINATION --- */}
+        {pageItems.length > 0 && (
+          <Box
+            sx={{
+              p: 2,
+              borderTop: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.surface",
+            }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems="center"
+              spacing={2}>
+              <Typography level="body-sm" color="neutral">
+                {t("reports.showing_page", {
+                  page: pageSafe,
+                  total: totalPages,
+                })}
+              </Typography>
+              <PaginationLite
+                page={pageSafe}
+                count={totalPages}
+                onChange={setPage}
+                size="sm"
+              />
+            </Stack>
+          </Box>
+        )}
       </Sheet>
+
+      {/* --- EXPORT MODAL --- */}
+      <ExportDialog
+        open={openExport}
+        onClose={() => setOpenExport(false)}
+        rows={filtered}
+        pageRows={pageItems}
+        columns={columnsExport}
+        defaultTitle={t("reports.report_items.empleados_actividad.title")}
+        defaultSheetName="Empleados"
+        defaultFilenameBase={filenameBase}
+        defaultOrientation="portrait"
+      />
     </Box>
   );
 }

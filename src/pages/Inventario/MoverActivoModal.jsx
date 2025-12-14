@@ -1,7 +1,11 @@
+// src/pages/Inventario/MoverActivoModal.jsx
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useFormik } from "formik";
+import * as yup from "yup";
+
 import {
-  Modal,
-  ModalDialog,
+  Drawer,
   Typography,
   Divider,
   Stack,
@@ -10,25 +14,57 @@ import {
   Input,
   Button,
   Autocomplete,
-  Drawer,
   Sheet,
   ModalClose,
+  FormHelperText,
 } from "@mui/joy";
+
+// Services
 import { moverActivo } from "../../services/UbicacionesServices";
 import { getBodegas } from "../../services/BodegasServices";
 import { getClientes } from "../../services/ClientesServices";
 import { getActiveSitesByCliente } from "../../services/SitesServices";
 import { getEmpleados } from "../../services/AuthServices";
+
+// Context
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 
-// util para buscar sin acentos/diacríticos y sin mayúsculas
+// Util para normalizar texto
 const normalize = (s = "") =>
   s
     .toString()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
+
+// --- ESQUEMA DE VALIDACIÓN YUP ---
+const validationSchema = yup.object({
+  tipo_destino: yup.string().required("El tipo de destino es requerido"),
+  motivo: yup.string().required("El motivo es requerido"), // Hacemos obligatorio el motivo para trazabilidad
+
+  // Condicional: Si es Bodega, id_bodega es requerido
+  id_bodega: yup.string().when("tipo_destino", {
+    is: "Bodega",
+    then: (schema) => schema.required("Debes seleccionar una bodega"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+
+  // Condicional: Si es Empleado, id_empleado es requerido
+  id_empleado: yup.string().when("tipo_destino", {
+    is: "Empleado",
+    then: (schema) => schema.required("Debes seleccionar un empleado"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+
+  // Condicional: Si es Cliente, id_site es requerido
+  // (Nota: id_cliente es auxiliar, lo que importa es el site)
+  id_site: yup.string().when("tipo_destino", {
+    is: "Cliente",
+    then: (schema) => schema.required("Debes seleccionar un site"),
+    otherwise: (schema) => schema.nullable(),
+  }),
+});
 
 export default function MoverActivoModal({
   open,
@@ -38,166 +74,171 @@ export default function MoverActivoModal({
   defaultTipo = "Bodega",
   defaultClienteId = null,
 }) {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const { userData } = useAuth();
 
-  // const [tipoDestino, setTipoDestino] = useState("Bodega");
-  const [tipoDestino, setTipoDestino] = useState(defaultTipo);
-  const [clienteDestino, setClienteDestino] = useState(defaultClienteId || "");
-
+  // Listas de datos
   const [clientes, setClientes] = useState([]);
   const [sites, setSites] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [empleados, setEmpleados] = useState([]);
 
-  // const [clienteDestino, setClienteDestino] = useState("");
-  const [siteDestino, setSiteDestino] = useState(""); // guarda id
-  const [bodegaDestino, setBodegaDestino] = useState(""); // guarda id
-  const [empleadoDestino, setEmpleadoDestino] = useState(""); // guarda id
-  const [motivo, setMotivo] = useState("");
-
-  const [saving, setSaving] = useState(false);
-  const [loadingClientes, setLoadingClientes] = useState(false);
-  const [loadingBodegas, setLoadingBodegas] = useState(false);
+  // Loaders
+  const [loadingBase, setLoadingBase] = useState(false);
   const [loadingSites, setLoadingSites] = useState(false);
   const [loadingEmpleados, setLoadingEmpleados] = useState(false);
 
+  // --- FORMIK ---
+  const formik = useFormik({
+    initialValues: {
+      tipo_destino: defaultTipo,
+      id_cliente: defaultClienteId ? String(defaultClienteId) : "", // Auxiliar para cargar sites
+      id_site: "",
+      id_bodega: "",
+      id_empleado: "",
+      motivo: "",
+    },
+    validationSchema,
+    enableReinitialize: true, // Permite reiniciar si cambian los props default
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        await moverActivo({
+          id_activo: activo.id,
+          tipo_destino: values.tipo_destino,
+          id_cliente_site:
+            values.tipo_destino === "Cliente" ? values.id_site : null,
+          id_bodega: values.tipo_destino === "Bodega" ? values.id_bodega : null,
+          id_empleado:
+            values.tipo_destino === "Empleado" ? values.id_empleado : null,
+          motivo: values.motivo,
+          usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
+        });
+
+        showToast(t("inventory.move.success"), "success");
+        onClose?.();
+        onSaved?.();
+      } catch (err) {
+        showToast(err?.message || t("inventory.move.errors.failed"), "danger");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  // --- EFECTOS ---
+
+  // 1. Cargar datos base al abrir
   useEffect(() => {
     if (open) {
+      // Reset form visualmente a defaults si se reabre
+      formik.resetForm({
+        values: {
+          tipo_destino: defaultTipo,
+          id_cliente: defaultClienteId ? String(defaultClienteId) : "",
+          id_site: "",
+          id_bodega: "",
+          id_empleado: "",
+          motivo: "",
+        },
+      });
       loadBaseLists();
-      setTipoDestino(defaultTipo);
-      setClienteDestino(defaultClienteId || "");
-      setSiteDestino("");
-      setBodegaDestino("");
-      setEmpleadoDestino("");
-      setMotivo("");
     }
-  }, [open, defaultTipo, defaultClienteId]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadBaseLists() {
     try {
-      setLoadingClientes(true);
-      setLoadingBodegas(true);
+      setLoadingBase(true);
       const [cli, bod] = await Promise.all([getClientes(), getBodegas()]);
       setClientes(Array.isArray(cli) ? cli : []);
       setBodegas(Array.isArray(bod) ? bod : []);
     } catch {
-      showToast("Error al cargar clientes/bodegas", "danger");
+      showToast(t("inventory.move.errors.load_failed"), "danger");
     } finally {
-      setLoadingClientes(false);
-      setLoadingBodegas(false);
+      setLoadingBase(false);
     }
   }
 
-  // Cargar sites al elegir cliente
+  // 2. Cargar Sites cuando cambia el Cliente seleccionado
   useEffect(() => {
-    if (tipoDestino === "Cliente" && clienteDestino) {
+    const { tipo_destino, id_cliente } = formik.values;
+    if (tipo_destino === "Cliente" && id_cliente) {
       setLoadingSites(true);
-      getActiveSitesByCliente(clienteDestino)
+      getActiveSitesByCliente(id_cliente)
         .then((rows) => setSites(Array.isArray(rows) ? rows : []))
         .catch(() => setSites([]))
         .finally(() => setLoadingSites(false));
     } else {
       setSites([]);
     }
-  }, [tipoDestino, clienteDestino]);
+  }, [formik.values.tipo_destino, formik.values.id_cliente]);
 
-  // Cargar empleados solo cuando se elige "Empleado"
+  // 3. Cargar Empleados cuando el tipo es Empleado
   useEffect(() => {
-    if (tipoDestino !== "Empleado" || !open) return;
-    setLoadingEmpleados(true);
-    getEmpleados()
-      .then((rows) => setEmpleados(Array.isArray(rows) ? rows : []))
-      .catch(() => {
-        setEmpleados([]);
-        showToast("Error al cargar empleados", "danger");
-      })
-      .finally(() => setLoadingEmpleados(false));
-  }, [tipoDestino, open, showToast]);
-
-  function resetForm() {
-    setTipoDestino("Bodega");
-    setClienteDestino("");
-    setSiteDestino("");
-    setBodegaDestino("");
-    setEmpleadoDestino("");
-    setMotivo("");
-  }
-
-  // limpiar campos al cambiar el tipo
-  useEffect(() => {
-    if (tipoDestino === "Bodega") {
-      setClienteDestino("");
-      setSiteDestino("");
-      setEmpleadoDestino("");
-    } else if (tipoDestino === "Cliente") {
-      setBodegaDestino("");
-      setEmpleadoDestino("");
-    } else if (tipoDestino === "Empleado") {
-      setClienteDestino("");
-      setSiteDestino("");
-      setBodegaDestino("");
+    if (formik.values.tipo_destino === "Empleado" && open) {
+      setLoadingEmpleados(true);
+      getEmpleados()
+        .then((rows) => setEmpleados(Array.isArray(rows) ? rows : []))
+        .catch(() => setEmpleados([]))
+        .finally(() => setLoadingEmpleados(false));
     }
-  }, [tipoDestino]);
+  }, [formik.values.tipo_destino, open]);
 
-  // helpers para encontrar el "value" del Autocomplete (obj completo desde el id)
+  // 4. Limpieza de campos al cambiar Tipo de Destino
+  //    (Usamos un useEffect para no ensuciar el onChange del select)
+  useEffect(() => {
+    const tipo = formik.values.tipo_destino;
+    if (tipo === "Bodega") {
+      formik.setFieldValue("id_cliente", "");
+      formik.setFieldValue("id_site", "");
+      formik.setFieldValue("id_empleado", "");
+    } else if (tipo === "Cliente") {
+      formik.setFieldValue("id_bodega", "");
+      formik.setFieldValue("id_empleado", "");
+    } else if (tipo === "Empleado") {
+      formik.setFieldValue("id_bodega", "");
+      formik.setFieldValue("id_cliente", "");
+      formik.setFieldValue("id_site", "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formik.values.tipo_destino]);
+
+  // --- HELPERS PARA AUTOCOMPLETE (Values Objects) ---
+  const valueBodega = useMemo(
+    () =>
+      bodegas.find((b) => String(b.id) === String(formik.values.id_bodega)) ||
+      null,
+    [bodegas, formik.values.id_bodega]
+  );
   const valueCliente = useMemo(
-    () => clientes.find((c) => c.id === clienteDestino) || null,
-    [clientes, clienteDestino]
+    () =>
+      clientes.find((c) => String(c.id) === String(formik.values.id_cliente)) ||
+      null,
+    [clientes, formik.values.id_cliente]
   );
   const valueSite = useMemo(
-    () => sites.find((s) => s.id === siteDestino) || null,
-    [sites, siteDestino]
-  );
-  const valueBodega = useMemo(
-    () => bodegas.find((b) => b.id === bodegaDestino) || null,
-    [bodegas, bodegaDestino]
+    () =>
+      sites.find((s) => String(s.id) === String(formik.values.id_site)) || null,
+    [sites, formik.values.id_site]
   );
   const valueEmpleado = useMemo(
-    () => empleados.find((e) => e.id === empleadoDestino) || null,
-    [empleados, empleadoDestino]
+    () =>
+      empleados.find(
+        (e) => String(e.id) === String(formik.values.id_empleado)
+      ) || null,
+    [empleados, formik.values.id_empleado]
   );
 
-  // filtros insensibles a acentos (Autocomplete ya filtra, pero esto mejora)
-  const filterByName = (optArray, inputValue, key = "nombre") => {
+  const filterByName = (opts, { inputValue }, key = "nombre") => {
     const q = normalize(inputValue);
-    if (!q) return optArray;
-    return optArray.filter((o) => normalize(o?.[key] || "").includes(q));
+    return opts.filter((o) => normalize(o?.[key] || "").includes(q));
   };
 
-  function isValid() {
-    if (tipoDestino === "Bodega") return !!bodegaDestino;
-    if (tipoDestino === "Cliente") return !!clienteDestino && !!siteDestino;
-    if (tipoDestino === "Empleado") return !!empleadoDestino;
-    return false;
-  }
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    if (!isValid()) {
-      showToast("Completa los campos requeridos según el destino", "warning");
-      return;
-    }
-    setSaving(true);
-    try {
-      await moverActivo({
-        id_activo: activo.id,
-        tipo_destino: tipoDestino,
-        id_cliente_site: tipoDestino === "Cliente" ? siteDestino : null,
-        id_bodega: tipoDestino === "Bodega" ? bodegaDestino : null,
-        id_empleado: tipoDestino === "Empleado" ? empleadoDestino : null,
-        motivo,
-        usuario_responsable: userData?.id_usuario ?? userData?.id ?? null,
-      });
-      showToast("Activo movido correctamente", "success");
-      onClose?.();
-      onSaved?.();
-    } catch (err) {
-      showToast(err?.message || "Error al mover activo", "danger");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const typeOptions = [
+    { value: "Bodega", label: t("inventory.move.types.warehouse") },
+    { value: "Cliente", label: t("inventory.move.types.client") },
+    { value: "Empleado", label: t("inventory.move.types.employee") },
+  ];
 
   return (
     <Drawer
@@ -205,200 +246,223 @@ export default function MoverActivoModal({
       size="md"
       variant="plain"
       open={open}
-      onClose={onClose}
+      onClose={() => !formik.isSubmitting && onClose()}
       slotProps={{
         content: {
           sx: {
-            bgcolor: "transparent",
-            p: { md: 3, sm: 0 },
-            boxShadow: "none",
+            bgcolor: "background.surface",
+            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            boxShadow: "xl",
           },
         },
       }}>
-      <Sheet
-        component={"form"}
-        onSubmit={onSubmit}
-        sx={{
-          borderRadius: "md",
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-          height: "100%",
-          overflow: "auto",
-          width: { xs: "100%", sm: 520 },
-        }}>
-        <Typography level="title-lg">Mover Activo</Typography>
-        <ModalClose />
-        <Divider />
-        <Stack spacing={1.5} mt={1}>
-          {/* Tipo destino */}
-          <FormControl required>
-            <FormLabel>Tipo destino</FormLabel>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography level="h4">{t("inventory.move.title")}</Typography>
+        <ModalClose disabled={formik.isSubmitting} onClick={onClose} />
+      </Stack>
+      <Divider />
+
+      <Stack
+        component="form"
+        onSubmit={formik.handleSubmit}
+        spacing={2}
+        sx={{ flex: 1, overflowY: "auto", px: 1, pt: 1 }}>
+        {/* TIPO DESTINO */}
+        <FormControl>
+          <FormLabel>{t("inventory.move.fields.destination_type")}</FormLabel>
+          <Autocomplete
+            options={typeOptions}
+            value={
+              typeOptions.find((o) => o.value === formik.values.tipo_destino) ||
+              null
+            }
+            onChange={(_, v) =>
+              v && formik.setFieldValue("tipo_destino", v.value)
+            }
+            getOptionLabel={(v) => v.label}
+            isOptionEqualToValue={(a, b) => a.value === b.value}
+            disableClearable
+            disabled={formik.isSubmitting}
+          />
+        </FormControl>
+
+        {/* --- CASO BODEGA --- */}
+        {formik.values.tipo_destino === "Bodega" && (
+          <FormControl
+            error={formik.touched.id_bodega && Boolean(formik.errors.id_bodega)}
+            required>
+            <FormLabel>
+              {t("inventory.move.fields.destination_warehouse")}
+            </FormLabel>
             <Autocomplete
-              options={["Bodega", "Cliente", "Empleado"]}
-              value={tipoDestino}
-              onChange={(_, v) => v && setTipoDestino(v)}
-              getOptionLabel={(v) => v}
-              isOptionEqualToValue={(a, b) => a === b}
-              disabled={saving}
-              disablePortal
-              slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
+              placeholder={t("common.search_placeholder")}
+              options={bodegas}
+              loading={loadingBase}
+              value={valueBodega}
+              onChange={(_, v) =>
+                formik.setFieldValue("id_bodega", v?.id || "")
+              }
+              getOptionLabel={(o) => o?.nombre || ""}
+              isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
+              filterOptions={(opts, state) =>
+                filterByName(opts, state, "nombre")
+              }
+              onBlur={() => formik.setFieldTouched("id_bodega", true)}
+              disabled={formik.isSubmitting}
+              autoHighlight
             />
+            {formik.touched.id_bodega && formik.errors.id_bodega && (
+              <FormHelperText>{formik.errors.id_bodega}</FormHelperText>
+            )}
           </FormControl>
+        )}
 
-          {/* Bodega */}
-          {tipoDestino === "Bodega" && (
-            <FormControl required>
-              <FormLabel>Bodega destino</FormLabel>
+        {/* --- CASO CLIENTE --- */}
+        {formik.values.tipo_destino === "Cliente" && (
+          <>
+            <FormControl>
+              <FormLabel>
+                {t("inventory.move.fields.destination_client")}
+              </FormLabel>
               <Autocomplete
-                placeholder="Escribe para buscar bodega…"
-                options={bodegas}
-                loading={loadingBodegas}
-                value={valueBodega}
-                onChange={(_, v) => setBodegaDestino(v?.id || "")}
-                getOptionLabel={(o) => o?.nombre || ""}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                filterOptions={(opts, state) =>
-                  filterByName(opts, state.inputValue, "nombre")
-                }
-                disabled={saving}
-                disablePortal
-                clearOnBlur={false}
-                autoHighlight
-                renderInput={(params) => <Input {...params} />}
-                slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
-              />
-            </FormControl>
-          )}
-
-          {/* Cliente + Site */}
-          {tipoDestino === "Cliente" && (
-            <>
-              <FormControl required>
-                <FormLabel>Cliente destino</FormLabel>
-                <Autocomplete
-                  placeholder="Escribe para buscar cliente…"
-                  options={clientes}
-                  loading={loadingClientes}
-                  value={valueCliente}
-                  onChange={(_, v) => {
-                    setClienteDestino(v?.id || "");
-                    setSiteDestino("");
-                  }}
-                  getOptionLabel={(o) => o?.nombre || ""}
-                  isOptionEqualToValue={(o, v) => o.id === v.id}
-                  filterOptions={(opts, state) =>
-                    filterByName(opts, state.inputValue, "nombre")
-                  }
-                  disabled={saving}
-                  disablePortal
-                  clearOnBlur={false}
-                  autoHighlight
-                  renderInput={(params) => <Input {...params} />}
-                  slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
-                />
-              </FormControl>
-
-              <FormControl required>
-                <FormLabel>Site destino</FormLabel>
-                <Autocomplete
-                  placeholder={
-                    clienteDestino
-                      ? "Escribe para buscar site…"
-                      : "Selecciona un cliente primero"
-                  }
-                  options={sites}
-                  loading={loadingSites}
-                  value={valueSite}
-                  onChange={(_, v) => setSiteDestino(v?.id || "")}
-                  getOptionLabel={(o) => {
-                    if (!o) return "";
-                    const desc = (o.descripcion || "").trim();
-
-                    // Si la descripción está vacía o es solo "-"
-                    if (!desc || desc === "-") {
-                      return o.nombre || "";
-                    }
-
-                    return `${o.nombre} - ${desc}`;
-                  }}
-                  isOptionEqualToValue={(o, v) => o.id === v.id}
-                  filterOptions={(opts, state) =>
-                    filterByName(opts, state.inputValue, "nombre")
-                  }
-                  disabled={!clienteDestino || saving}
-                  disablePortal
-                  clearOnBlur={false}
-                  autoHighlight
-                  renderInput={(params) => <Input {...params} />}
-                  slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
-                />
-              </FormControl>
-            </>
-          )}
-
-          {/* Empleado */}
-          {tipoDestino === "Empleado" && (
-            <FormControl required>
-              <FormLabel>Empleado destino</FormLabel>
-              <Autocomplete
-                placeholder="Escribe para buscar empleado…"
-                options={empleados}
-                loading={loadingEmpleados}
-                value={valueEmpleado}
-                onChange={(_, v) => setEmpleadoDestino(v?.id || "")}
-                getOptionLabel={(o) =>
-                  [
-                    o?.nombre || o?.usuario_nombre || "",
-                    o?.puesto ? `— ${o.puesto}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                }
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                filterOptions={(opts, state) => {
-                  const q = normalize(state.inputValue);
-                  return opts.filter((e) =>
-                    [e?.nombre, e?.usuario_nombre, e?.puesto]
-                      .filter(Boolean)
-                      .map(normalize)
-                      .some((t) => t.includes(q))
-                  );
+                placeholder={t("common.search_placeholder")}
+                options={clientes}
+                loading={loadingBase}
+                value={valueCliente}
+                onChange={(_, v) => {
+                  formik.setFieldValue("id_cliente", v?.id || "");
+                  formik.setFieldValue("id_site", ""); // Reset site
                 }}
-                disabled={saving}
-                disablePortal
-                clearOnBlur={false}
+                getOptionLabel={(o) => o?.nombre || ""}
+                isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
+                filterOptions={(opts, state) =>
+                  filterByName(opts, state, "nombre")
+                }
+                disabled={formik.isSubmitting}
                 autoHighlight
-                renderInput={(params) => <Input {...params} />}
-                slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
               />
             </FormControl>
-          )}
 
-          <FormControl required>
-            <FormLabel>Motivo</FormLabel>
-            <Input
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              disabled={saving}
-              placeholder="(ej: Cambio de equipo / salida del cliente)"
+            <FormControl
+              error={formik.touched.id_site && Boolean(formik.errors.id_site)}
+              required>
+              <FormLabel>
+                {t("inventory.move.fields.destination_site")}
+              </FormLabel>
+              <Autocomplete
+                placeholder={
+                  formik.values.id_cliente
+                    ? t("common.search_placeholder")
+                    : t("inventory.move.hints.select_client_first")
+                }
+                options={sites}
+                loading={loadingSites}
+                value={valueSite}
+                onChange={(_, v) =>
+                  formik.setFieldValue("id_site", v?.id || "")
+                }
+                getOptionLabel={(o) => {
+                  if (!o) return "";
+                  const desc = (o.descripcion || "").trim();
+                  return !desc || desc === "-"
+                    ? o.nombre || ""
+                    : `${o.nombre} - ${desc}`;
+                }}
+                isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
+                filterOptions={(opts, state) =>
+                  filterByName(opts, state, "nombre")
+                }
+                onBlur={() => formik.setFieldTouched("id_site", true)}
+                disabled={!formik.values.id_cliente || formik.isSubmitting}
+                autoHighlight
+              />
+              {formik.touched.id_site && formik.errors.id_site && (
+                <FormHelperText>{formik.errors.id_site}</FormHelperText>
+              )}
+            </FormControl>
+          </>
+        )}
+
+        {/* --- CASO EMPLEADO --- */}
+        {formik.values.tipo_destino === "Empleado" && (
+          <FormControl
+            error={
+              formik.touched.id_empleado && Boolean(formik.errors.id_empleado)
+            }
+            required>
+            <FormLabel>
+              {t("inventory.move.fields.destination_employee")}
+            </FormLabel>
+            <Autocomplete
+              placeholder={t("common.search_placeholder")}
+              options={empleados}
+              loading={loadingEmpleados}
+              value={valueEmpleado}
+              onChange={(_, v) =>
+                formik.setFieldValue("id_empleado", v?.id || "")
+              }
+              getOptionLabel={(o) => {
+                const parts = [
+                  o?.nombre || o?.usuario_nombre || "",
+                  o?.puesto ? `— ${o.puesto}` : "",
+                ];
+                return parts.filter(Boolean).join(" ");
+              }}
+              isOptionEqualToValue={(o, v) => String(o.id) === String(v.id)}
+              filterOptions={(opts, state) => {
+                const q = normalize(state.inputValue);
+                return opts.filter((e) =>
+                  [e?.nombre, e?.usuario_nombre, e?.puesto]
+                    .filter(Boolean)
+                    .map(normalize)
+                    .some((t) => t.includes(q))
+                );
+              }}
+              onBlur={() => formik.setFieldTouched("id_empleado", true)}
+              disabled={formik.isSubmitting}
+              autoHighlight
             />
+            {formik.touched.id_empleado && formik.errors.id_empleado && (
+              <FormHelperText>{formik.errors.id_empleado}</FormHelperText>
+            )}
           </FormControl>
-        </Stack>
+        )}
 
-        <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
-          <Button variant="plain" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            disabled={saving || !isValid()}>
-            Mover
-          </Button>
-        </Stack>
-      </Sheet>
+        {/* MOTIVO */}
+        <FormControl
+          error={formik.touched.motivo && Boolean(formik.errors.motivo)}
+          required>
+          <FormLabel>{t("inventory.move.fields.reason")}</FormLabel>
+          <Input
+            name="motivo"
+            value={formik.values.motivo}
+            onChange={formik.handleChange}
+            onBlur={() => formik.setFieldTouched("motivo", true)} // Seguridad para Enter key
+            disabled={formik.isSubmitting}
+            placeholder={t("inventory.move.hints.reason_placeholder")}
+          />
+          {formik.touched.motivo && formik.errors.motivo && (
+            <FormHelperText>{formik.errors.motivo}</FormHelperText>
+          )}
+        </FormControl>
+      </Stack>
+
+      {/* FOOTER */}
+      <Stack direction="row" justifyContent="flex-end" spacing={1} pt={2}>
+        <Button
+          variant="plain"
+          color="neutral"
+          onClick={onClose}
+          disabled={formik.isSubmitting}>
+          {t("common.actions.cancel")}
+        </Button>
+        <Button onClick={formik.handleSubmit} loading={formik.isSubmitting}>
+          {t("common.actions.move")}
+        </Button>
+      </Stack>
     </Drawer>
   );
 }

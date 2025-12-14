@@ -1,21 +1,21 @@
 // src/pages/SoporteAdmin/FAQsAdminPage.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { useFormik } from "formik";
+import * as yup from "yup";
+
 import {
   Box,
-  Sheet,
-  Card,
-  CardContent,
   Typography,
   Stack,
   Table,
+  Sheet,
   Input,
   Select,
   Option,
   Button,
   IconButton,
   Chip,
-  Modal,
-  ModalDialog,
   FormControl,
   FormLabel,
   Textarea,
@@ -23,9 +23,13 @@ import {
   Switch,
   Tooltip,
   CircularProgress,
+  Autocomplete,
+  Drawer,
+  ModalClose,
+  FormHelperText,
 } from "@mui/joy";
-import Autocomplete from "@mui/joy/Autocomplete";
 
+// Iconos
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -33,23 +37,24 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ClearIcon from "@mui/icons-material/Clear";
+import HelpCenterRoundedIcon from "@mui/icons-material/HelpCenterRounded"; // Icono empty
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
 import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
-import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
+// Services & Context
 import { listFaqs } from "../../services/help.api";
 import { createFaq, updateFaq, deleteFaq } from "../../services/helpAdmin.api";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import StatusCard from "../../components/common/StatusCard";
+import PaginationLite from "../../components/common/PaginationLite";
 
-/* ---------------- utils ---------------- */
+// --- Utils ---
 function slugify(s = "") {
   return s
     .toString()
@@ -61,23 +66,18 @@ function slugify(s = "") {
     .slice(0, 160);
 }
 
-// Normaliza a array de strings (seguro para JSON)
 function toTagArray(value) {
   if (!value) return [];
   if (Array.isArray(value))
     return value.map((t) => String(t).trim()).filter(Boolean);
   if (typeof value === "string") {
-    const s = value.trim();
-    if (!s) return [];
-    if (s.startsWith("[") || s.startsWith("{")) {
-      try {
-        const j = JSON.parse(s);
-        return Array.isArray(j) ? j.map((t) => String(t).trim()) : [];
-      } catch {
-        // cae a CSV
-      }
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      /* ignore */
     }
-    return s
+    return value
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
@@ -85,195 +85,198 @@ function toTagArray(value) {
   return [];
 }
 
-/* -------------- pager simple -------------- */
-function SimplePager({ page, totalPages, onPage }) {
-  return (
-    <Stack direction="row" spacing={1} alignItems="center">
-      <Button
-        size="sm"
-        variant="plain"
-        disabled={page <= 1}
-        onClick={() => onPage(page - 1)}>
-        Anterior
-      </Button>
-      <Typography level="body-sm">
-        Página {page} / {Math.max(totalPages, 1)}
-      </Typography>
-      <Button
-        size="sm"
-        variant="plain"
-        disabled={page >= totalPages}
-        onClick={() => onPage(page + 1)}>
-        Siguiente
-      </Button>
-    </Stack>
-  );
-}
+// --- Esquema de Validación ---
+const validationSchema = yup.object({
+  question: yup.string().required("La pregunta es requerida"),
+  answer: yup.string().required("La respuesta es requerida"),
+  category: yup.string().required("La categoría es requerida"),
+  order: yup.number().typeError("Debe ser un número").integer().min(0),
+});
 
-/* -------------- form modal -------------- */
-function FaqFormModal({ open, onClose, onSave, initial, tagOptions = [] }) {
-  const [question, setQuestion] = useState(initial?.question || "");
-  const [answer, setAnswer] = useState(initial?.answer || "");
-  const [category, setCategory] = useState(initial?.category || "General");
-  const [visibility, setVisibility] = useState(initial?.visibility || "public");
-  const [tags, setTags] = useState(toTagArray(initial?.tags));
-  const [order, setOrder] = useState(initial?.order ?? 0);
-  const [isActive, setIsActive] = useState(initial?.isActive ?? 1);
-  const [saving, setSaving] = useState(false);
+// --- Componente Formulario (Drawer) ---
+function FaqFormDrawer({ open, onClose, onSave, initial, tagOptions = [] }) {
+  const { t } = useTranslation();
 
-  const { showToast } = useToast();
-
-  useEffect(() => {
-    if (!open) return;
-    setQuestion(initial?.question || "");
-    setAnswer(initial?.answer || "");
-    setCategory(initial?.category || "General");
-    setVisibility(initial?.visibility || "public");
-    setTags(toTagArray(initial?.tags));
-    setOrder(initial?.order ?? 0);
-    setIsActive(initial?.isActive ?? 1);
-    setSaving(false);
-  }, [open, initial]);
-
-  const submit = async () => {
-    if (!question.trim() || !answer.trim()) {
-      showToast("Pregunta y respuesta son obligatorias", "warning");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = {
-        question: question.trim(),
-        answer: answer.trim(),
-        category: category.trim() || "General",
-        visibility,
-        order: Number(order) || 0,
-        isActive: isActive ? 1 : 0,
-        tags, // array → el controller la guarda como JSON
-        slug: initial?.slug || slugify(question),
-      };
-      await onSave(payload);
-      showToast("Guardado correctamente", "success");
-      onClose?.();
-    } catch (e) {
-      showToast(e?.message || "No se pudo guardar", "danger");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const formik = useFormik({
+    initialValues: {
+      question: initial?.question || "",
+      answer: initial?.answer || "",
+      category: initial?.category || "General",
+      visibility: initial?.visibility || "public",
+      tags: toTagArray(initial?.tags),
+      order: initial?.order ?? 0,
+      isActive: initial?.isActive ?? 1,
+    },
+    validationSchema,
+    enableReinitialize: true,
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        const payload = {
+          ...values,
+          tags: values.tags, // Array
+          slug: initial?.slug || slugify(values.question),
+          isActive: values.isActive ? 1 : 0,
+        };
+        await onSave(payload);
+        onClose();
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ width: 680, maxWidth: "96vw" }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center">
-          <Typography level="title-lg">
-            {initial ? "Editar FAQ" : "Nueva FAQ"}
-          </Typography>
-          <IconButton onClick={onClose}>
-            <CloseRoundedIcon />
-          </IconButton>
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={() => !formik.isSubmitting && onClose()}
+      size="md"
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "background.surface",
+            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            boxShadow: "xl",
+          },
+        },
+      }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography level="h4">
+          {initial
+            ? t("support.faqs.edit_title")
+            : t("support.faqs.create_title")}
+        </Typography>
+        <ModalClose disabled={formik.isSubmitting} onClick={onClose} />
+      </Stack>
+      <Divider />
+
+      <Stack
+        component="form"
+        onSubmit={formik.handleSubmit}
+        spacing={2}
+        sx={{ flex: 1, overflowY: "auto", px: 1, pt: 1 }}>
+        <FormControl
+          required
+          error={formik.touched.question && Boolean(formik.errors.question)}>
+          <FormLabel>{t("support.faqs.form.question")}</FormLabel>
+          <Input
+            name="question"
+            value={formik.values.question}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+          />
+          {formik.touched.question && (
+            <FormHelperText>{formik.errors.question}</FormHelperText>
+          )}
+        </FormControl>
+
+        <FormControl
+          required
+          error={formik.touched.answer && Boolean(formik.errors.answer)}>
+          <FormLabel>{t("support.faqs.form.answer")}</FormLabel>
+          <Textarea
+            name="answer"
+            minRows={6}
+            value={formik.values.answer}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+          />
+          {formik.touched.answer && (
+            <FormHelperText>{formik.errors.answer}</FormHelperText>
+          )}
+        </FormControl>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <FormControl
+            required
+            sx={{ flex: 1 }}
+            error={formik.touched.category && Boolean(formik.errors.category)}>
+            <FormLabel>{t("support.faqs.form.category")}</FormLabel>
+            <Autocomplete
+              freeSolo
+              options={["General", "Cuentas", "Técnico", "Facturación"]} // Sugerencias básicas
+              value={formik.values.category}
+              onInputChange={(_, v) => formik.setFieldValue("category", v)}
+            />
+          </FormControl>
+
+          <FormControl sx={{ width: { xs: "100%", sm: 200 } }}>
+            <FormLabel>{t("support.faqs.form.visibility")}</FormLabel>
+            <Select
+              name="visibility"
+              value={formik.values.visibility}
+              onChange={(_, v) => formik.setFieldValue("visibility", v)}>
+              <Option value="public">
+                {t("support.faqs.visibility.public")}
+              </Option>
+              <Option value="internal">
+                {t("support.faqs.visibility.internal")}
+              </Option>
+            </Select>
+          </FormControl>
         </Stack>
-        <Divider sx={{ my: 1 }} />
 
-        <Stack spacing={1.25}>
-          <FormControl required>
-            <FormLabel>Pregunta</FormLabel>
+        <FormControl>
+          <FormLabel>{t("support.faqs.form.tags")}</FormLabel>
+          <Autocomplete
+            multiple
+            freeSolo
+            options={tagOptions}
+            value={formik.values.tags}
+            onChange={(_, v) => formik.setFieldValue("tags", v)}
+            placeholder={t("support.faqs.form.tags_placeholder")}
+          />
+        </FormControl>
+
+        <Stack direction="row" spacing={3}>
+          <FormControl>
+            <FormLabel>{t("support.faqs.form.order")}</FormLabel>
             <Input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ej. ¿Cómo cambio mi contraseña?"
+              type="number"
+              name="order"
+              value={formik.values.order}
+              onChange={formik.handleChange}
+              sx={{ width: 100 }}
             />
           </FormControl>
 
-          <FormControl required>
-            <FormLabel>Respuesta</FormLabel>
-            <Textarea
-              minRows={5}
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Describe los pasos o la explicación…"
+          <FormControl>
+            <FormLabel>{t("support.faqs.form.active")}</FormLabel>
+            <Switch
+              checked={Boolean(formik.values.isActive)}
+              onChange={(e) =>
+                formik.setFieldValue("isActive", e.target.checked)
+              }
             />
           </FormControl>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <FormControl sx={{ flex: 1 }}>
-              <FormLabel>Categoría</FormLabel>
-              <Input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ej. Cuentas & Acceso"
-              />
-            </FormControl>
-            <FormControl sx={{ width: { xs: "100%", sm: 220 } }}>
-              <FormLabel>Visibilidad</FormLabel>
-              <Select value={visibility} onChange={(_, v) => setVisibility(v)}>
-                <Option value="public">Público</Option>
-                <Option value="internal">Interno</Option>
-              </Select>
-            </FormControl>
-          </Stack>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <FormControl sx={{ flex: 1 }}>
-              <FormLabel>Tags</FormLabel>
-              <Autocomplete
-                multiple
-                freeSolo
-                limitTags={2}
-                placeholder="Escribe y presiona Enter…"
-                options={tagOptions}
-                value={tags}
-                onChange={(_, newValue) =>
-                  setTags(newValue.map((t) => String(t).trim()).filter(Boolean))
-                }
-                getOptionLabel={(opt) => String(opt)}
-                isOptionEqualToValue={(opt, val) => String(opt) === String(val)}
-                slotProps={{
-                  listbox: { sx: { maxHeight: 240 } },
-                  chip: { size: "sm", variant: "soft", color: "neutral" },
-                }}
-                sx={{ "--Input-minHeight": "40px" }}
-              />
-            </FormControl>
-            <FormControl sx={{ width: { xs: "100%", sm: 140 } }}>
-              <FormLabel>Orden</FormLabel>
-              <Input
-                type="number"
-                value={order}
-                onChange={(e) => setOrder(e.target.value)}
-              />
-            </FormControl>
-            <FormControl sx={{ width: { xs: "100%", sm: 160 } }}>
-              <FormLabel>Activo</FormLabel>
-              <Switch
-                checked={!!isActive}
-                onChange={(e) => setIsActive(e.target.checked ? 1 : 0)}
-              />
-            </FormControl>
-          </Stack>
-
-          <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button variant="plain" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              startDecorator={<SaveRoundedIcon />}
-              loading={saving}
-              onClick={submit}>
-              Guardar
-            </Button>
-          </Stack>
         </Stack>
-      </ModalDialog>
-    </Modal>
+      </Stack>
+
+      <Stack direction="row" justifyContent="flex-end" spacing={1} pt={2}>
+        <Button
+          variant="plain"
+          color="neutral"
+          onClick={onClose}
+          disabled={formik.isSubmitting}>
+          {t("common.actions.cancel")}
+        </Button>
+        <Button
+          startDecorator={<SaveRoundedIcon />}
+          onClick={formik.handleSubmit}
+          loading={formik.isSubmitting}>
+          {t("common.actions.save")}
+        </Button>
+      </Stack>
+    </Drawer>
   );
 }
 
-/* -------------- main -------------- */
+// --- Componente Principal ---
 export default function FAQsAdminPage() {
+  const { t } = useTranslation();
   const { hasPermiso, userData, checkingSession } = useAuth();
   const { showToast } = useToast();
 
@@ -283,45 +286,39 @@ export default function FAQsAdminPage() {
     [isAdmin, hasPermiso]
   );
 
-  // Permisos (mismo patrón que ActivosList)
-  const canView = can("help_manage"); // ver listado
+  // Permisos
+  const canView = can("help_manage");
   const canCreate = can("help_manage");
   const canEdit = can("help_manage");
   const canDelete = can("help_manage");
 
-  // tabla
+  // Estado
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
-
-  // filtros
-  const [q, setQ] = useState("");
-  const [visibility, setVisibility] = useState("all"); // all | public | internal
-  const [active, setActive] = useState("all"); // all | 1 | 0
-
-  // paginación
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-
-  // loading / error
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // sort simple por "order"
+  // Filtros
+  const [q, setQ] = useState("");
+  const [visibility, setVisibility] = useState("all");
+  const [active, setActive] = useState("all");
+
+  // Paginación y Orden
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState({ key: "order", dir: "asc" });
 
-  // modal
+  // Modal
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  // --- Fetch Data ---
   const fetchData = useCallback(async () => {
-    if (checkingSession) return; // espera a que termine la verificación
-
+    if (checkingSession) return;
     if (!canView) {
-      // Sin permisos: no intentamos llamar al backend
       setRows([]);
       setTotal(0);
       setLoading(false);
-      setFetchError(null);
       return;
     }
 
@@ -340,20 +337,17 @@ export default function FAQsAdminPage() {
       setRows(items);
       setTotal(Number(res?.total || items.length));
     } catch (e) {
-      setRows([]);
-      setTotal(0);
-      const msg = e?.message || "No se pudieron cargar las FAQs";
-      setFetchError(msg);
-      showToast(msg, "danger");
+      setFetchError(t("support.faqs.errors.load_failed"));
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canView, page, limit, q, visibility, active, showToast]);
+  }, [checkingSession, canView, page, limit, q, visibility, active, t]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  // --- Helpers ---
   const sortedRows = useMemo(() => {
     const src = rows.slice();
     const { key, dir } = sort;
@@ -377,44 +371,39 @@ export default function FAQsAdminPage() {
     );
   };
 
+  const tagOptions = useMemo(() => {
+    const set = new Set();
+    rows.forEach((r) => toTagArray(r.tags).forEach((t) => set.add(t)));
+    return Array.from(set).sort();
+  }, [rows]);
+
+  // --- Handlers ---
   const onCreate = () => {
-    if (!canCreate) {
-      showToast("No tienes permiso para crear FAQs", "warning");
-      return;
-    }
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
     setEditing(null);
     setOpenForm(true);
   };
 
   const onEdit = (row) => {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar FAQs", "warning");
-      return;
-    }
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     setEditing(row);
     setOpenForm(true);
   };
 
   const onDeleteRow = async (row) => {
-    if (!canDelete) {
-      showToast("No tienes permiso para eliminar FAQs", "warning");
-      return;
-    }
-    if (!confirm(`¿Eliminar la FAQ "${row.question}"?`)) return;
+    if (!canDelete) return showToast(t("common.no_permission"), "warning");
+    if (!confirm(t("support.faqs.delete_confirm"))) return;
     try {
       await deleteFaq(row.id);
-      showToast("Eliminado", "success");
+      showToast(t("support.faqs.success.deleted"), "success");
       fetchData();
     } catch (e) {
-      showToast(e?.message || "No se pudo eliminar", "danger");
+      showToast(t("support.faqs.errors.delete_failed"), "danger");
     }
   };
 
   const onQuickToggleActive = async (row) => {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar FAQs", "warning");
-      return;
-    }
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     try {
       await updateFaq(row.id, { isActive: row.isActive ? 0 : 1 });
       setRows((rs) =>
@@ -422,53 +411,27 @@ export default function FAQsAdminPage() {
           r.id === row.id ? { ...r, isActive: r.isActive ? 0 : 1 } : r
         )
       );
-    } catch (e) {
-      showToast(e?.message || "No se pudo actualizar", "danger");
-    }
-  };
-
-  const onQuickToggleVisibility = async (row) => {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar FAQs", "warning");
-      return;
-    }
-    const next = row.visibility === "public" ? "internal" : "public";
-    try {
-      await updateFaq(row.id, { visibility: next });
-      setRows((rs) =>
-        rs.map((r) => (r.id === row.id ? { ...r, visibility: next } : r))
-      );
-    } catch (e) {
-      showToast(e?.message || "No se pudo actualizar", "danger");
+    } catch {
+      showToast(t("support.faqs.errors.update_failed"), "danger");
     }
   };
 
   const onSaveForm = async (payload) => {
-    if (!canEdit && !canCreate) throw new Error("Sin permiso");
-    if (editing) {
-      await updateFaq(editing.id, payload);
-      showToast("Actualizado", "success");
-    } else {
-      await createFaq(payload);
-      showToast("Creado", "success");
+    try {
+      if (editing) {
+        await updateFaq(editing.id, payload);
+        showToast(t("support.faqs.success.updated"), "success");
+      } else {
+        await createFaq(payload);
+        showToast(t("support.faqs.success.created"), "success");
+      }
+      fetchData();
+    } catch (e) {
+      throw e; // Formik handlea el error visualmente si se quiere, aquí lanzamos para que el modal lo cachee
     }
-    fetchData();
   };
 
-  // Opciones de tags deduplicadas desde las filas cargadas
-  const tagOptions = useMemo(() => {
-    const set = new Set();
-    rows.forEach((r) => {
-      toTagArray(r.tags).forEach((t) => set.add(t));
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [rows]);
-
-  // ===== View state (igual patrón que ActivosList) =====
-  const isNetworkErr = /conexión|failed to fetch|network/i.test(
-    fetchError || ""
-  );
-
+  // --- Render Status ---
   const viewState = checkingSession
     ? "checking"
     : !canView
@@ -482,28 +445,62 @@ export default function FAQsAdminPage() {
     : "data";
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Typography level="h4" mb={1}>
-        Administración de FAQs
-      </Typography>
+    <Sheet
+      variant="plain"
+      sx={{
+        flex: 1,
+        width: "100%",
+        pt: { xs: "calc(12px + var(--Header-height))", md: 3 },
+        pb: 4,
+        px: { xs: 2, md: 4 },
+        minHeight: "auto",
+        bgcolor: "background.body",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}>
+      <Box sx={{ width: "100%", maxWidth: 1400 }}>
+        {/* HEADER */}
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", md: "center" }}
+          spacing={2}
+          mb={3}>
+          <Box>
+            <Typography level="h3" fontWeight="lg">
+              {t("support.faqs.title")}
+            </Typography>
+            <Typography level="body-sm" color="neutral">
+              {t("support.faqs.subtitle")}
+            </Typography>
+          </Box>
 
-      <Card variant="outlined">
-        <CardContent sx={{ p: 2 }}>
-          {/* filtros */}
+          {/* FILTROS */}
           <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={1}
-            alignItems={{ xs: "stretch", md: "center" }}>
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="wrap">
             <Input
-              placeholder="Buscar (pregunta, respuesta, categoría, tag)…"
-              startDecorator={<SearchRoundedIcon />}
+              placeholder={t("support.faqs.search_placeholder")}
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
                 setPage(1);
               }}
-              sx={{ flex: 1, minWidth: 200 }}
-              disabled={viewState !== "data" && viewState !== "empty"}
+              startDecorator={<SearchRoundedIcon />}
+              endDecorator={
+                q && (
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    onClick={() => setQ("")}>
+                    <ClearIcon />
+                  </IconButton>
+                )
+              }
+              sx={{ width: { xs: "100%", sm: 260 } }}
             />
 
             <Select
@@ -512,11 +509,14 @@ export default function FAQsAdminPage() {
                 setVisibility(v);
                 setPage(1);
               }}
-              sx={{ width: 180 }}
-              disabled={viewState !== "data" && viewState !== "empty"}>
-              <Option value="all">Todas</Option>
-              <Option value="public">Públicas</Option>
-              <Option value="internal">Internas</Option>
+              sx={{ width: 140 }}>
+              <Option value="all">{t("common.status.all")}</Option>
+              <Option value="public">
+                {t("support.faqs.visibility.public")}
+              </Option>
+              <Option value="internal">
+                {t("support.faqs.visibility.internal")}
+              </Option>
             </Select>
 
             <Select
@@ -525,156 +525,129 @@ export default function FAQsAdminPage() {
                 setActive(v);
                 setPage(1);
               }}
-              sx={{ width: 180 }}
-              disabled={viewState !== "data" && viewState !== "empty"}>
-              <Option value="all">Todas</Option>
-              <Option value="1">Activas</Option>
-              <Option value="0">Inactivas</Option>
+              sx={{ width: 140 }}>
+              <Option value="all">{t("common.status.all")}</Option>
+              <Option value="1">{t("common.status.active")}</Option>
+              <Option value="0">{t("common.status.inactive")}</Option>
             </Select>
 
-            <Select
-              value={String(limit)}
-              onChange={(_, v) => {
-                setLimit(Number(v));
-                setPage(1);
-              }}
-              sx={{ width: 140 }}
-              disabled={viewState !== "data" && viewState !== "empty"}>
-              <Option value="10">10 / pág</Option>
-              <Option value="20">20 / pág</Option>
-              <Option value="50">50 / pág</Option>
-            </Select>
-
-            <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
-              <SimplePager
-                page={page}
-                totalPages={totalPages}
-                onPage={setPage}
-              />
-              <Tooltip
-                title={
-                  canCreate
-                    ? "Crear FAQ"
-                    : "No tienes permiso para crear. Solicítalo al administrador."
-                }
+            {canCreate && (
+              <Button
+                startDecorator={<AddRoundedIcon />}
+                onClick={onCreate}
                 variant="solid"
-                placement="bottom-end">
-                <span>
-                  <Button
-                    startDecorator={<AddRoundedIcon />}
-                    onClick={onCreate}
-                    disabled={!canCreate}
-                    aria-disabled={!canCreate}
-                    variant={canCreate ? "solid" : "soft"}
-                    color={canCreate ? "primary" : "neutral"}>
-                    Nueva FAQ
-                  </Button>
-                </span>
-              </Tooltip>
-            </Stack>
+                color="primary">
+                {t("support.faqs.actions.new")}
+              </Button>
+            )}
           </Stack>
+        </Stack>
 
-          <Divider sx={{ my: 1.5 }} />
-
-          {/* Estados con StatusCard */}
-          {viewState === "checking" && (
-            <StatusCard
-              icon={<HourglassEmptyRoundedIcon />}
-              title="Verificando sesión…"
-              description={
-                <Stack alignItems="center" spacing={1}>
-                  <CircularProgress size="sm" />
-                  <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                    Por favor, espera un momento.
-                  </Typography>
-                </Stack>
-              }
-            />
-          )}
-
-          {viewState === "no-permission" && (
-            <StatusCard
-              color="danger"
-              icon={<LockPersonRoundedIcon />}
-              title="Sin permisos para administrar FAQs"
-              description="Consulta con un administrador para obtener acceso."
-            />
-          )}
-
-          {viewState === "error" && (
-            <StatusCard
-              color={isNetworkErr ? "warning" : "danger"}
-              icon={
-                isNetworkErr ? (
-                  <WifiOffRoundedIcon />
-                ) : (
-                  <ErrorOutlineRoundedIcon />
-                )
-              }
-              title={
-                isNetworkErr
-                  ? "Problema de conexión"
-                  : "No se pudo cargar la lista"
-              }
-              description={fetchError}
-              actions={
-                <Button
-                  startDecorator={<RestartAltRoundedIcon />}
-                  onClick={fetchData}
-                  variant="soft">
-                  Reintentar
-                </Button>
-              }
-            />
-          )}
-
-          {viewState === "empty" && (
-            <StatusCard
-              color="neutral"
-              icon={<InfoOutlinedIcon />}
-              title="No hay FAQs"
-              description="Ajusta los filtros o crea la primera."
-            />
-          )}
-
+        {/* CONTENT */}
+        <Sheet
+          variant="outlined"
+          sx={{
+            borderRadius: "lg",
+            overflow: "hidden",
+            bgcolor: "background.surface",
+            minHeight: "auto",
+          }}>
           {viewState === "loading" && (
-            <Sheet p={3} sx={{ textAlign: "center" }}>
-              <Stack spacing={1} alignItems="center">
-                <CircularProgress />
-                <Typography level="body-sm">Cargando…</Typography>
-              </Stack>
-            </Sheet>
+            <Box display="flex" justifyContent="center" py={10}>
+              <CircularProgress />
+            </Box>
+          )}
+          {viewState === "error" && (
+            <Box p={4} display="flex" justifyContent="center">
+              <StatusCard
+                color="danger"
+                icon={<ErrorOutlineRoundedIcon />}
+                title={t("common.error_title")}
+                description={fetchError}
+                actions={
+                  <Button
+                    startDecorator={<RestartAltRoundedIcon />}
+                    onClick={fetchData}
+                    variant="soft">
+                    {t("common.retry")}
+                  </Button>
+                }
+              />
+            </Box>
+          )}
+          {viewState === "empty" && (
+            <Box p={4} display="flex" justifyContent="center">
+              <StatusCard
+                color="neutral"
+                icon={<HelpCenterRoundedIcon />}
+                title={t("support.faqs.empty.title")}
+                description={t("support.faqs.empty.desc")}
+              />
+            </Box>
+          )}
+          {viewState === "no-permission" && (
+            <Box p={4} display="flex" justifyContent="center">
+              <StatusCard
+                color="danger"
+                icon={<LockPersonRoundedIcon />}
+                title={t("common.no_permission")}
+                description={t("common.contact_admin")}
+              />
+            </Box>
+          )}
+          {viewState === "checking" && (
+            <Box p={4} display="flex" justifyContent="center">
+              <StatusCard
+                icon={<HourglassEmptyRoundedIcon />}
+                title={t("common.verifying_session")}
+                description={<CircularProgress size="sm" />}
+              />
+            </Box>
           )}
 
           {viewState === "data" && (
-            <Sheet variant="plain" sx={{ overflowX: "auto" }}>
-              <Table size="sm" stickyHeader hoverRow sx={{ minWidth: 1040 }}>
+            <>
+              <Table
+                stickyHeader
+                hoverRow
+                sx={{
+                  "--TableCell-paddingX": "16px",
+                  "--TableCell-paddingY": "12px",
+                  "& thead th": {
+                    bgcolor: "background.level1",
+                    color: "text.tertiary",
+                    fontWeight: "md",
+                    textTransform: "uppercase",
+                    fontSize: "xs",
+                    letterSpacing: "0.05em",
+                  },
+                }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 54 }}>ID</th>
-                    <th>Pregunta</th>
-                    <th>Categoría</th>
-                    <th>Visibilidad</th>
-                    <th>Activo</th>
+                    <th style={{ width: 60 }}>ID</th>
+                    <th style={{ width: "25%" }}>
+                      {t("support.faqs.columns.question")}
+                    </th>
+                    <th style={{ width: "30%" }}>
+                      {t("support.faqs.columns.answer")}
+                    </th>
+                    <th>{t("support.faqs.columns.category")}</th>
+                    <th>{t("support.faqs.columns.visibility")}</th>
+                    <th>{t("support.faqs.columns.status")}</th>
                     <th
-                      style={{
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        width: 110,
-                      }}
+                      style={{ cursor: "pointer", width: 100 }}
                       onClick={() => toggleSort("order")}>
-                      <Stack direction="row" spacing={0.25} alignItems="center">
-                        <span>Orden</span>
-                        {sort.key === "order" ? (
-                          sort.dir === "asc" ? (
+                      <Stack direction="row" alignItems="center">
+                        {t("support.faqs.columns.order")}
+                        {sort.key === "order" &&
+                          (sort.dir === "asc" ? (
                             <ArrowDropUpIcon fontSize="sm" />
                           ) : (
                             <ArrowDropDownIcon fontSize="sm" />
-                          )
-                        ) : null}
+                          ))}
                       </Stack>
                     </th>
-                    <th style={{ width: 220, textAlign: "right" }}>Acciones</th>
+                    <th style={{ width: 120, textAlign: "right" }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -682,36 +655,36 @@ export default function FAQsAdminPage() {
                     <tr key={r.id}>
                       <td>{r.id}</td>
                       <td>
-                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                          {r.question}
-                        </Typography>
-                        <Typography level="body-xs" color="neutral">
-                          {r.answer?.slice(0, 88)}
-                          {r.answer?.length > 88 ? "…" : ""}
-                        </Typography>
-
-                        {/* Tags */}
-                        {toTagArray(r.tags).length > 0 && (
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            sx={{ mt: 0.5, flexWrap: "wrap" }}>
-                            {toTagArray(r.tags)
-                              .slice(0, 6)
-                              .map((t, i) => (
-                                <Chip
-                                  key={`${r.id}-tag-${i}`}
-                                  size="sm"
-                                  variant="outlined">
-                                  #{t}
-                                </Chip>
-                              ))}
-                          </Stack>
-                        )}
+                        <Typography fontWeight="md">{r.question}</Typography>
+                      </td>
+                      <td>
+                        <Tooltip
+                          title={r.answer}
+                          variant="soft"
+                          placement="top-start"
+                          sx={{ maxWidth: 400 }}>
+                          <Typography
+                            level="body-sm"
+                            noWrap
+                            sx={{ maxWidth: 300, cursor: "help" }}>
+                            {r.answer}
+                          </Typography>
+                        </Tooltip>
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          mt={0.5}
+                          flexWrap="wrap">
+                          {toTagArray(r.tags).map((tag, i) => (
+                            <Chip key={i} size="sm" variant="outlined">
+                              #{tag}
+                            </Chip>
+                          ))}
+                        </Stack>
                       </td>
                       <td>
                         <Chip size="sm" variant="soft">
-                          {r.category || "General"}
+                          {r.category}
                         </Chip>
                       </td>
                       <td>
@@ -729,85 +702,109 @@ export default function FAQsAdminPage() {
                           checked={!!r.isActive}
                           onChange={() => onQuickToggleActive(r)}
                           disabled={!canEdit}
-                          slotProps={{ track: { sx: { minWidth: 36 } } }}
+                          slotProps={{ track: { sx: { minWidth: 32 } } }}
                         />
                       </td>
-                      <td>{r.order ?? 0}</td>
-                      <td style={{ textAlign: "right" }}>
+                      <td>{r.order}</td>
+                      <td>
                         <Stack
                           direction="row"
-                          spacing={0.5}
-                          justifyContent="flex-end">
-                          <Tooltip
-                            title={
-                              r.visibility === "public"
-                                ? "Hacer interna"
-                                : "Hacer pública"
-                            }
-                            variant="soft">
-                            <span>
+                          justifyContent="flex-end"
+                          spacing={0.5}>
+                          {canEdit && (
+                            <Tooltip
+                              title={t("common.actions.edit")}
+                              variant="soft">
+                              <IconButton size="sm" onClick={() => onEdit(r)}>
+                                <EditRoundedIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {canEdit && (
+                            <Tooltip
+                              title={
+                                r.visibility === "public"
+                                  ? t("support.faqs.make_internal")
+                                  : t("support.faqs.make_public")
+                              }
+                              variant="soft">
                               <IconButton
                                 size="sm"
-                                onClick={() => onQuickToggleVisibility(r)}
-                                disabled={!canEdit}>
+                                onClick={async () => {
+                                  try {
+                                    await updateFaq(r.id, {
+                                      visibility:
+                                        r.visibility === "public"
+                                          ? "internal"
+                                          : "public",
+                                    });
+                                    fetchData();
+                                  } catch {}
+                                }}>
                                 {r.visibility === "public" ? (
                                   <VisibilityOffRoundedIcon />
                                 ) : (
                                   <VisibilityRoundedIcon />
                                 )}
                               </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip
-                            title={canEdit ? "Editar" : "Sin permiso"}
-                            variant="soft">
-                            <span>
-                              <IconButton
-                                size="sm"
-                                onClick={() => onEdit(r)}
-                                disabled={!canEdit}
-                                aria-disabled={!canEdit}
-                                variant={canEdit ? "soft" : "plain"}
-                                color={canEdit ? "primary" : "neutral"}>
-                                <EditRoundedIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip
-                            title={canDelete ? "Eliminar" : "Sin permiso"}
-                            variant="soft">
-                            <span>
+                            </Tooltip>
+                          )}
+                          {canDelete && (
+                            <Tooltip
+                              title={t("common.actions.delete")}
+                              variant="soft">
                               <IconButton
                                 size="sm"
                                 color="danger"
-                                onClick={() => onDeleteRow(r)}
-                                disabled={!canDelete}
-                                aria-disabled={!canDelete}>
+                                onClick={() => onDeleteRow(r)}>
                                 <DeleteRoundedIcon />
                               </IconButton>
-                            </span>
-                          </Tooltip>
+                            </Tooltip>
+                          )}
                         </Stack>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </Table>
-            </Sheet>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Modal crear/editar */}
-      <FaqFormModal
-        open={openForm}
-        initial={editing}
-        onClose={() => setOpenForm(false)}
-        onSave={onSaveForm}
-        tagOptions={tagOptions}
-      />
-    </Box>
+              {/* Footer Paginación */}
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ p: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+                <PaginationLite
+                  page={page}
+                  count={totalPages}
+                  onChange={setPage}
+                />
+                <Select
+                  size="sm"
+                  value={limit}
+                  onChange={(_, v) => {
+                    setLimit(v);
+                    setPage(1);
+                  }}
+                  sx={{ width: 80 }}>
+                  <Option value={10}>10</Option>
+                  <Option value={25}>25</Option>
+                  <Option value={50}>50</Option>
+                </Select>
+              </Stack>
+            </>
+          )}
+        </Sheet>
+
+        {/* Form Drawer */}
+        <FaqFormDrawer
+          open={openForm}
+          onClose={() => setOpenForm(false)}
+          onSave={onSaveForm}
+          initial={editing}
+          tagOptions={tagOptions}
+        />
+      </Box>
+    </Sheet>
   );
 }

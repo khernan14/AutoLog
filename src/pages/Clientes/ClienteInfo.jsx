@@ -1,12 +1,14 @@
+// src/pages/Clientes/ClienteInfo.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom"; // Import navigate
+import { useTranslation } from "react-i18next"; // 👈 i18n
+
 import {
   Box,
   Card,
   Typography,
   Stack,
   Button,
-  Sheet,
   Input,
   Avatar,
   Divider,
@@ -17,11 +19,17 @@ import {
   Option,
   Tooltip,
   CircularProgress,
+  Grid,
+  IconButton,
 } from "@mui/joy";
+
+// Iconos
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded"; // Nuevo
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded"; // Nuevo
 
 import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
 import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
@@ -30,10 +38,10 @@ import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 
+// Services & Context
 import { getClienteById, updateCliente } from "../../services/ClientesServices";
 import { getSitesByCliente } from "../../services/SitesServices";
 import { getActivosByCliente } from "../../services/ActivosServices";
-
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
 import StatusCard from "../../components/common/StatusCard";
@@ -41,25 +49,28 @@ import StatusCard from "../../components/common/StatusCard";
 const ESTATUS = ["Activo", "Inactivo"];
 
 export default function ClienteInfo() {
+  const { t } = useTranslation();
   const { id } = useParams();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const isAdmin = userData?.rol?.toLowerCase() === "admin";
 
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
     (perm) => isAdmin || hasPermiso(perm),
     [isAdmin, hasPermiso]
   );
+
   const canView = can("ver_companias");
   const canEdit = can("editar_companias");
 
-  // ---- estado principal del cliente ----
+  // Estado
   const [cliente, setCliente] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-
   const [editMode, setEditMode] = useState(false);
+
   const [form, setForm] = useState({
     codigo: "",
     nombre: "",
@@ -67,12 +78,11 @@ export default function ClienteInfo() {
     estatus: "Activo",
   });
 
-  // ---- logo ----
   const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null); // url (server o blob)
+  const [logoPreview, setLogoPreview] = useState(null);
   const prevBlobUrlRef = useRef(null);
 
-  // ---- resumen (sites + activos) ----
+  // Resumen
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
   const [summary, setSummary] = useState({
@@ -80,18 +90,18 @@ export default function ClienteInfo() {
     activeSites: 0,
     inactiveSites: 0,
     totalActivos: 0,
-    activosByStatus: {}, // { "Activo": 10, "En reparación": 2, ... }
+    activosByStatus: {},
   });
 
+  // Carga Principal
   const load = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
       return;
     }
-
     if (!canView) {
       setLoading(false);
-      setError(null); // tarjeta de "sin permisos" se encarga
+      setError(null);
       return;
     }
 
@@ -113,21 +123,20 @@ export default function ClienteInfo() {
         setLogoFile(null);
       }
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No se pudo cargar el cliente."
+          ? t("common.network_error")
+          : t("clients.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [id, checkingSession, canView]);
+  }, [id, checkingSession, canView, t]);
 
-  // resumen: sites + activos
+  // Carga Resumen
   const loadSummary = useCallback(async () => {
     if (!canView) return;
-
     setSummaryLoading(true);
     setSummaryError(null);
     try {
@@ -138,16 +147,11 @@ export default function ClienteInfo() {
 
       const sitesArr = Array.isArray(sites) ? sites : [];
       const activosArr = Array.isArray(activos) ? activos : [];
-
-      // normalizar activo flag
       const isSiteActivo = (v) =>
         v === 1 || v === "1" || v === true || v === "true";
 
       const totalSites = sitesArr.length;
       const activeSites = sitesArr.filter((s) => isSiteActivo(s.activo)).length;
-      const inactiveSites = totalSites - activeSites;
-
-      const totalActivos = activosArr.length;
 
       const activosByStatus = {};
       activosArr.forEach((a) => {
@@ -158,14 +162,13 @@ export default function ClienteInfo() {
       setSummary({
         totalSites,
         activeSites,
-        inactiveSites,
-        totalActivos,
+        inactiveSites: totalSites - activeSites,
+        totalActivos: activosArr.length,
         activosByStatus,
       });
     } catch (err) {
-      setSummaryError(
-        err?.message || "No se pudo cargar el resumen de este cliente."
-      );
+      // Silent fail for summary is often better UX, just log it
+      console.warn("Summary load error:", err);
     } finally {
       setSummaryLoading(false);
     }
@@ -176,7 +179,7 @@ export default function ClienteInfo() {
     loadSummary();
   }, [load, loadSummary]);
 
-  // Limpieza de blobs
+  // Cleanup blobs
   useEffect(() => {
     return () => {
       if (prevBlobUrlRef.current) {
@@ -190,40 +193,36 @@ export default function ClienteInfo() {
     const f = e.target.files?.[0];
     if (!f) return;
     if (!/^image\//.test(f.type))
-      return showToast("Solo se permiten imágenes", "warning");
-    if (f.size > 2 * 1024 * 1024) return showToast("Máximo 2MB", "warning");
+      return showToast(t("clients.errors.image_only"), "warning");
+    if (f.size > 2 * 1024 * 1024)
+      return showToast(t("clients.errors.image_size"), "warning");
 
     if (prevBlobUrlRef.current) {
       URL.revokeObjectURL(prevBlobUrlRef.current);
       prevBlobUrlRef.current = null;
     }
-
     const blobUrl = URL.createObjectURL(f);
     prevBlobUrlRef.current = blobUrl;
-
     setLogoFile(f);
     setLogoPreview(blobUrl);
   }
 
   async function onSave() {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar este cliente.", "warning");
-      return;
-    }
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     if (!form.codigo.trim())
-      return showToast("El código es requerido", "warning");
+      return showToast(t("clients.errors.code_required"), "warning");
     if (!form.nombre.trim())
-      return showToast("El nombre es requerido", "warning");
+      return showToast(t("clients.errors.name_required"), "warning");
 
     setSaving(true);
     try {
       await updateCliente(id, form, logoFile);
-      showToast("Cliente actualizado correctamente", "success");
+      showToast(t("clients.success.updated"), "success");
       setEditMode(false);
-      await load(); // refresca datos
-      await loadSummary(); // por si cambiaste estatus y quieres refrescar contexto
+      await load();
+      await loadSummary();
     } catch (err) {
-      showToast(err?.message || "Error al actualizar cliente", "danger");
+      showToast(err?.message || t("clients.errors.update_failed"), "danger");
     } finally {
       setSaving(false);
     }
@@ -246,11 +245,10 @@ export default function ClienteInfo() {
   const createdAtText = useMemo(() => {
     if (!cliente?.fecha_registro) return "—";
     const d = new Date(cliente.fecha_registro);
-    if (Number.isNaN(d.getTime())) return "—";
-    return d.toLocaleString();
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString();
   }, [cliente?.fecha_registro]);
 
-  // ----- view state -----
+  // View State Logic
   const viewState = checkingSession
     ? "checking"
     : !canView
@@ -263,468 +261,344 @@ export default function ClienteInfo() {
     ? "empty"
     : "data";
 
+  // Render Status
   const renderStatus = () => {
-    if (viewState === "checking") {
+    if (viewState === "checking")
       return (
         <StatusCard
           icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
+          title={t("common.verifying_session")}
+          description={<CircularProgress size="sm" />}
         />
       );
-    }
-    if (viewState === "no-permission") {
+    if (viewState === "no-permission")
       return (
         <StatusCard
           color="danger"
           icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver clientes"
-          description="Consulta con un administrador para obtener acceso."
+          title={t("common.no_permission")}
+          description={t("common.contact_admin")}
         />
       );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
+    if (viewState === "error")
       return (
         <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar el cliente"
-          }
+          color="danger"
+          icon={<ErrorOutlineRoundedIcon />}
+          title={t("common.error_title")}
           description={error}
           actions={
             <Button
               startDecorator={<RestartAltRoundedIcon />}
-              onClick={() => {
-                load();
-                loadSummary();
-              }}
+              onClick={load}
               variant="soft">
-              Reintentar
+              {t("common.retry")}
             </Button>
           }
         />
       );
-    }
-    if (viewState === "empty") {
+    if (viewState === "empty")
       return (
         <StatusCard
           color="neutral"
           icon={<InfoOutlinedIcon />}
-          title="Cliente no encontrado"
-          description="Verifica el identificador en la URL."
+          title={t("clients.not_found")}
+          description={t("clients.check_url")}
         />
       );
-    }
-    if (viewState === "loading") {
+    if (viewState === "loading")
       return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando…</Typography>
-          </Stack>
-        </Sheet>
+        <Box display="flex" justifyContent="center" py={10}>
+          <CircularProgress />
+        </Box>
       );
-    }
     return null;
   };
 
-  return (
-    <Sheet
-      variant="plain"
-      sx={{
-        flex: 1,
-        width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, md: 4 },
-        px: { xs: 2, md: 4 },
-        display: "flex",
-        justifyContent: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
-        bgcolor: "background.body",
-      }}>
-      <Box sx={{ width: "100%", maxWidth: 900 }}>
-        {viewState !== "data" ? (
-          <Card variant="plain" sx={{ mb: 2 }}>
-            <Box p={2}>{renderStatus()}</Box>
-          </Card>
-        ) : (
-          <>
-            {/* Header de página */}
-            <Stack spacing={0.5} mb={2}>
-              <Typography
-                level="body-xs"
-                sx={{ textTransform: "uppercase", opacity: 0.7 }}>
-                Cliente
-              </Typography>
-              <Typography level="h4">
-                {cliente?.nombre || "Cliente sin nombre"}
-              </Typography>
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                flexWrap="wrap">
-                {cliente?.codigo && (
-                  <Chip size="sm" variant="soft" color="neutral">
-                    Código: {cliente.codigo}
-                  </Chip>
-                )}
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={cliente?.estatus === "Activo" ? "success" : "neutral"}>
-                  {cliente?.estatus || "Sin estatus"}
-                </Chip>
-              </Stack>
-            </Stack>
+  if (viewState !== "data") {
+    return (
+      <Box p={4} maxWidth={800} mx="auto">
+        {renderStatus()}
+      </Box>
+    );
+  }
 
-            {/* Resumen del cliente */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mb={2}>
-              {/* Card Activos */}
-              <Card
-                variant="soft"
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  p: 1.75,
-                }}>
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                  Activos del cliente
-                </Typography>
-                {summaryLoading ? (
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ mt: 1 }}>
-                    <CircularProgress size="sm" />
-                    <Typography level="body-sm">Cargando resumen…</Typography>
-                  </Stack>
-                ) : (
-                  <>
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="baseline"
-                      sx={{ mt: 0.5 }}>
-                      <Typography level="h3">{summary.totalActivos}</Typography>
-                      <Typography
-                        level="body-xs"
-                        color="neutral"
-                        sx={{ opacity: 0.8 }}>
-                        registrados
-                      </Typography>
-                    </Stack>
-                    <Stack
-                      direction="row"
-                      spacing={0.75}
-                      flexWrap="wrap"
-                      sx={{ mt: 1 }}>
-                      {Object.keys(summary.activosByStatus).length === 0 ? (
-                        <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                          Sin activos asociados.
-                        </Typography>
-                      ) : (
-                        Object.entries(summary.activosByStatus).map(
-                          ([st, count]) => (
-                            <Chip
-                              key={st}
-                              size="sm"
-                              variant="outlined"
-                              color={
-                                st === "Activo"
-                                  ? "success"
-                                  : st === "Baja"
-                                  ? "danger"
-                                  : "neutral"
-                              }>
-                              {st}: {count}
-                            </Chip>
-                          )
-                        )
+  return (
+    <Box
+      component="main"
+      sx={{
+        px: { xs: 2, md: 4 },
+        py: 3,
+        maxWidth: 1200,
+        mx: "auto",
+        minHeight: "100vh",
+      }}>
+      {/* HEADER & NAV */}
+      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
+        {/* <IconButton
+          onClick={() => navigate("/admin/clientes")}
+          variant="plain"
+          color="neutral">
+          <ArrowBackRoundedIcon />
+        </IconButton> */}
+        <Box>
+          <Typography
+            level="body-xs"
+            fontWeight="bold"
+            textColor="text.tertiary"
+            textTransform="uppercase">
+            {t("clients.module_name")} / {t("clients.detail")}
+          </Typography>
+          <Typography level="h2" fontSize="xl2" fontWeight="lg">
+            {cliente?.nombre}
+          </Typography>
+        </Box>
+        <Box flex={1} />
+
+        {!editMode ? (
+          canEdit && (
+            <Button
+              startDecorator={<EditIcon />}
+              onClick={() => setEditMode(true)}
+              variant="soft"
+              color="primary">
+              {t("common.actions.edit")}
+            </Button>
+          )
+        ) : (
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="plain"
+              color="neutral"
+              disabled={saving}
+              onClick={onCancel}
+              startDecorator={<CloseIcon />}>
+              {t("common.actions.cancel")}
+            </Button>
+            <Button
+              variant="solid"
+              color="primary"
+              loading={saving}
+              onClick={onSave}
+              startDecorator={<SaveIcon />}>
+              {t("common.actions.save")}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+
+      <Grid container spacing={3}>
+        {/* COLUMNA IZQUIERDA: Info Principal */}
+        <Grid xs={12} md={8}>
+          <Stack spacing={3}>
+            {/* TARJETA PRINCIPAL */}
+            <Card variant="outlined">
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={3}
+                alignItems="flex-start">
+                {/* Logo Section */}
+                <Stack alignItems="center" spacing={2} minWidth={120}>
+                  <Avatar
+                    src={logoPreview}
+                    sx={{
+                      width: 100,
+                      height: 100,
+                      fontSize: "2.5rem",
+                      boxShadow: "sm",
+                    }}
+                    variant="rounded">
+                    {cliente?.nombre?.[0]}
+                  </Avatar>
+
+                  {editMode && (
+                    <Stack spacing={1} width="100%">
+                      <Button
+                        component="label"
+                        size="sm"
+                        variant="outlined"
+                        startDecorator={<CloudUploadRoundedIcon />}>
+                        {t("common.actions.upload")}
+                        <input
+                          type="file"
+                          hidden
+                          accept="image/*"
+                          onChange={onLogoChange}
+                        />
+                      </Button>
+                      {logoPreview && (
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          color="danger"
+                          onClick={() => {
+                            setLogoFile(null);
+                            setLogoPreview(null);
+                          }}>
+                          {t("common.actions.remove")}
+                        </Button>
                       )}
                     </Stack>
-                  </>
-                )}
-                {summaryError && !summaryLoading && (
-                  <Typography
-                    level="body-xs"
-                    color="danger"
-                    sx={{ mt: 1, opacity: 0.9 }}>
-                    {summaryError}
-                  </Typography>
-                )}
-              </Card>
-
-              {/* Card Sites */}
-              <Card
-                variant="soft"
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  p: 1.75,
-                }}>
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                  Sites del cliente
-                </Typography>
-                {summaryLoading ? (
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ mt: 1 }}>
-                    <CircularProgress size="sm" />
-                    <Typography level="body-sm">Cargando resumen…</Typography>
-                  </Stack>
-                ) : (
-                  <>
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="baseline"
-                      sx={{ mt: 0.5 }}>
-                      <Typography level="h3">{summary.totalSites}</Typography>
-                      <Typography
-                        level="body-xs"
-                        color="neutral"
-                        sx={{ opacity: 0.8 }}>
-                        registrados
-                      </Typography>
-                    </Stack>
-                    <Stack
-                      direction="row"
-                      spacing={0.75}
-                      sx={{ mt: 1 }}
-                      flexWrap="wrap">
-                      <Chip size="sm" variant="soft" color="success">
-                        Activos: {summary.activeSites}
-                      </Chip>
-                      <Chip size="sm" variant="soft" color="neutral">
-                        Inactivos: {summary.inactiveSites}
-                      </Chip>
-                    </Stack>
-                  </>
-                )}
-              </Card>
-            </Stack>
-
-            {/* Contenido principal: ficha / edición */}
-            <Card
-              variant="outlined"
-              sx={{
-                p: 2.5,
-                backgroundColor: "background.surface",
-              }}>
-              <Stack spacing={2}>
-                {/* Top: logo + acciones */}
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={2}
-                  justifyContent="space-between"
-                  alignItems={{ xs: "flex-start", md: "center" }}>
-                  {/* Avatar + logo controls */}
-                  <Stack
-                    direction="row"
-                    spacing={2}
-                    alignItems="center"
-                    sx={{ minWidth: 0 }}>
-                    <Avatar
-                      src={logoPreview || undefined}
-                      sx={{ "--Avatar-size": "80px", fontSize: "2rem" }}>
-                      {cliente?.nombre?.[0] || "C"}
-                    </Avatar>
-                    {!editMode && (
-                      <Box>
-                        <Typography level="title-md">
-                          {cliente?.nombre || "—"}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Stack>
-
-                  {/* Acciones */}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    mt={{ xs: 2, md: 0 }}
-                    justifyContent={{ xs: "flex-start", md: "flex-end" }}>
-                    {!editMode ? (
-                      <Tooltip
-                        title={
-                          canEdit
-                            ? "Editar cliente"
-                            : "No tienes permiso para editar. Solicítalo al administrador."
-                        }
-                        placement="top">
-                        <span>
-                          <Button
-                            startDecorator={<EditIcon />}
-                            onClick={() => canEdit && setEditMode(true)}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "solid" : "soft"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            Editar
-                          </Button>
-                        </span>
-                      </Tooltip>
-                    ) : (
-                      <>
-                        <Button
-                          color="neutral"
-                          startDecorator={<CloseIcon />}
-                          disabled={saving}
-                          onClick={onCancel}>
-                          Cancelar
-                        </Button>
-                        <Button
-                          color="primary"
-                          startDecorator={<SaveIcon />}
-                          loading={saving}
-                          onClick={onSave}>
-                          Guardar
-                        </Button>
-                      </>
-                    )}
-                  </Stack>
+                  )}
                 </Stack>
 
-                <Divider />
-
-                {/* Sección principal: lectura vs edición */}
-                {!editMode ? (
-                  <Stack spacing={1.5}>
-                    <Sheet
-                      variant="soft"
-                      sx={{
-                        p: 1.5,
-                        borderRadius: "md",
-                      }}>
-                      <Typography level="title-sm">Descripción</Typography>
-                      <Typography level="body-sm" sx={{ mt: 0.5 }}>
-                        {cliente?.descripcion || "Sin descripción registrada."}
-                      </Typography>
-                    </Sheet>
-                  </Stack>
-                ) : (
-                  <Stack
-                    direction={{ xs: "column", md: "row" }}
-                    spacing={2}
-                    alignItems="flex-start">
-                    {/* Columna Izquierda: logo controls */}
-                    <Stack spacing={1} sx={{ minWidth: 0 }}>
-                      <Typography level="title-sm">Logo</Typography>
-                      <Avatar
-                        src={logoPreview || undefined}
-                        sx={{ "--Avatar-size": "80px", fontSize: "2rem" }}>
-                        {cliente?.nombre?.[0] || "C"}
-                      </Avatar>
-                      <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
-                        <Button
-                          component="label"
-                          variant="outlined"
-                          size="sm"
-                          disabled={saving}>
-                          Cambiar logo
-                          <input
-                            type="file"
-                            accept="image/*"
-                            hidden
-                            onChange={onLogoChange}
-                          />
-                        </Button>
-                        {logoPreview && (
-                          <Button
-                            variant="plain"
-                            size="sm"
-                            color="neutral"
-                            startDecorator={<DeleteOutlineIcon />}
-                            disabled={saving}
-                            onClick={() => {
-                              if (prevBlobUrlRef.current) {
-                                URL.revokeObjectURL(prevBlobUrlRef.current);
-                                prevBlobUrlRef.current = null;
-                              }
-                              setLogoFile(null);
-                              setLogoPreview(null);
-                            }}>
-                            Quitar
-                          </Button>
-                        )}
-                      </Stack>
-                    </Stack>
-
-                    {/* Columna Derecha: formulario */}
-                    <Stack spacing={1.5} sx={{ flex: 1, width: "100%" }}>
-                      <FormControl required>
-                        <FormLabel>Código</FormLabel>
-                        <Input
-                          disabled={saving}
-                          value={form.codigo}
-                          onChange={(e) =>
-                            setForm({ ...form, codigo: e.target.value })
-                          }
-                        />
-                      </FormControl>
-                      <FormControl required>
-                        <FormLabel>Nombre</FormLabel>
-                        <Input
-                          disabled={saving}
-                          value={form.nombre}
-                          onChange={(e) =>
-                            setForm({ ...form, nombre: e.target.value })
-                          }
-                        />
-                      </FormControl>
+                {/* Fields Section */}
+                <Stack spacing={2} flex={1} width="100%">
+                  <Grid container spacing={2}>
+                    <Grid xs={12} sm={6}>
                       <FormControl>
-                        <FormLabel>Descripción</FormLabel>
-                        <Input
-                          disabled={saving}
-                          value={form.descripcion}
-                          onChange={(e) =>
-                            setForm({ ...form, descripcion: e.target.value })
-                          }
-                        />
+                        <FormLabel>{t("clients.form.code")}</FormLabel>
+                        {editMode ? (
+                          <Input
+                            value={form.codigo}
+                            onChange={(e) =>
+                              setForm({ ...form, codigo: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <Typography level="title-lg" fontFamily="monospace">
+                            {cliente.codigo}
+                          </Typography>
+                        )}
                       </FormControl>
-                      <FormControl required>
-                        <FormLabel>Estatus</FormLabel>
-                        <Select
-                          disabled={saving}
-                          value={form.estatus}
-                          onChange={(_, v) => setForm({ ...form, estatus: v })}>
-                          {ESTATUS.map((s) => (
-                            <Option key={s} value={s}>
-                              {s}
+                    </Grid>
+                    <Grid xs={12} sm={6}>
+                      <FormControl>
+                        <FormLabel>{t("clients.form.name")}</FormLabel>
+                        {editMode ? (
+                          <Input
+                            value={form.nombre}
+                            onChange={(e) =>
+                              setForm({ ...form, nombre: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <Typography level="title-lg">
+                            {cliente.nombre}
+                          </Typography>
+                        )}
+                      </FormControl>
+                    </Grid>
+                    <Grid xs={12}>
+                      <FormControl>
+                        <FormLabel>{t("clients.form.description")}</FormLabel>
+                        {editMode ? (
+                          <Input
+                            value={form.descripcion}
+                            onChange={(e) =>
+                              setForm({ ...form, descripcion: e.target.value })
+                            }
+                          />
+                        ) : (
+                          <Typography
+                            level="body-md"
+                            textColor="text.secondary">
+                            {cliente.descripcion || t("common.no_description")}
+                          </Typography>
+                        )}
+                      </FormControl>
+                    </Grid>
+                    <Grid xs={12} sm={6}>
+                      <FormControl>
+                        <FormLabel>{t("clients.form.status")}</FormLabel>
+                        {editMode ? (
+                          <Select
+                            value={form.estatus}
+                            onChange={(_, v) =>
+                              setForm({ ...form, estatus: v })
+                            }>
+                            <Option value="Activo">
+                              {t("common.status.active")}
                             </Option>
-                          ))}
-                        </Select>
+                            <Option value="Inactivo">
+                              {t("common.status.inactive")}
+                            </Option>
+                          </Select>
+                        ) : (
+                          <Chip
+                            color={
+                              cliente.estatus === "Activo"
+                                ? "success"
+                                : "neutral"
+                            }
+                            variant="soft">
+                            {cliente.estatus === "Activo"
+                              ? t("common.status.active")
+                              : t("common.status.inactive")}
+                          </Chip>
+                        )}
                       </FormControl>
-                    </Stack>
-                  </Stack>
-                )}
-
-                <Divider sx={{ mt: 1 }} />
-
-                <Typography level="body-xs" color="neutral">
-                  Registrado el: {createdAtText}
-                </Typography>
+                    </Grid>
+                  </Grid>
+                </Stack>
               </Stack>
             </Card>
-          </>
-        )}
-      </Box>
-    </Sheet>
+
+            {/* INFO ADICIONAL */}
+            <Typography level="body-xs" textAlign="right" color="neutral">
+              {t("common.created_at")}: {createdAtText}
+            </Typography>
+          </Stack>
+        </Grid>
+
+        {/* COLUMNA DERECHA: Resumen / Stats */}
+        <Grid xs={12} md={4}>
+          <Stack spacing={2}>
+            {/* Resumen Activos */}
+            <Card
+              variant="soft"
+              color="primary"
+              invertedColors
+              sx={{ boxShadow: "none" }}>
+              <Typography level="title-md" mb={1}>
+                {t("clients.stats.assets")}
+              </Typography>
+              <Typography level="h2">{summary.totalActivos}</Typography>
+              <Typography level="body-sm">
+                {t("clients.stats.total_registered")}
+              </Typography>
+
+              <Divider sx={{ my: 1.5, opacity: 0.2 }} />
+
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {Object.entries(summary.activosByStatus).map(([st, count]) => (
+                  <Chip
+                    key={st}
+                    size="sm"
+                    variant="solid"
+                    color="neutral"
+                    sx={{ bgcolor: "rgba(79, 68, 236, 0.2)" }}>
+                    {st}: {count}
+                  </Chip>
+                ))}
+                {Object.keys(summary.activosByStatus).length === 0 && (
+                  <Typography level="body-xs">{t("common.no_data")}</Typography>
+                )}
+              </Stack>
+            </Card>
+
+            {/* Resumen Sites */}
+            <Card variant="outlined">
+              <Typography level="title-md" mb={1}>
+                {t("clients.stats.sites")}
+              </Typography>
+              <Typography level="h2">{summary.totalSites}</Typography>
+              <Typography level="body-sm" color="neutral" mb={2}>
+                {t("clients.stats.total_registered")}
+              </Typography>
+
+              <Stack direction="row" spacing={1}>
+                <Chip variant="soft" color="success" size="sm">
+                  {t("common.status.active")}: {summary.activeSites}
+                </Chip>
+                <Chip variant="soft" color="neutral" size="sm">
+                  {t("common.status.inactive")}: {summary.inactiveSites}
+                </Chip>
+              </Stack>
+            </Card>
+          </Stack>
+        </Grid>
+      </Grid>
+    </Box>
   );
 }

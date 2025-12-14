@@ -3,7 +3,6 @@ import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box,
-  Sheet,
   Typography,
   Input,
   Chip,
@@ -13,91 +12,23 @@ import {
   Stack,
   Button,
   Divider,
-  Tooltip,
+  IconButton,
+  aspectRatioClasses,
 } from "@mui/joy";
+
+// Iconos
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
 import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
-import WarehouseRoundedIcon from "@mui/icons-material/WarehouseRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
+import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 
-// 👉 catálogo declarativo de reportes (agrega libremente)
-const REPORTS = [
-  {
-    id: "registros-uso",
-    title: "Registros de uso",
-    description: "Entradas/Salidas, pendientes y finalizados.",
-    icon: <BarChartRoundedIcon />,
-    category: "Operación",
-    tags: ["vehículos", "registros"],
-  },
-  {
-    id: "vehiculos-uso",
-    title: "Vehículos más utilizados",
-    description: "Top de uso por periodo.",
-    icon: <DirectionsCarRoundedIcon />,
-    category: "Operación",
-    tags: ["vehículos", "ranking"],
-  },
-  {
-    id: "empleados-actividad",
-    title: "Empleados más activos",
-    description: "Top de salidas por empleado.",
-    icon: <BusinessRoundedIcon />,
-    category: "Recursos Humanos",
-    tags: ["empleados", "actividad"],
-  },
-  {
-    id: "kilometraje-empleado",
-    title: "Kilómetros por empleado",
-    description: "Top de kilómetros por empleado.",
-    icon: <DirectionsCarRoundedIcon />,
-    category: "Operación",
-    tags: ["kilometraje", "empleados"],
-  },
-  {
-    id: "ubicacion-vehiculo",
-    title: "Registro por ubicación",
-    description: "Top de ubicaciones por vehículo.",
-    icon: <PlaceRoundedIcon />,
-    category: "Operación",
-    tags: ["ubicaciones", "vehiculos"],
-  },
-  {
-    id: "consumo-combustible-vehiculo",
-    title: "Consumo combustible por vehículo",
-    description: "Top de combustible por vehículo.",
-    icon: <DirectionsCarRoundedIcon />,
-    category: "Operación",
-    tags: ["combustible", "vehiculos"],
-  },
-  // {
-  //   id: "activos-general",
-  //   title: "Activos (inventario)",
-  //   description: "Estado y distribución de activos.",
-  //   icon: <Inventory2RoundedIcon />,
-  //   category: "Inventario",
-  //   tags: ["activos"],
-  // },
-  // {
-  //   id: "bodegas-ocupacion",
-  //   title: "Bodegas / ocupación",
-  //   description: "Capacidad y ocupación por bodega.",
-  //   icon: <WarehouseRoundedIcon />,
-  //   category: "Inventario",
-  //   tags: ["bodegas", "capacidad"],
-  // },
-  // {
-  //   id: "clientes-sitios",
-  //   title: "Clientes / Sites",
-  //   description: "Resumen por cliente y sus sites.",
-  //   icon: <PlaceRoundedIcon />,
-  //   category: "Comercial",
-  //   tags: ["clientes", "sites"],
-  // },
-];
+import { useTranslation } from "react-i18next";
 
 const CATEGORIES = [
   "Todos",
@@ -113,15 +44,70 @@ function useQuery() {
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const qs = useQuery();
   const navigate = useNavigate();
 
-  // estado desde URL (para persistir filtros al refrescar)
+  // Estados
   const [query, setQuery] = useState(qs.get("q") || "");
   const [category, setCategory] = useState(qs.get("cat") || "Todos");
   const [tag, setTag] = useState(qs.get("tag") || "");
 
-  // “recientes” (localStorage)
+  // Definición de reportes
+  const REPORTS = [
+    {
+      id: "registros-uso",
+      title: t("reports.report_items.registros_uso.title"),
+      description: t("reports.report_items.registros_uso.description"),
+      icon: <BarChartRoundedIcon fontSize="inherit" />,
+      category: "Operación",
+      tags: ["vehículos", "registros"],
+    },
+    {
+      id: "vehiculos-uso",
+      title: t("reports.report_items.vehiculos_uso.title"),
+      description: t("reports.report_items.vehiculos_uso.description"),
+      icon: <DirectionsCarRoundedIcon fontSize="inherit" />,
+      category: "Operación",
+      tags: ["vehículos", "ranking"],
+    },
+    {
+      id: "empleados-actividad",
+      title: t("reports.report_items.empleados_actividad.title"),
+      description: t("reports.report_items.empleados_actividad.description"),
+      icon: <BusinessRoundedIcon fontSize="inherit" />,
+      category: "Recursos Humanos",
+      tags: ["empleados", "actividad"],
+    },
+    {
+      id: "kilometraje-empleado",
+      title: t("reports.report_items.kilometraje_empleado.title"),
+      description: t("reports.report_items.kilometraje_empleado.description"),
+      icon: <DirectionsCarRoundedIcon fontSize="inherit" />,
+      category: "Operación",
+      tags: ["kilometraje", "empleados"],
+    },
+    {
+      id: "ubicacion-vehiculo",
+      title: t("reports.report_items.ubicacion_vehiculo.title"),
+      description: t("reports.report_items.ubicacion_vehiculo.description"),
+      icon: <PlaceRoundedIcon fontSize="inherit" />,
+      category: "Operación",
+      tags: ["ubicaciones", "vehiculos"],
+    },
+    {
+      id: "consumo-combustible-vehiculo",
+      title: t("reports.report_items.consumo_combustible_vehiculo.title"),
+      description: t(
+        "reports.report_items.consumo_combustible_vehiculo.description"
+      ),
+      icon: <DirectionsCarRoundedIcon fontSize="inherit" />,
+      category: "Operación",
+      tags: ["combustible", "vehiculos"],
+    },
+  ];
+
+  // Recientes (LocalStorage)
   const [recentIds, setRecentIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("recent_reports") || "[]");
@@ -130,7 +116,7 @@ export default function ReportsPage() {
     }
   });
 
-  // sincroniza URL cuando cambian filtros
+  // Sincronizar URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
@@ -144,7 +130,7 @@ export default function ReportsPage() {
     );
   }, [query, category, tag]);
 
-  // filtra catálogo
+  // Filtrado
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return REPORTS.filter((r) => {
@@ -157,197 +143,342 @@ export default function ReportsPage() {
       const matchTag = !tag || r.tags.includes(tag);
       return matchQ && matchC && matchTag;
     });
-  }, [query, category, tag]);
+  }, [query, category, tag, REPORTS]);
 
   const recentReports = recentIds
     .map((id) => REPORTS.find((r) => r.id === id))
     .filter(Boolean);
 
   const openReport = (id) => {
-    // guarda en recientes (máx 6)
-    const next = [id, ...recentIds.filter((x) => x !== id)].slice(0, 6);
+    const next = [id, ...recentIds.filter((x) => x !== id)].slice(0, 4); // Guardo solo 4 recientes para no saturar
     setRecentIds(next);
     localStorage.setItem("recent_reports", JSON.stringify(next));
-    // navega sin recargar
     navigate(`/admin/reports?view=${id}`);
   };
 
-  // nube de tags (dinámica)
+  // Nube de tags
   const allTags = useMemo(() => {
     const map = new Map();
     REPORTS.forEach((r) =>
       r.tags.forEach((t) => map.set(t, (map.get(t) || 0) + 1))
     );
     return [...map.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
-  }, []);
+  }, [REPORTS]);
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, md: 3 }, pb: 4 }}>
-      {/* Hero / filtros básicos */}
-      <Sheet
-        variant="plain"
-        sx={{
-          p: 2,
-          borderRadius: "xl",
-          border: "1px solid",
-          borderColor: "neutral.outlinedBorder",
-          boxShadow: "sm",
-          mb: 2,
-        }}>
-        <Stack spacing={1.25}>
-          <Typography level="h2" sx={{ fontWeight: 800, fontSize: 26 }}>
-            Reportes
-          </Typography>
+    <Box
+      component="main"
+      sx={{
+        px: { xs: 2, md: 4 },
+        pt: 3,
+        pb: 8,
+        maxWidth: 1200,
+        mx: "auto",
+      }}>
+      {/* --- HEADER SECTION --- */}
+      <Box sx={{ mb: 4 }}>
+        <Typography level="h2" sx={{ mb: 1, fontWeight: "xl" }}>
+          {t("reports.reports_list.title")}
+        </Typography>
+        <Typography level="body-md" color="neutral" sx={{ maxWidth: 600 }}>
+          {t("reports.reports_list.description")}
+        </Typography>
+      </Box>
 
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1.25}>
-            <Input
-              startDecorator={<SearchRoundedIcon />}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar reportes: vehículos, registros, activos…"
-              sx={{ flex: 1 }}
-            />
-            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-              {CATEGORIES.map((c) => (
-                <Chip
-                  key={c}
-                  variant={category === c ? "solid" : "soft"}
-                  onClick={() => setCategory(c)}
-                  sx={{ borderRadius: "999px" }}>
-                  {c}
-                </Chip>
-              ))}
-            </Stack>
-          </Stack>
+      {/* --- SEARCH & FILTERS BAR --- */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        sx={{ mb: 4, alignItems: "center" }}>
+        {/* Buscador grande */}
+        <Input
+          size="lg"
+          placeholder={t("reports.reports_list.search_placeholder")}
+          startDecorator={<SearchRoundedIcon />}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          sx={{
+            flex: 1,
+            borderRadius: "xl",
+            boxShadow: "sm",
+            "&::before": { display: "none" },
+            "&:focus-within": { boxShadow: "md", borderColor: "primary.500" },
+          }}
+          endDecorator={
+            query && (
+              <IconButton
+                size="sm"
+                variant="plain"
+                color="neutral"
+                onClick={() => setQuery("")}>
+                <ClearRoundedIcon />
+              </IconButton>
+            )
+          }
+        />
 
-          {/* Tags populares */}
-          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
+        {/* Scroll horizontal de categorías */}
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            overflowX: "auto",
+            maxWidth: { xs: "100%", md: "60%" },
+            pb: 0.5,
+            "::-webkit-scrollbar": { display: "none" }, // Ocultar scrollbar visualmente
+          }}>
+          {CATEGORIES.map((c) => (
             <Chip
-              variant={!tag ? "solid" : "soft"}
-              onClick={() => setTag("")}
-              sx={{ borderRadius: "999px" }}>
-              Todas las etiquetas
+              key={c}
+              variant={category === c ? "solid" : "outlined"}
+              color={category === c ? "primary" : "neutral"}
+              onClick={() => setCategory(c)}
+              sx={{
+                borderRadius: "lg",
+                fontWeight: category === c ? "lg" : "md",
+                px: 2,
+                py: 1,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                "&:hover": { bgcolor: category !== c && "background.level1" },
+              }}>
+              {t(`reports.reports_list.categories.${c}`)}
             </Chip>
-            {allTags.map((t) => (
-              <Chip
-                key={t}
-                variant={tag === t ? "solid" : "soft"}
-                onClick={() => setTag(t)}
-                sx={{ borderRadius: "999px" }}>
-                #{t}
-              </Chip>
-            ))}
-          </Stack>
+          ))}
         </Stack>
-      </Sheet>
+      </Stack>
 
-      {/* Recientes */}
-      {recentReports.length > 0 && (
-        <>
+      {/* --- SECCIÓN RECIENTES (Destacada) --- */}
+      {recentReports.length > 0 && !query && category === "Todos" && !tag && (
+        <Box sx={{ mb: 5 }}>
           <Stack
             direction="row"
+            alignItems="center"
             justifyContent="space-between"
-            alignItems="baseline"
-            sx={{ mb: 1 }}>
-            <Typography level="title-lg" sx={{ fontWeight: 700 }}>
-              Vistos recientemente
+            sx={{ mb: 2 }}>
+            <Typography
+              level="title-md"
+              startDecorator={<HistoryRoundedIcon color="primary" />}
+              sx={{ color: "text.primary" }}>
+              {t("reports.reports_list.recent")}
             </Typography>
             <Button
-              size="sm"
               variant="plain"
+              size="sm"
+              color="neutral"
               onClick={() => {
                 setRecentIds([]);
                 localStorage.removeItem("recent_reports");
               }}>
-              Limpiar
+              {t("reports.reports_list.clear_history")}
             </Button>
           </Stack>
-          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+
+          <Grid container spacing={2}>
             {recentReports.map((r) => (
-              <Grid key={r.id} xs={12} sm={6} md={4} lg={3}>
-                <ReportCard report={r} onOpen={() => openReport(r.id)} />
+              <Grid key={r.id} xs={12} sm={6} md={3}>
+                <RecentCard report={r} onClick={() => openReport(r.id)} />
               </Grid>
             ))}
           </Grid>
-          <Divider sx={{ my: 2 }} />
-        </>
+        </Box>
       )}
 
-      {/* Catálogo filtrado */}
-      <Grid container spacing={1.5}>
+      {/* --- LISTADO PRINCIPAL --- */}
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+        <FilterListRoundedIcon sx={{ color: "text.tertiary", fontSize: 20 }} />
+        <Typography level="title-sm" color="neutral">
+          {filtered.length} {t("reports.reports_list.found")}
+        </Typography>
+
+        {tag && (
+          <Chip
+            variant="soft"
+            color="primary"
+            endDecorator={<ClearRoundedIcon fontSize="small" />}
+            onClick={() => setTag("")}>
+            Filtro: {tag}
+          </Chip>
+        )}
+      </Stack>
+
+      <Grid container spacing={2}>
         {filtered.map((r) => (
-          <Grid key={r.id} xs={12} sm={6} md={4} lg={3}>
-            <ReportCard report={r} onOpen={() => openReport(r.id)} />
+          <Grid key={r.id} xs={12} sm={6} lg={4}>
+            <ReportCard report={r} onClick={() => openReport(r.id)} />
           </Grid>
         ))}
+
         {filtered.length === 0 && (
-          <Box sx={{ p: 3 }}>
-            <Typography color="neutral">
-              No hay reportes para esos filtros.
+          <Box sx={{ width: "100%", textAlign: "center", py: 8 }}>
+            <Typography level="h4" color="neutral">
+              🔍 {t("reports.reports_list.no_data_title")}
             </Typography>
+            <Typography level="body-md">
+              {t("reports.reports_list.no_data_desc")}
+            </Typography>
+            <Button
+              variant="soft"
+              sx={{ mt: 2 }}
+              onClick={() => {
+                setQuery("");
+                setCategory("Todos");
+                setTag("");
+              }}>
+              {t("reports.reports_list.clear_filters")}
+            </Button>
           </Box>
         )}
       </Grid>
+
+      {/* --- TAGS CLOUD --- */}
+      {allTags.length > 0 && (
+        <Box
+          sx={{ mt: 6, pt: 4, borderTop: "1px solid", borderColor: "divider" }}>
+          <Typography level="title-sm" sx={{ mb: 2, color: "text.tertiary" }}>
+            {t("reports.reports_list.tags_cloud")}
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {allTags.map((t) => (
+              <Chip
+                key={t}
+                variant={tag === t ? "solid" : "soft"}
+                color="neutral"
+                onClick={() => setTag(tag === t ? "" : t)}
+                sx={{
+                  borderRadius: "sm",
+                  cursor: "pointer",
+                  bgcolor: tag === t ? "neutral.800" : undefined,
+                }}>
+                #{t}
+              </Chip>
+            ))}
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }
 
-function ReportCard({ report, onOpen }) {
+// 🎨 COMPONENTE: Tarjeta Principal
+function ReportCard({ report, onClick }) {
+  const { t } = useTranslation();
+
   return (
     <Card
-      variant="plain"
+      variant="outlined"
+      onClick={onClick}
       sx={{
         height: "100%",
-        border: "1px solid",
-        borderColor: "neutral.outlinedBorder",
-        borderRadius: "xl",
-        boxShadow: "sm",
+        borderRadius: "lg",
+        transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+        cursor: "pointer",
+        "&:hover": {
+          borderColor: "primary.300",
+          boxShadow: "md",
+          transform: "translateY(-2px)",
+          // Hacemos que el botón interior reaccione al hover de la tarjeta
+          "& .action-btn": {
+            bgcolor: "primary.solidBg",
+            color: "#fff",
+          },
+        },
       }}>
-      <CardContent>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Tooltip title={report.category}>
-            <Box
-              sx={{
-                width: 38,
-                height: 38,
-                borderRadius: "md",
-                display: "grid",
-                placeItems: "center",
-                bgcolor: "primary.softBg",
-                color: "primary.softColor",
-              }}>
-              {report.icon || <BarChartRoundedIcon />}
-            </Box>
-          </Tooltip>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography level="title-sm" noWrap>
-              {report.title}
-            </Typography>
-            <Typography level="body-xs" color="neutral" noWrap>
-              {report.description}
-            </Typography>
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {/* Encabezado: Icono y Botón */}
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="start">
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "lg",
+              display: "grid",
+              placeItems: "center",
+              bgcolor: "primary.softBg",
+              color: "primary.main",
+              fontSize: "1.5rem",
+            }}>
+            {report.icon}
           </Box>
+
+          <IconButton
+            className="action-btn"
+            variant="soft"
+            color="neutral"
+            sx={{ borderRadius: "50%", transition: "0.2s" }}>
+            <ArrowForwardRoundedIcon />
+          </IconButton>
         </Stack>
 
-        <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: "wrap" }}>
-          {report.tags.map((t) => (
-            <Chip
-              key={t}
-              variant="soft"
-              size="sm"
-              sx={{ borderRadius: "999px" }}>
-              #{t}
-            </Chip>
-          ))}
-        </Stack>
+        {/* Contenido */}
+        <Box>
+          <Typography level="title-md" sx={{ fontWeight: "bold", mb: 0.5 }}>
+            {report.title}
+          </Typography>
+          <Typography level="body-sm" color="neutral" sx={{ lineHeight: 1.4 }}>
+            {report.description}
+          </Typography>
+        </Box>
 
-        <Button
-          onClick={onOpen}
-          variant="soft"
-          sx={{ mt: 1.25, width: "100%" }}>
-          Abrir
-        </Button>
+        {/* Footer: Categoría */}
+        <Box sx={{ mt: "auto", pt: 1 }}>
+          <Typography
+            level="body-xs"
+            fontWeight="lg"
+            textColor="primary.500"
+            textTransform="uppercase">
+            {t(`reports.reports_list.categories.${report.category}`)}
+          </Typography>
+        </Box>
       </CardContent>
+    </Card>
+  );
+}
+
+// 🎨 COMPONENTE: Tarjeta de Recientes (Más compacta)
+function RecentCard({ report, onClick }) {
+  return (
+    <Card
+      orientation="horizontal"
+      variant="soft"
+      color="neutral"
+      onClick={onClick}
+      sx={{
+        gap: 2,
+        alignItems: "center",
+        cursor: "pointer",
+        borderRadius: "lg",
+        transition: "0.2s",
+        "&:hover": {
+          bgcolor: "background.level2",
+          boxShadow: "sm",
+        },
+      }}>
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: "50%",
+          display: "grid",
+          placeItems: "center",
+          bgcolor: "white",
+          color: "neutral.700",
+          boxShadow: "sm",
+          flexShrink: 0,
+        }}>
+        {report.icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography level="title-sm" noWrap>
+          {report.title}
+        </Typography>
+        <Typography level="body-xs" noWrap>
+          {report.category}
+        </Typography>
+      </Box>
     </Card>
   );
 }

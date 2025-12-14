@@ -1,3 +1,4 @@
+// src/components/VehiculosForm/VehiculosModal.jsx
 import { useState, useEffect, useMemo } from "react";
 import Drawer from "@mui/joy/Drawer";
 import Sheet from "@mui/joy/Sheet";
@@ -16,20 +17,55 @@ import CircularProgress from "@mui/joy/CircularProgress";
 import Divider from "@mui/joy/Divider";
 import { useFormik } from "formik";
 import * as yup from "yup";
+import { useTranslation } from "react-i18next";
 
 import { getUbicaciones as defaultGetUbicaciones } from "../../services/VehiculosService";
 
-const validationSchema = yup.object({
-  placa: yup.string().trim().required("La placa es requerida"),
-  marca: yup.string().trim().required("La marca es requerida"),
-  modelo: yup.string().trim().required("El modelo es requerido"),
-  estado: yup.string().required("El estado es requerido"),
-  id_ubicacion_actual: yup
-    .number()
-    .typeError("La ubicación es requerida")
-    .required("La ubicación es requerida"),
-});
+export const validationSchemaFactory = (t) =>
+  yup.object({
+    placa: yup
+      .string()
+      .trim()
+      .required(t("vehiculos.modal.validation.placa", "La placa es requerida")),
+    marca: yup
+      .string()
+      .trim()
+      .required(t("vehiculos.modal.validation.marca", "La marca es requerida")),
+    modelo: yup
+      .string()
+      .trim()
+      .required(
+        t("vehiculos.modal.validation.modelo", "El modelo es requerido")
+      ),
+    estado: yup
+      .string()
+      .required(
+        t("vehiculos.modal.validation.estado", "El estado es requerido")
+      ),
+    id_ubicacion_actual: yup
+      .number()
+      .typeError(
+        t("vehiculos.modal.validation.ubicacion", "La ubicación es requerida")
+      )
+      .required(
+        t("vehiculos.modal.validation.ubicacion", "La ubicación es requerida")
+      ),
+  });
 
+/**
+ * VehiculoModal
+ *
+ * Props:
+ * - open: boolean
+ * - onClose: () => void
+ * - onSubmit: async (values) => {}
+ * - ubicaciones?: array (optional)
+ * - loadingUbicaciones?: boolean (optional)
+ * - fetchUbicaciones?: function to load ubicaciones
+ * - saving?: boolean (saving state)
+ * - initialValues?: object
+ * - title?: string (override)
+ */
 export default function VehiculoModal({
   open,
   onClose,
@@ -46,8 +82,10 @@ export default function VehiculoModal({
     estado: "Disponible",
     id_ubicacion_actual: null,
   },
-  title, // opcional: sobreescribe el título
+  title, // optional override
 }) {
+  const { t } = useTranslation();
+
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loadingUbicaciones, setLoadingUbicaciones] = useState(true);
 
@@ -57,7 +95,7 @@ export default function VehiculoModal({
       ? loadingUbicacionesProp
       : loadingUbicaciones;
 
-  // Cargar ubicaciones si no vienen por props
+  // cargar ubicaciones si no vienen por props
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -83,6 +121,14 @@ export default function VehiculoModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, useExternalUbics, ubicacionesProp]);
 
+  // estados permitidos (coinciden con ENUM DB)
+  const STATE_OPTIONS = useMemo(
+    () => ["Disponible", "En Uso", "En Mantenimiento", "Reservado", "Inactivo"],
+    []
+  );
+
+  const validationSchema = useMemo(() => validationSchemaFactory(t), [t]);
+
   const formik = useFormik({
     initialValues,
     validationSchema,
@@ -92,6 +138,9 @@ export default function VehiculoModal({
     onSubmit: async (values, helpers) => {
       try {
         await onSubmit?.(values);
+      } catch (err) {
+        // si el back devuelve errores, puedes mapearlos aquí usando helpers.setErrors(...)
+        // mostramos error en aria-live (si necesitas)
       } finally {
         helpers.setSubmitting(false);
       }
@@ -101,10 +150,17 @@ export default function VehiculoModal({
   const isBusy = saving || formik.isSubmitting;
   const canClose = !isBusy;
 
-  // Mapea ubicaciones a opciones (memo)
+  // opciones de ubicaciones mapeadas (id,value,label)
   const ubicOptions = useMemo(() => {
-    return (useExternalUbics ? ubicacionesProp : ubicaciones) || [];
+    const arr = useExternalUbics ? ubicacionesProp || [] : ubicaciones;
+    return Array.isArray(arr) ? arr : [];
   }, [useExternalUbics, ubicacionesProp, ubicaciones]);
+
+  // pequeña helper para disabled close cuando isBusy
+  const handleClose = () => {
+    if (!canClose) return;
+    onClose?.();
+  };
 
   return (
     <Drawer
@@ -150,9 +206,11 @@ export default function VehiculoModal({
           }}>
           <Typography level="title-lg">
             {title ||
-              (initialValues?.id ? "Editar vehículo" : "Agregar vehículo")}
+              (initialValues?.id
+                ? t("vehiculos.modal.title_edit", "Editar vehículo")
+                : t("vehiculos.modal.title_add", "Agregar vehículo"))}
           </Typography>
-          <ModalClose disabled={!canClose} />
+          <ModalClose disabled={!canClose} onClick={handleClose} />
         </Sheet>
 
         {/* Contenido scrollable */}
@@ -160,36 +218,49 @@ export default function VehiculoModal({
           sx={{
             flex: 1,
             overflow: "auto",
-            p: 1.5,
+            p: 2,
           }}>
           <Typography level="body-sm" sx={{ opacity: 0.8, mb: 1 }}>
-            Los campos marcados con * son obligatorios.
+            {t(
+              "vehiculos.modal.required_note",
+              "Los campos marcados con * son obligatorios."
+            )}
           </Typography>
 
           {/* Grid responsive: 1 col en móvil, 2 cols en sm+ */}
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "1fr", // siempre UNA sola columna
-              gap: 1.5,
+              gridTemplateColumns: "1fr",
+              gap: 2,
             }}>
             {/* Placa */}
             <FormControl
               required
-              error={formik.touched.placa && !!formik.errors.placa}
-              sx={{ width: "100%" }}>
-              <FormLabel>Placa</FormLabel>
+              error={formik.touched.placa && !!formik.errors.placa}>
+              <FormLabel>
+                {t("vehiculos.modal.labels.placa", "Placa")}
+              </FormLabel>
               <Input
                 name="placa"
                 value={formik.values.placa}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                placeholder="Ej. ABC123"
+                placeholder={t(
+                  "vehiculos.modal.placeholders.placa",
+                  "Ej. ABC123"
+                )}
                 disabled={isBusy}
                 autoFocus
+                inputProps={{
+                  "aria-label": t("vehiculos.modal.aria.placa", "Placa"),
+                }}
               />
               {formik.touched.placa && formik.errors.placa && (
-                <FormHelperText color="danger">
+                <FormHelperText
+                  color="danger"
+                  role="alert"
+                  aria-live="assertive">
                   {formik.errors.placa}
                 </FormHelperText>
               )}
@@ -198,19 +269,29 @@ export default function VehiculoModal({
             {/* Marca */}
             <FormControl
               required
-              error={formik.touched.marca && !!formik.errors.marca}
-              sx={{ width: "100%" }}>
-              <FormLabel>Marca</FormLabel>
+              error={formik.touched.marca && !!formik.errors.marca}>
+              <FormLabel>
+                {t("vehiculos.modal.labels.marca", "Marca")}
+              </FormLabel>
               <Input
                 name="marca"
                 value={formik.values.marca}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                placeholder="Ej. Toyota"
+                placeholder={t(
+                  "vehiculos.modal.placeholders.marca",
+                  "Ej. Toyota"
+                )}
                 disabled={isBusy}
+                inputProps={{
+                  "aria-label": t("vehiculos.modal.aria.marca", "Marca"),
+                }}
               />
               {formik.touched.marca && formik.errors.marca && (
-                <FormHelperText color="danger">
+                <FormHelperText
+                  color="danger"
+                  role="alert"
+                  aria-live="assertive">
                   {formik.errors.marca}
                 </FormHelperText>
               )}
@@ -219,19 +300,29 @@ export default function VehiculoModal({
             {/* Modelo */}
             <FormControl
               required
-              error={formik.touched.modelo && !!formik.errors.modelo}
-              sx={{ width: "100%" }}>
-              <FormLabel>Modelo</FormLabel>
+              error={formik.touched.modelo && !!formik.errors.modelo}>
+              <FormLabel>
+                {t("vehiculos.modal.labels.modelo", "Modelo")}
+              </FormLabel>
               <Input
                 name="modelo"
                 value={formik.values.modelo}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                placeholder="Ej. Corolla"
+                placeholder={t(
+                  "vehiculos.modal.placeholders.modelo",
+                  "Ej. Corolla"
+                )}
                 disabled={isBusy}
+                inputProps={{
+                  "aria-label": t("vehiculos.modal.aria.modelo", "Modelo"),
+                }}
               />
               {formik.touched.modelo && formik.errors.modelo && (
-                <FormHelperText color="danger">
+                <FormHelperText
+                  color="danger"
+                  role="alert"
+                  aria-live="assertive">
                   {formik.errors.modelo}
                 </FormHelperText>
               )}
@@ -240,20 +331,36 @@ export default function VehiculoModal({
             {/* Estado */}
             <FormControl
               required
-              error={formik.touched.estado && !!formik.errors.estado}
-              sx={{ width: "100%" }}>
-              <FormLabel>Estado</FormLabel>
+              error={formik.touched.estado && !!formik.errors.estado}>
+              <FormLabel>
+                {t("vehiculos.modal.labels.estado", "Estado")}
+              </FormLabel>
               <Select
                 value={formik.values.estado || null}
                 onChange={(_, value) => formik.setFieldValue("estado", value)}
                 onBlur={formik.handleBlur}
                 disabled={isBusy}
-                placeholder="Selecciona estado">
-                <Option value="Disponible">Disponible</Option>
-                <Option value="En Uso">En Uso</Option>
+                placeholder={t(
+                  "vehiculos.modal.placeholders.estado",
+                  "Selecciona estado"
+                )}
+                aria-label={t("vehiculos.modal.aria.estado", "Estado")}>
+                {STATE_OPTIONS.map((s) => (
+                  <Option key={s} value={s}>
+                    {t(
+                      `vehiculos.states.${s
+                        .toLowerCase()
+                        .replace(/\s+/g, "_")}`,
+                      s
+                    )}
+                  </Option>
+                ))}
               </Select>
               {formik.touched.estado && formik.errors.estado && (
-                <FormHelperText color="danger">
+                <FormHelperText
+                  color="danger"
+                  role="alert"
+                  aria-live="assertive">
                   {formik.errors.estado}
                 </FormHelperText>
               )}
@@ -265,9 +372,10 @@ export default function VehiculoModal({
               error={
                 formik.touched.id_ubicacion_actual &&
                 !!formik.errors.id_ubicacion_actual
-              }
-              sx={{ width: "100%" }}>
-              <FormLabel>Ubicación actual</FormLabel>
+              }>
+              <FormLabel>
+                {t("vehiculos.modal.labels.ubicacion", "Ubicación actual")}
+              </FormLabel>
               <Select
                 value={
                   formik.values.id_ubicacion_actual !== null
@@ -284,21 +392,43 @@ export default function VehiculoModal({
                 disabled={isBusy || isUbicacionesLoading}
                 placeholder={
                   isUbicacionesLoading
-                    ? "Cargando ubicaciones…"
-                    : "Selecciona ubicación"
+                    ? t(
+                        "vehiculos.modal.loading_ubicaciones",
+                        "Cargando ubicaciones…"
+                      )
+                    : t(
+                        "vehiculos.modal.placeholders.ubicacion",
+                        "Selecciona ubicación"
+                      )
                 }
+                aria-label={t(
+                  "vehiculos.modal.aria.ubicacion",
+                  "Ubicación actual"
+                )}
                 endDecorator={
                   isUbicacionesLoading ? <CircularProgress size="sm" /> : null
                 }>
-                {ubicOptions.map((u) => (
-                  <Option key={u.id} value={u.id}>
-                    {u.nombre_ubicacion}
+                {ubicOptions.length === 0 && !isUbicacionesLoading ? (
+                  <Option value={""} disabled>
+                    {t(
+                      "vehiculos.modal.no_ubicaciones",
+                      "No hay ubicaciones disponibles"
+                    )}
                   </Option>
-                ))}
+                ) : (
+                  ubicOptions.map((u) => (
+                    <Option key={u.id} value={u.id}>
+                      {u.nombre_ubicacion}
+                    </Option>
+                  ))
+                )}
               </Select>
               {formik.touched.id_ubicacion_actual &&
                 formik.errors.id_ubicacion_actual && (
-                  <FormHelperText color="danger">
+                  <FormHelperText
+                    color="danger"
+                    role="alert"
+                    aria-live="assertive">
                     {formik.errors.id_ubicacion_actual}
                   </FormHelperText>
                 )}
@@ -317,12 +447,14 @@ export default function VehiculoModal({
           <Button
             variant="plain"
             color="neutral"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={!canClose}>
-            Cancelar
+            {t("vehiculos.modal.cancel", "Cancelar")}
           </Button>
-          <Button type="submit" loading={isBusy}>
-            {initialValues?.id ? "Actualizar" : "Guardar"}
+          <Button type="submit" loading={isBusy} aria-disabled={isBusy}>
+            {initialValues?.id
+              ? t("vehiculos.modal.update", "Actualizar")
+              : t("vehiculos.modal.save", "Guardar")}
           </Button>
         </Stack>
       </Sheet>

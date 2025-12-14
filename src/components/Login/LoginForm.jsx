@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -23,6 +24,7 @@ export default function LoginForm({
   loading,
   onForgotPassword, // Recibe la nueva función
 }) {
+  const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
 
   const togglePasswordVisibility = () => {
@@ -49,38 +51,37 @@ export default function LoginForm({
         minHeight: "100vh",
         display: "flex",
         flexDirection: { xs: "column", md: "row" },
-        backgroundColor: "background.body", // Fondo general de la página
+        backgroundColor: "background.body",
       }}>
-      {/* Sección de Ilustración/Información (Oculta en mobile pequeño para ahorrar espacio) */}
       <Box
         sx={{
-          display: { xs: "none", sm: "flex" }, // Ocultar en mobile muy pequeño
+          display: { xs: "none", sm: "flex" },
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          flex: { xs: "none", md: 1 }, // Toma la mitad en desktop
+          flex: { xs: "none", md: 1 },
           p: { xs: 2, sm: 4 },
-          backgroundColor: "background.level1", // Un color de fondo suave
+          backgroundColor: "background.level1",
           position: "relative",
           overflow: "hidden",
-          borderRadius: { xs: 0, md: "lg" }, // Bordes redondeados en desktop
-          m: { xs: 0, md: 2 }, // Margen para que no esté pegado a los bordes en desktop
-          boxShadow: { xs: "none", md: "xl" }, // Sombra sutil en desktop
+          borderRadius: { xs: 0, md: "lg" },
+          m: { xs: 0, md: 2 },
+          boxShadow: { xs: "none", md: "xl" },
         }}>
         <Box
           component="img"
           src={loginBg}
           alt="Login illustration"
           sx={{
-            width: { xs: "80%", sm: "60%", md: "80%" }, // Ajuste de tamaño responsivo
+            width: { xs: "80%", sm: "60%", md: "80%" },
             height: "auto",
             mb: 4,
             animation: "float 3s ease-in-out infinite",
             "@keyframes float": {
               "0%, 100%": { transform: "translateY(0px)" },
-              "50%": { transform: "translateY(-10px)" }, // Animación más pronunciada
+              "50%": { transform: "translateY(-10px)" },
             },
-            maxWidth: "400px", // Limitar tamaño máximo
+            maxWidth: "400px",
           }}
         />
 
@@ -88,70 +89,69 @@ export default function LoginForm({
           level="h3"
           textAlign="center"
           sx={{ fontWeight: "lg", color: "text.primary" }}>
-          ¡Bienvenido a Tecnasa Core!
+          {t("login.title_bienvenida")}
         </Typography>
         <Typography
           level="body-lg"
           textAlign="center"
           mt={1}
           sx={{ color: "text.secondary", maxWidth: "400px" }}>
-          Entra para ver tu operación en una sola vista.
+          {t("login.description_bienvenida")}
         </Typography>
         <Typography
           level="body-sm"
           textAlign="center"
           mt={3}
           color="neutral.500">
-          ¿Necesitas ayuda? Contacta a soporte:
+          {t("login.title_ayuda")}
           <br />
           <Link
             href="mailto:micros.teh@tecnasadesk.com"
             level="body-sm"
             sx={{ fontWeight: "md" }}>
-            micros.teh@tecnasa.com
+            {t("login.link_ayuda")}
           </Link>
         </Typography>
       </Box>
 
-      {/* Formulario de Login */}
       <Sheet
-        variant="outlined" // Usar outlined para un borde sutil
+        variant="outlined"
         sx={{
-          p: { xs: 3, sm: 4, md: 6 }, // Padding responsivo
-          flex: { xs: 1, md: 1 }, // Toma la mitad en desktop, todo en mobile
+          p: { xs: 3, sm: 4, md: 6 },
+          flex: { xs: 1, md: 1 },
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          gap: 3, // Espaciado entre elementos del formulario
-          borderRadius: { xs: "lg", md: "xl" }, // Bordes redondeados
-          boxShadow: { xs: "lg", md: "xl" }, // Sombra más pronunciada
-          m: { xs: 2, md: 2 }, // Margen para que no esté pegado a los bordes
-          maxWidth: { xs: "90%", sm: "450px", md: "500px" }, // Ancho máximo
-          mx: "auto", // Centrar horizontalmente
+          gap: 3,
+          borderRadius: { xs: "lg", md: "xl" },
+          boxShadow: { xs: "lg", md: "xl" },
+          m: { xs: 2, md: 2 },
+          maxWidth: { xs: "90%", sm: "450px", md: "500px" },
+          mx: "auto",
         }}>
         <Typography
           level="h2"
           sx={{ mb: 2, fontWeight: "xl", color: "primary.plainColor" }}>
-          Iniciar Sesión
+          {t("login.title")}
         </Typography>
 
         <Stack spacing={2} width="100%">
           <Input
             name="username"
             type="text"
-            placeholder="Usuario"
+            placeholder={t("login.usuario")}
             value={credentials.username}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             size="lg"
             startDecorator={<EmailRoundedIcon />}
-            sx={{ borderRadius: "md" }} // Bordes redondeados
+            sx={{ borderRadius: "md" }}
           />
           <Input
             name="password"
             type={showPassword ? "text" : "password"}
-            placeholder="Contraseña"
+            placeholder={t("login.contraseña")}
             value={credentials.password}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -169,9 +169,8 @@ export default function LoginForm({
             }
             sx={{ borderRadius: "md" }}
           />
-          {/* Enlace de Olvidé mi contraseña */}
           <Link
-            component="button" // Renderiza como un botón para accesibilidad
+            component="button"
             onClick={onForgotPassword}
             level="body-sm"
             sx={{
@@ -180,7 +179,7 @@ export default function LoginForm({
               color: "text.secondary",
               "&:hover": { color: "primary.plainColor" },
             }}>
-            ¿Olvidaste tu contraseña?
+            {t("login.olvidaste_contraseña")}
           </Link>
           <Button
             size="lg"
@@ -190,7 +189,7 @@ export default function LoginForm({
             loading={loading}
             sx={{
               mt: 2,
-              borderRadius: "xl", // Botón más redondeado
+              borderRadius: "xl",
               fontWeight: "lg",
               letterSpacing: "0.05em",
               transition: "transform 0.2s ease-in-out",
@@ -198,16 +197,16 @@ export default function LoginForm({
                 transform: "scale(0.98)",
               },
             }}>
-            Entrar
+            {t("login.entrar")}
           </Button>
-          <Divider sx={{ my: 2 }}>O</Divider> {/* Separador */}
+          <Divider sx={{ my: 2 }}>O</Divider>
           <Typography
             level="body-sm"
             textAlign="center"
             sx={{ color: "text.secondary" }}>
-            ¿No tienes cuenta?{" "}
+            {t("login.no_cuentas")}{" "}
             <Link href="mailto:support@herndevs.com" sx={{ fontWeight: "md" }}>
-              Contacta al administrador.
+              {t("login.registrarte")}
             </Link>
           </Typography>
         </Stack>

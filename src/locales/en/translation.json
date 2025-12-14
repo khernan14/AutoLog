@@ -1,0 +1,1347 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "confirm_delete": "Confirm delete",
+    "status": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "upload": "Upload image",
+      "remove": "Remove",
+      "view_details": "View details",
+      "edit": "Edit",
+      "delete": "Delete",
+      "back_to_list": "Back to list",
+      "filters": "Filters",
+      "clear": "Clear",
+      "apply": "Apply",
+      "move": "Move",
+      "history": "History",
+      "qr": "QR",
+      "close": "Close",
+      "download_png": "Download PNG",
+      "options": "Options",
+      "export": "Export",
+      "import": "Import",
+      "shortcuts": "Keyboard Shortcuts",
+      "deactivate": "Disable",
+      "restore": "Restore",
+      "deactivate_selected": "Disable ({{count}})",
+      "send": "Send",
+      "save_changes": "Save Changes"
+    },
+    "showing_results": "Showing {{count}} of {{total}}",
+    "unknown_error": "Unknown error",
+    "no_permission": "No permission",
+    "verifying_session": "Verifying session...",
+    "contact_admin": "Contact the Administrator.",
+    "error_title": "An error occurred",
+    "retry": "Retry",
+    "no_description": "No description.",
+    "created_at": "Created at",
+    "network_error": "Network error",
+    "no_data": "No data",
+    "all_cities": "All cities",
+    "showing_results_range": "Showing {{start}}–{{end}} of {{total}}",
+    "no_data_title": "No results found",
+    "no_data_desc": "No results available for display.",
+    "clear_filters": "Clear filters",
+    "search_placeholder": "Type to search...",
+    "example_short": "Ej"
+  },
+  "home": {
+    "weather_not_available": "Weather not available",
+    "read_more": "Read more",
+    "quick_access": "Quick Access",
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "news_title": "News & Announcements",
+    "no_news": "No recent news.",
+    "view_all": "View all"
+  },
+  "menu": {
+    "dashboard": "Dashboard",
+    "inventory": "Inventory",
+    "fleet": "Fleet"
+  },
+  "dashboard": {
+    "title": "Control Panel",
+    "subtitle": "General overview of the operation in real time",
+    "kpi": {
+      "active_vehicles": "Active Vehicles",
+      "currently_in_use": "Currently in use",
+      "today_activity": "Today's activity",
+      "movements_today": "Registered movements",
+      "total_employees": "Total employees",
+      "registered": "Registered in system",
+      "pending_maintenance": "Pending maintenance",
+      "requires_attention": "Requires attention"
+    },
+    "charts": {
+      "top_employees": "Top Employees (Movements)",
+      "top_vehicles": "Top Vehicles (Use)",
+      "exits": "Exits",
+      "uses": "Uses"
+    },
+    "tables": {
+      "km_title": "Total Distance (Top 5)",
+      "fuel_title": "Fuel Consumption (Top 5)",
+      "employee": "Employee",
+      "km_total": "Km Total",
+      "vehicle": "Vehicle",
+      "consumption": "Average Consumption"
+    },
+    "empty_data": "No data available",
+    "errors": {
+      "load_failed": "No data available"
+    }
+  },
+  "sidebar": {
+    "inicio": "Home",
+    "dashboard": "Dashboard",
+    "vehiculos": "Vehicles",
+    "registros": "Records",
+    "reportes": "Reports",
+    "gestion": "Management",
+    "companias": "Companies",
+    "paises": "Countries",
+    "inventario": "Inventory",
+    "ciudades": "Cities",
+    "estacionamientos": "Parking Lots",
+    "sistema": "System",
+    "gestion_usuarios": "Manage Users",
+    "ayuda": "Support and Help",
+    "bodegas": "Warehouses",
+    "activos": "Assets",
+    "notificaciones": "Notifications",
+    "gestionar_faqs": "Manage FAQs",
+    "gestionar_tutoriales": "Manage Tutorials",
+    "gestionar_novedades": "Manage News",
+    "estado_de_servicios": "Service Status",
+    "mi_cuenta": "My Account",
+    "mi_perfil": "My Profile",
+    "configuraciones": "Configurations",
+    "cerrar_sesion": "Logout",
+    "centro_de_ayuda": "Help Center",
+    "busqueda": "Search modules, clients, assets…",
+    "atajos": "Shortcuts",
+    "sin_resultados": "No results yet…",
+    "buscando": "Searching…",
+    "buscando_resultados": "Search results",
+    "resultados": "Results",
+    "sin_permiso": "No permission"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your profile and preferences for the application.",
+    "save": "Save",
+    "inicio": "Home",
+    "seguridad": "Security",
+    "apariencia": "Appearance",
+    "idioma": "Language & Region",
+    "accesibilidad": "Accessibility",
+    "integraciones": "Integrations",
+    "privacidad": "Data & Privacy",
+    "backups": "Backup & Restore",
+    "acerca": "About",
+    "page_title": "Settings",
+    "page_desc": "Manage your profile and preferences for the application.",
+    "menu": {
+      "home": "Home",
+      "security": "Security",
+      "appearance": "Appearance",
+      "language": "Language & Region",
+      "accessibility": "Accessibility",
+      "integrations": "Integrations",
+      "privacy": "Data & Privacy",
+      "backups": "Backup & Restore",
+      "about": "About"
+    },
+    "home": {
+      "shortcuts": "Shortcuts",
+      "welcome_secure": "Everything looks good here",
+      "welcome_warning": "Complete your configuration",
+      "welcome_desc_secure": "Your account complies with all recommended security standards.",
+      "welcome_desc_warning": "We have detected that you can improve the security of your access.",
+      "security": {
+        "secure_title": "Protected Account",
+        "secure_badge": "100% Secure",
+        "secure_desc": "Excellent! You have two-step verification and alerts enabled.",
+        "warning_title": "Pending Security",
+        "warning_badge": "Action required",
+        "warning_desc": "Your account is not fully secure. {{action}} for maximum protection.",
+        "action_2fa": "Enable 2FA",
+        "action_alerts": "Enable alerts",
+        "btn_details": "View details",
+        "btn_improve": "Improve security"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "desc": "Customize the theme (Light/Dark) and interface density.",
+        "btn": "Customize"
+      },
+      "privacy": {
+        "title": "Privacy",
+        "desc": "Manage who can see your activity and use your data.",
+        "btn": "Review privacy"
+      },
+      "health": {
+        "title": "Account Health",
+        "subtitle": "General state of your configuration",
+        "label": "Security configured",
+        "recommendation_prefix": "Recommendation: Go to the tab",
+        "recommendation_suffix": "and activate the missing options."
+      }
+    },
+    "security": {
+      "title": "Account Security",
+      "subtitle": "Manage how you log in and protect your data.",
+      "2fa": {
+        "title": "Two-Factor Authentication (2FA)",
+        "desc": "Protect your account with Google Authenticator."
+      },
+      "alerts": {
+        "title": "Login Alerts",
+        "desc": "Receive an email for new logins."
+      },
+      "2fa_modal": {
+        "title": "Two-Factor Authentication (2FA)",
+        "subtitle": "Scan the QR code with your authentication app (Google Authenticator, Authy).",
+        "manual_entry": "Manual entry",
+        "input_label": "Enter the 6-digit code",
+        "verify_btn": "Verify and Activate",
+        "error_invalid": "Invalid code. Try again."
+      },
+      "disable_modal": {
+        "title": "Disable 2FA?",
+        "desc": "Your account will be less secure without two-factor authentication.",
+        "confirm": "Yes, disable"
+      }
+    },
+    "appearance": {
+      "title": "System Appearance",
+      "subtitle": "Customize the interface to adapt it to your preferences.",
+      "theme": {
+        "title": "Theme",
+        "system": "System",
+        "system_desc": "Adjusts to your device",
+        "dark": "Dark Mode",
+        "dark_desc": "Ideal for low light",
+        "light": "Light Mode",
+        "light_desc": "Clean and bright"
+      },
+      "accent": {
+        "title": "Accent Color"
+      },
+      "typography": {
+        "title": "Typography",
+        "desc": "Define the font style for the entire application. The panel on the right shows a preview.",
+        "pending_title": "Pending Change",
+        "pending_desc": "It is necessary to restart the application to apply the new font correctly.",
+        "apply_btn": "Apply and Restart"
+      },
+      "errors": {
+        "save_theme": "Error saving theme",
+        "save_font": "Error saving font"
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "accent_label": "Accent Color",
+      "example_title": "Example — Title with {{font}}",
+      "example_text": "This is an example paragraph to see how the font and accent color are applied. When you save, you will see a confirmation.",
+      "example_btn": "Example Action"
+    },
+    "region": {
+      "title": "Language & Region",
+      "subtitle": "Adjust your language and region preferences.",
+      "success_save": "Configuration saved",
+      "error_save": "Error saving",
+      "language": {
+        "label": "Language",
+        "alert_title": "Language change",
+        "alert_desc": "You must apply the language for the interface to be translated.",
+        "apply_btn": "Apply language",
+        "success": "Language applied",
+        "error": "Error saving language",
+        "manual_reload": "The language was saved. Reload the application to apply the translation."
+      },
+      "timezone": {
+        "label": "Timezone"
+      },
+      "formats": {
+        "title": "Regional Formats",
+        "date_label": "Date",
+        "time_label": "Time",
+        "12h": "12 Hours",
+        "24h": "24 Hours"
+      },
+      "preview": {
+        "title": "Preview",
+        "desc": "As it will be shown in your reports and dashboard."
+      }
+    }
+  },
+  "login": {
+    "title": "Login",
+    "usuario": "Username",
+    "contraseña": "Password",
+    "entrar": "Enter",
+    "olvidaste_contraseña": "Forgot your password?",
+    "no_cuentas": "Don't have an account?",
+    "registrarte": "Contact the Administrator.",
+    "title_bienvenida": "Welcome to Tecnasa Core!",
+    "description_bienvenida": "Enter to see your operation in one view.",
+    "title_ayuda": "Need help? Contact support:",
+    "link_ayuda": "micros.teh@tecnasa.com",
+    "title_2fa": "Two-Factor Authentication",
+    "description_2fa": "Enter the 6-digit code from your authentication app to continue.",
+    "button_2fa": "Verify"
+  },
+  "forgot": {
+    "title": "Forgot your password?",
+    "subtitle": "Enter your email and we'll send a link to reset your password.",
+    "placeholder_email": "Your email address",
+    "input_email_aria": "Email address",
+    "send_button": "Send link",
+    "sending": "Sending...",
+    "success_message": "If your email is registered, you'll receive a link to reset your password.",
+    "invalid_email": "Enter a valid email address.",
+    "error_generic": "There was an error processing your request. Please try again later.",
+    "error_user_not_found": "We couldn't find an account with that email.",
+    "error_too_many_requests": "Too many requests. Please try again later.",
+    "error_server": "Server error. Please try again later.",
+    "back_to_login": "Back to login"
+  },
+  "vehiculos": {
+    "title": "Vehicles",
+    "subtitle": "Fleet vehicles catalog management.",
+    "total_registered": "Total registered: {{count}}",
+    "load_error": "Failed to load vehicles. Try again later.",
+    "no_connection": "No connection to the server.",
+    "unknown_error": "Unknown error.",
+    "no_permission_create": "You don't have permission to create vehicles.",
+    "no_permission_edit": "You don't have permission to edit vehicles.",
+    "no_permission_delete": "You don't have permission to disable vehicles.",
+    "no_permission_restore": "You don't have permission to restore vehicles.",
+    "confirm_disable_title": "Are you sure?",
+    "confirm_disable_text": "The vehicle will be marked as inactive.",
+    "yes_disable": "Yes, disable",
+    "cancel": "Cancel",
+    "disabled_success": "Vehicle disabled successfully",
+    "disabled_error": "Error disabling the vehicle.",
+    "disabled_network_error": "Connection error while disabling the vehicle.",
+    "confirm_restore_title": "Restore vehicle?",
+    "confirm_restore_text": "The vehicle will be marked as available again.",
+    "yes_restore": "Yes, restore",
+    "restored_success": "Vehicle restored successfully",
+    "restored_error": "Error restoring the vehicle.",
+    "restored_network_error": "Connection error while restoring the vehicle.",
+    "no_permission_save": "You don't have permission to save vehicles.",
+    "updated_success": "Vehicle updated successfully",
+    "updated_error": "Error updating the vehicle.",
+    "added_success": "Vehicle added successfully",
+    "added_error": "Error adding the vehicle.",
+    "save_network_error": "Connection error while saving the vehicle.",
+    "no_permission_qr": "You don't have permission to view the registration QR.",
+    "qr_link_error": "Failed to generate registration link.",
+    "empty_title": "No vehicles",
+    "empty_description": "There are no vehicles registered yet.",
+    "no_matches": "No matches",
+    "no_matches_desc": "No vehicles found with the current filters.",
+    "qr_title": "Vehicle registration QR",
+    "qr_test_link": "Open registration link",
+    "close": "Close",
+    "download_png": "Download PNG",
+    "search_tooltip": "Search by plate, brand, model or location…",
+    "search_placeholder": "Search…",
+    "show_inactive": "Show inactive",
+    "add_vehicle": "Add vehicle",
+    "request_permission": "You don't have permission to create. Request it from the admin.",
+    "add_button": "Add",
+    "actions": "Actions",
+    "edit": "Edit",
+    "restore": "Restore",
+    "disable": "Disable",
+    "view_qr": "View registration QR",
+    "no_location": "No location",
+    "table_aria": "Vehicles table",
+    "col_vehicle": "Vehicle",
+    "col_brand": "Brand",
+    "col_model": "Model",
+    "col_status": "Status",
+    "col_location": "Location",
+    "col_actions": "Actions",
+    "states": {
+      "disponible": "Available",
+      "en_uso": "In Use",
+      "en_mantenimiento": "Under Maintenance",
+      "reservado": "Reserved",
+      "inactivo": "Inactive",
+      "unknown": "Unknown"
+    },
+    "search": {
+      "placeholder": "Search by plate, brand or model…",
+      "clear_label": "Clear search",
+      "add_tooltip": "Register vehicle usage",
+      "add_tooltip_disabled": "You don't have permission to register usage",
+      "add_button": "Register Use"
+    },
+    "modal": {
+      "title_add": "Add vehicle",
+      "title_edit": "Edit vehicle",
+      "required_note": "Fields marked with * are required.",
+      "labels": {
+        "placa": "Plate",
+        "marca": "Brand",
+        "modelo": "Model",
+        "estado": "Status",
+        "ubicacion": "Current location"
+      },
+      "placeholders": {
+        "placa": "E.g. ABC123",
+        "marca": "E.g. Toyota",
+        "modelo": "E.g. Corolla",
+        "estado": "Select status",
+        "ubicacion": "Select location"
+      },
+      "aria": {
+        "placa": "Plate",
+        "marca": "Brand",
+        "modelo": "Model",
+        "estado": "Status",
+        "ubicacion": "Current location"
+      },
+      "loading_ubicaciones": "Loading locations…",
+      "no_ubicaciones": "No locations available",
+      "cancel": "Cancel",
+      "save": "Save",
+      "update": "Update",
+      "validation": {
+        "placa": "Plate is required",
+        "marca": "Brand is required",
+        "modelo": "Model is required",
+        "estado": "Status is required",
+        "ubicacion": "Location is required"
+      }
+    },
+    "qr_in_use_title": "Vehicle in use",
+    "qr_in_use_detected": "This vehicle is in use by",
+    "since": "Departure",
+    "qr_in_use_go_to_registration": "Go to return",
+    "qr_in_use_notify_user": "Notify user",
+    "qr_in_use_no_email_title": "Email not found",
+    "qr_in_use_no_email_text": "No email was found for the responsible user. Automatic notification cannot be sent.",
+    "qr_notify_sent_title": "Notification sent",
+    "qr_notify_sent_text": "An email has been sent to the responsible user.",
+    "qr_notify_error_title": "Error",
+    "qr_notify_error_text": "Could not send the notification. Try again later.",
+    "unknown_user": "a user",
+    "qr_link_error_qr": "Could not generate the QR link."
+  },
+  "register": {
+    "salidas": {
+      "title": "Register Vehicle Departure",
+      "subtitle": "Register your vehicle departure in the vehicle log system.",
+      "field_vehicle": "Vehicle",
+      "ph_select_vehicle": "Select a vehicle...",
+      "field_km": "Current Odometer",
+      "ph_km": "Enter odometer",
+      "field_fuel": "Fuel Percentage",
+      "ph_fuel": "Percentage (%)",
+      "field_observations": "Observations",
+      "ph_observations": "Observations (optional)",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "success_title": "Departure registered successfully!",
+      "success_text": "Departure registered successfully 🚗",
+      "success_toast": "Departure registered successfully 🚗✅",
+      "error_title": "Error",
+      "err_server": "An error occurred while registering the departure. Try again.",
+      "err_fix_fields": "Please fix the highlighted fields before continuing.",
+      "err_user_invalid": "Invalid user data. Please sign in again.",
+      "err_vehicle": "Select a vehicle.",
+      "err_vehicle_invalid": "Invalid vehicle. Please select an existing vehicle.",
+      "err_km_required": "Odometer is required.",
+      "err_km_invalid": "Invalid odometer value.",
+      "err_fuel_invalid": "Invalid fuel percentage (0-100).",
+      "err_observations": "Add an observation.",
+      "err_images": "Add at least one image.",
+      "err_values_invalid": "Please verify odometer and fuel values are valid."
+    },
+    "uploads": {
+      "add_images": "Add images",
+      "max_size_each": "max {{mb}}MB each",
+      "drag_hint": "Drag & drop here",
+      "remove_label": "Remove image",
+      "error_too_big": "File too large",
+      "error_bad_type": "File type not allowed",
+      "error_max_files": "File limit reached",
+      "region_label": "Image upload area"
+    },
+    "title": "Vehicle Use Registration",
+    "no_permiso": "You do not have permission to register vehicle use.",
+    "no_results": "No vehicles match your search.",
+    "errors": {
+      "no_list": "The vehicle list could not be retrieved.",
+      "server": "Could not connect to the server.",
+      "check_reservas": "Could not check your active reservations."
+    },
+    "reservas": {
+      "title": "Pending Reservations",
+      "msg": "You have one or more active pending reservations. Please complete the corresponding record.",
+      "ok": "Understood"
+    },
+    "registro_activo": {
+      "title": "You have an active record",
+      "msg": "You must register the vehicle return before making another departure.",
+      "go": "Go to return",
+      "cancel": "Close",
+      "banner_title": "Active record:",
+      "fecha": "Departure"
+    },
+    "regreso": {
+      "title": "Register Vehicle Return",
+      "subtitle": "Register the vehicle return to release the unit and record evidence.",
+      "field_vehicle_in_use": "Vehicle in use",
+      "field_parking": "Parking",
+      "ph_parking": "Select a parking...",
+      "ph_select_parking": "Select a parking",
+      "field_last_km": "Last recorded odometer",
+      "ph_km": "Enter return odometer",
+      "field_fuel": "Fuel Percentage",
+      "ph_fuel": "Percentage (%)",
+      "field_observations": "Observations",
+      "ph_observations": "Observations (optional)",
+      "field_images": "Evidences (photos)",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "success_title": "Return registered successfully!",
+      "success_text": "Return registered successfully 🚗",
+      "success_toast": "Return registered successfully 🚗✅",
+      "error_title": "Error",
+      "err_server": "An error occurred while registering the return. Try again.",
+      "err_fix_fields": "Please fix the highlighted fields before continuing.",
+      "err_user_invalid": "Invalid user data. Please sign in again.",
+      "err_reg_invalid": "Invalid record data. Refresh and try again.",
+      "err_parking": "Select a parking.",
+      "err_km_required": "Return odometer is required.",
+      "err_km_invalid": "Invalid odometer value.",
+      "err_km_less": "Return odometer cannot be less than the departure odometer.",
+      "err_fuel_required": "Fuel percentage is required.",
+      "err_fuel_invalid": "Invalid percentage (0-100).",
+      "err_obs": "Add a short observation.",
+      "err_images": "Add at least one image.",
+      "unknown_parking": "Unknown"
+    },
+    "not_authenticated_title": "Not authenticated",
+    "not_authenticated_text": "Sign in to register departures/returns.",
+    "title_regreso": "Register vehicle return",
+    "title_salida": "Register vehicle departure",
+    "qr": {
+      "invalid_title": "Invalid code",
+      "invalid_text": "The QR code is invalid or expired. Select the vehicle manually.",
+      "ok": "Got it"
+    }
+  },
+  "reports": {
+    "reports_list": {
+      "title": "Reports",
+      "search_placeholder": "Search reports: vehicles, records, assets…",
+      "description": "Consult key metrics, generate exports and analyze your operation performance.",
+      "found": "reports found",
+      "clear_history": "Clear history",
+      "clear_filters": "Clear filters",
+      "tags_cloud": "Filter by tags",
+      "no_data_title": "No results",
+      "no_data_desc": "No records found with the current filters.",
+
+      "categories": {
+        "Todos": "All",
+        "Operación": "Operation",
+        "Inventario": "Inventory",
+        "Comercial": "Commercial",
+        "Recursos Humanos": "Human Resources"
+      },
+
+      "tags_all": "All tags",
+      "recent": "Recently seen",
+      "clear": "Clear",
+      "no_matches": "No reports found for these filters.",
+      "open": "Open"
+    },
+
+    "report_items": {
+      "registros_uso": {
+        "title": "Usage records",
+        "description": "Entries/Exits, pending and completed."
+      },
+      "vehiculos_uso": {
+        "title": "Most used vehicles",
+        "description": "Usage ranking by period."
+      },
+      "empleados_actividad": {
+        "title": "Most active employees",
+        "description": "Top employee departures."
+      },
+      "kilometraje_empleado": {
+        "title": "Kilometers by employee",
+        "description": "Top kilometers per employee."
+      },
+      "ubicacion_vehiculo": {
+        "title": "Records by location",
+        "description": "Top vehicle locations."
+      },
+      "consumo_combustible_vehiculo": {
+        "title": "Fuel consumption per vehicle",
+        "description": "Fuel usage ranking per vehicle."
+      }
+    },
+    "search_placeholder": "Search employee, plate...",
+    "total_records": "{{count}} records found",
+    "ranges": {
+      "all": "All",
+      "today": "Today",
+      "7d": "7 Days",
+      "month": "This Month",
+      "custom": "Custom"
+    },
+    "status": {
+      "todos": "All",
+      "activos": "Active",
+      "finalizados": "Completed"
+    },
+    "actions": {
+      "export": "Export",
+      "clear_filters": "Clear Filters"
+    },
+    "no_data_title": "No results",
+    "no_data_desc": "No records found with the current filters.",
+    "showing_page": "Page {{page}} of {{total}}",
+    "errors": {
+      "load_failed": "Error loading data."
+    },
+    "columns": {
+      "employee": "Employee",
+      "vehicle": "Vehicle",
+      "plate": "Plate",
+      "departure_date": "Departure Date",
+      "return_date": "Return Date",
+      "km_out": "Km Out",
+      "km_in": "Km In",
+      "brand": "Brand",
+      "model": "Model",
+      "total_uses": "Total Uses",
+      "position": "Position",
+      "total_exits": "Total Exits",
+      "total_km": "Total Kilometers (km)",
+      "location_out": "Location Out",
+      "location_in": "Location In",
+      "avg_consumption": "Avg. Consumption (%)"
+    }
+  },
+  "clients": {
+    "module_name": "Clients",
+    "title": "Catalog of Companies",
+    "search_placeholder": "Search by code or name...",
+    "create_title": "New Company",
+    "actions": {
+      "new": "New Client"
+    },
+    "columns": {
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "logo": "Logo"
+    },
+    "form": {
+      "code": "Code",
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "logo": "Company logo"
+    },
+    "empty": {
+      "title": "No clients",
+      "desc": "No companies have been registered in the system yet."
+    },
+    "errors": {
+      "load_failed": "Error loading data.",
+      "image_only": "Only images are allowed.",
+      "image_size": "The image cannot weigh more than 2MB.",
+      "code_required": "The code is required.",
+      "name_required": "The name is required.",
+      "create_failed": "Error creating the client.",
+      "update_failed": "Error updating the client."
+    },
+    "success": {
+      "created": "Client created successfully.",
+      "updated": "Client updated successfully."
+    },
+    "detail": "Detail",
+    "not_found": "Client not found",
+    "check_url": "Verify that the ID is correct.",
+    "stats": {
+      "assets": "Assets of the Client",
+      "sites": "Sites of the Client",
+      "total_registered": "Registered in total"
+    },
+    "tabs": {
+      "info": "Information",
+      "sites": "Sites",
+      "assets": "Assets",
+      "contracts": "Contracts"
+    },
+    "sites": {
+      "title": "Client Sites",
+      "stats": "Total: {{total}} · Active: {{active}} · Inactive: {{inactive}}",
+      "search_placeholder": "Search by name, city...",
+      "create_title": "New Site",
+      "edit_title": "Edit Site",
+      "filters_title": "Sites Filters",
+      "actions": {
+        "new": "New Site",
+        "activate_selected": "Enable selected",
+        "deactivate_selected": "Disable selected"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "city": "City",
+        "status": "Status"
+      },
+      "form": {
+        "name": "Name",
+        "description": "Description",
+        "city": "City",
+        "status": "Status"
+      },
+      "empty": {
+        "title": "No sites",
+        "no_data": "No sites registered.",
+        "no_matches": "No sites found with the current filters."
+      },
+      "success": {
+        "created": "Site created successfully.",
+        "updated": "Site updated successfully.",
+        "bulk_updated": "Status updated successfully."
+      },
+      "errors": {
+        "load_failed": "Error loading sites.",
+        "name_required": "The name is required.",
+        "save_failed": "Error saving site.",
+        "bulk_failed": "Error updating sites."
+      }
+    },
+    "assets": {
+      "title": "Client Assets",
+      "subtitle": "Inventory of assets assigned to the client",
+      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtered: {{filtered}}",
+      "search_placeholder": "Search by code, name, serial...",
+      "actions": {
+        "move_to_warehouse": "Move to Warehouse",
+        "move_selected": "Move selected assets to warehouse",
+        "select_to_move": "Select one or more assets to move"
+      },
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "model": "Model",
+        "serial": "Serial",
+        "site": "Site",
+        "status": "Status"
+      },
+      "empty": {
+        "title": "No assets found",
+        "no_data": "No assets registered.",
+        "no_matches": "Adjust the filters to find results."
+      },
+      "qr_title": "Asset QR",
+      "view_public_page": "View public asset page",
+      "bulk_move_title": "Move selected assets to Warehouse",
+      "selected_count": "Selected assets: {{count}}",
+      "form": {
+        "destination_warehouse": "Destination warehouse",
+        "search_warehouse": "Search warehouse...",
+        "reason": "Reason",
+        "reason_placeholder": "Ej: Return for contract termination"
+      },
+      "bulk_move_reason": "Mass movement from client to warehouse (exit)",
+      "success": {
+        "bulk_moved": "Assets moved successfully."
+      },
+      "errors": {
+        "load_failed": "Assets could not be loaded.",
+        "qr_failed": "Error generating QR link.",
+        "load_warehouses": "Error loading warehouses.",
+        "select_warehouse": "Select a destination warehouse.",
+        "no_selection": "No assets selected.",
+        "bulk_failed": "Error moving assets.",
+        "bulk_partial": "Some assets could not be moved ({{count}} failures)."
+      }
+    }
+  },
+  "locations": {
+    "countries": {
+      "title": "Countries",
+      "subtitle": "Management of international locations",
+      "search_placeholder": "Search country...",
+      "create_title": "New Country",
+      "edit_title": "Edit Country",
+      "actions": {
+        "new": "New Country"
+      },
+      "columns": {
+        "name": "Name"
+      },
+      "form": {
+        "name": "Country name"
+      },
+      "empty": {
+        "title": "No countries found",
+        "desc": "No countries registered in the system.",
+        "no_matches": "No countries found with that name."
+      },
+      "success": {
+        "created": "Country created successfully.",
+        "updated": "Country updated successfully.",
+        "deleted": "Country deleted successfully."
+      },
+      "errors": {
+        "load_failed": "Countries could not be loaded.",
+        "create_failed": "Error creating the country.",
+        "update_failed": "Error updating the country.",
+        "delete_failed": "Error deleting the country."
+      },
+      "delete_confirm": "Are you sure you want to delete the country {{name}}?"
+    },
+    "cities": {
+      "title": "Cities",
+      "subtitle": "Management of local locations",
+      "search_placeholder": "Search city or country...",
+      "create_title": "New City",
+      "edit_title": "Edit City",
+      "actions": {
+        "new": "New City"
+      },
+      "columns": {
+        "name": "City",
+        "country": "Country"
+      },
+      "form": {
+        "name": "City name",
+        "country": "Country",
+        "select_country": "Select a country"
+      },
+      "empty": {
+        "title": "No cities found",
+        "desc": "No cities registered in the system.",
+        "no_matches": "No cities found with that name."
+      },
+      "success": {
+        "created": "City created successfully.",
+        "updated": "City updated successfully.",
+        "deleted": "City deleted successfully."
+      },
+      "errors": {
+        "load_failed": "Error loading cities.",
+        "create_failed": "Error creating the city.",
+        "update_failed": "Error updating the city.",
+        "delete_failed": "Error deleting the city."
+      },
+      "delete_confirm": "Are you sure you want to delete the city {{name}}?"
+    },
+    "parkings": {
+      "title": "Parking Lots",
+      "subtitle": "Management of parking lots",
+      "search_placeholder": "Search parking lot or city...",
+      "create_title": "New Parking Lot",
+      "edit_title": "Edit Parking Lot",
+      "actions": {
+        "new": "New Parking Lot"
+      },
+      "columns": {
+        "name": "Name",
+        "city": "City"
+      },
+      "form": {
+        "name": "Parking lot name",
+        "city": "City",
+        "select_city": "Select a city"
+      },
+      "empty": {
+        "title": "No parking lots found",
+        "desc": "No parking lots registered in the system.",
+        "no_matches": "No parking lots found with that name."
+      },
+      "success": {
+        "created": "Parking lot created successfully.",
+        "updated": "Parking lot updated successfully.",
+        "deleted": "Parking lot deleted successfully."
+      },
+      "errors": {
+        "load_failed": "Error loading parking lots.",
+        "create_failed": "Error creating the parking lot.",
+        "update_failed": "Error updating the parking lot.",
+        "delete_failed": "Error deleting the parking lot."
+      },
+      "delete_confirm": "Are you sure you want to delete the parking lot {{name}}?"
+    }
+  },
+  "warehouses": {
+    "title": "Warehouses",
+    "subtitle": "Management of inventory and storage",
+    "search_placeholder": "Search by name, city...",
+    "create_title": "New Warehouse",
+    "edit_title": "Edit Warehouse",
+    "actions": {
+      "new": "New Warehouse"
+    },
+    "columns": {
+      "name": "Name",
+      "city": "City",
+      "description": "Description"
+    },
+    "form": {
+      "name": "Warehouse name",
+      "description": "Description",
+      "city": "City",
+      "select_city": "Select a city"
+    },
+    "empty": {
+      "title": "No warehouses found",
+      "desc": "No warehouses registered in the system.",
+      "no_matches": "No warehouses found with that name."
+    },
+    "success": {
+      "created": "Warehouse created successfully.",
+      "updated": "Warehouse updated successfully."
+    },
+    "errors": {
+      "load_failed": "Error loading warehouses.",
+      "save_failed": "Error saving warehouse."
+    }
+  },
+  "inventory": {
+    "warehouse": {
+      "title": "Warehouse Details",
+      "stats": "Total Assets: {{total}}",
+      "search_placeholder": "Search Asset...",
+      "actions": {
+        "new_asset": "New Asset"
+      },
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "model": "Model",
+        "serial": "Serial",
+        "status": "Status"
+      },
+      "empty": {
+        "title": "No Assets",
+        "no_data": "No assets in this warehouse.",
+        "no_matches": "No assets found with that criteria."
+      },
+      "errors": {
+        "load_failed": "Error loading warehouse data.",
+        "qr_failed": "Error generating QR."
+      }
+    },
+    "asset_form": {
+      "create_title": "New Asset",
+      "edit_title": "Edit Asset",
+      "fields": {
+        "code": "Code",
+        "name": "Name",
+        "model": "Model",
+        "serial": "Serial",
+        "type": "Type",
+        "status": "Status"
+      },
+      "hints": {
+        "code_auto": "Next code estimated. Will be confirmed on save.",
+        "code_fixed": "The code cannot be manually modified.",
+        "code_failed": "Could not preview code."
+      },
+      "success": {
+        "created": "Asset created successfully.",
+        "updated": "Asset updated successfully."
+      },
+      "errors": {
+        "save_failed": "Error saving asset.",
+        "code_failed": "Error getting code."
+      }
+    },
+    "move": {
+      "title": "Move Asset",
+      "types": {
+        "warehouse": "Warehouse",
+        "client": "Client",
+        "employee": "Employee"
+      },
+      "fields": {
+        "destination_type": "Destination Type",
+        "destination_warehouse": "Destination Warehouse",
+        "destination_client": "Destination Client",
+        "destination_site": "Destination Site",
+        "destination_employee": "Destination Employee",
+        "reason": "Reason"
+      },
+      "hints": {
+        "select_client_first": "Select a client first",
+        "reason_placeholder": "Ej: Change of equipment, Out for repair..."
+      },
+      "success": "Asset moved successfully.",
+      "errors": {
+        "load_failed": "Error loading base data.",
+        "load_employees": "Error loading employees.",
+        "incomplete": "Complete the required fields.",
+        "failed": "Error moving the asset."
+      }
+    },
+    "history": {
+      "title": "Asset History",
+      "search_placeholder": "Search client, warehouse, reason...",
+      "filter_type": "Destination Type",
+      "date_from": "From",
+      "date_to": "To",
+      "only_current": "Only current location",
+      "current_location": "Current Location",
+      "export_title": "Asset History",
+      "ended_at": "Ended at",
+      "empty": {
+        "no_history": "No history registered.",
+        "no_matches": "No history matches."
+      },
+      "labels": {
+        "destination": "Destination",
+        "reason": "Reason",
+        "inactive_site": "Inactive Site"
+      },
+      "columns": {
+        "destination": "Destination",
+        "client": "Client",
+        "site": "Site",
+        "warehouse": "Warehouse",
+        "start_date": "Start Date",
+        "end_date": "End Date",
+        "reason": "Reason"
+      },
+      "errors": {
+        "load_failed": "Error loading history."
+      }
+    },
+    "list": {
+      "title": "Assets List",
+      "subtitle": "Centralized management of all inventory",
+      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtered: {{filtered}}",
+      "search_placeholder": "Search...",
+      "filters_title": "Assets Filters",
+      "actions": {
+        "new_asset": "New Asset"
+      },
+      "filters": {
+        "status": "Status",
+        "type": "Type",
+        "ubicacion": "Ubicación"
+      },
+      "columns": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "model": "Model",
+        "serial": "Serial",
+        "status": "Status",
+        "destination": "Current Destination"
+      },
+      "empty": {
+        "title": "No assets",
+        "no_data": "No assets registered in the system.",
+        "no_matches": "No assets found with that criteria."
+      },
+      "errors": {
+        "load_failed": "Error loading inventory list.",
+        "qr_failed": "Error generating QR."
+      }
+    }
+  },
+  "users": {
+    "title": "Users Management",
+    "subtitle": "User accounts and access management",
+    "stats": "Showing {{filtered}} of {{total}} users",
+    "search_placeholder": "Search by name, email, username...",
+    "actions": {
+      "new": "New User",
+      "permissions": "Permissions",
+      "reset_pass": "Reset Password",
+      "confirm_deactivate": "Deactivate User",
+      "confirm_restore": "Restore User",
+      "confirm_bulk_deactivate": "Deactivate Selected",
+      "confirm_reset_pass": "Reset Password",
+      "deactivate_warning": "The user will be marked as inactive.",
+      "reset_pass_warning": "A reset link will be sent to: {{email}}"
+    },
+    "labels": {
+      "inactive": "Show Inactive"
+    },
+    "tooltips": {
+      "show_inactive": "Show Inactive Users"
+    },
+    "columns": {
+      "name": "Name",
+      "username": "Username",
+      "email": "Email",
+      "role": "Role",
+      "city": "City",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No users",
+      "desc": "No users registered. Adjust filters to see more."
+    },
+    "success": {
+      "created": "User created successfully.",
+      "updated": "User updated successfully.",
+      "deactivated": "User deactivated successfully.",
+      "restored": "User restored successfully.",
+      "bulk_deactivated": "Users deactivated successfully.",
+      "reset_pass_sent": "Reset link sent successfully."
+    },
+    "errors": {
+      "load_failed": "Error loading users.",
+      "save_failed": "Error saving user.",
+      "deactivate_failed": "Error deactivating user.",
+      "restore_failed": "Error restoring user.",
+      "bulk_failed": "Error deactivating users.",
+      "reset_pass_failed": "Error sending reset link.",
+      "no_email": "User has no valid email."
+    },
+    "warnings": {
+      "email_failed": "User created, but email could not be sent."
+    },
+    "form": {
+      "create_title": "New User",
+      "edit_title": "Edit User",
+      "required_fields": "The fields marked with * are required.",
+      "fields": {
+        "name": "Name",
+        "email": "Email",
+        "username": "Username",
+        "role": "Role",
+        "position": "Position",
+        "city": "City",
+        "supervisor": "Supervisor"
+      }
+    }
+  },
+  "permissions": {
+    "title": "User Permissions",
+    "subtitle": "Configuring for: {{name}}",
+    "search_placeholder": "Search permission or group...",
+    "no_desc": "No description available",
+    "empty_search": "No permissions found that match.",
+    "empty_sub_search": "No sub-permissions found that match the search.",
+    "groups": {
+      "vehicles": {
+        "title": "Vehicle Management",
+        "desc": "Access to the vehicles module."
+      },
+      "users": {
+        "title": "User Management",
+        "desc": "Management of personnel and access."
+      }
+    },
+    "success": {
+      "updated": "Permissions updated successfully."
+    },
+    "errors": {
+      "load_failed": "Error loading permissions.",
+      "save_failed": "Error saving changes."
+    }
+  },
+  "support": {
+    "faqs": {
+      "title": "Manage FAQs",
+      "subtitle": "Manage FAQs",
+      "search_placeholder": "Search faqs, questions, answers, tags...",
+      "create_title": "New FAQ",
+      "edit_title": "Edit FAQ",
+      "delete_confirm": "Are you sure you want to delete this FAQ?",
+      "make_public": "Make public",
+      "make_internal": "Make internal",
+      "actions": {
+        "new": "New FAQ"
+      },
+      "columns": {
+        "question": "Question",
+        "answer": "Answer",
+        "category": "Category",
+        "visibility": "Visibility",
+        "status": "Active",
+        "order": "Order"
+      },
+      "form": {
+        "question": "Question",
+        "answer": "Answer",
+        "category": "Category",
+        "visibility": "Visibility",
+        "tags": "Tags",
+        "tags_placeholder": "Write and press Enter",
+        "order": "Order",
+        "active": "Active"
+      },
+      "visibility": {
+        "public": "Public",
+        "internal": "Internal"
+      },
+      "empty": {
+        "title": "No FAQs",
+        "desc": "No FAQs registered."
+      },
+      "success": {
+        "created": "FAQ created successfully.",
+        "updated": "FAQ updated successfully.",
+        "deleted": "FAQ deleted successfully."
+      },
+      "errors": {
+        "load_failed": "Error loading FAQs.",
+        "update_failed": "Error updating.",
+        "delete_failed": "Error deleting."
+      }
+    },
+    "tutorials": {
+      "title": "Manage Tutorials",
+      "subtitle": "Manage Tutorials",
+      "search_placeholder": "Search tutorials, questions, answers, tags...",
+      "create_title": "New Tutorial",
+      "edit_title": "Edit Tutorial",
+      "delete_confirm": "Are you sure you want to delete this tutorial?",
+      "make_public": "Make public",
+      "make_internal": "Make internal",
+      "actions": {
+        "new": "New Tutorial"
+      },
+      "columns": {
+        "title": "Title",
+        "category": "Category",
+        "visibility": "Visibility",
+        "published": "Published",
+        "duration": "Duration"
+      },
+      "form": {
+        "title": "Title",
+        "video_url": "Video URL",
+        "image_url": "Image URL (Optional)",
+        "description": "Description",
+        "category": "Category",
+        "visibility": "Visibility",
+        "tags": "Tags",
+        "tags_placeholder": "Write and press Enter...",
+        "duration": "Duration (sec)",
+        "published_date": "Published Date",
+        "active": "Active",
+        "order": "Order"
+      },
+      "steps": {
+        "title": "Tutorial Steps",
+        "empty": "No steps yet. Add the first one.",
+        "add": "Add Step",
+        "step_title": "Step Title",
+        "step_body": "Step Description",
+        "step_image": "Image URL (optional)"
+      },
+      "attachments": {
+        "title": "Tutorial Attachments",
+        "empty": "No attachments yet.",
+        "add": "Add Attachment",
+        "name": "Name",
+        "url": "Download URL"
+      },
+      "empty": {
+        "title": "No Tutorials",
+        "desc": "No tutorials registered."
+      },
+      "success": {
+        "created": "Tutorial created.",
+        "updated": "Tutorial updated.",
+        "deleted": "Tutorial deleted."
+      },
+      "errors": {
+        "load_failed": "Error loading tutorials.",
+        "load_detail": "Error loading detail.",
+        "save_failed": "Error saving.",
+        "delete_failed": "Error deleting.",
+        "update_failed": "Error updating state."
+      }
+    }
+  },
+  "account": {
+    "page_title": "Account Configuration",
+    "no_position": "Position not assigned",
+    "menu": {
+      "profile": "Personal Information",
+      "security": "Security and Password"
+    },
+    "profile": {
+      "title": "Personal Profile",
+      "subtitle": "Manage your basic information and contact details."
+    },
+    "security": {
+      "title": "Security",
+      "subtitle": "Update your password and improve the security of your account.",
+      "new_password_label": "New Password",
+      "placeholder": "Enter your new password",
+      "password_strength": "Password Strength",
+      "btn_save": "Update Password",
+      "confirm_title": "Do you want to change the password?",
+      "confirm_text": "Your current password will be updated. Make sure to remember it.",
+      "success_update": "Password updated successfully.",
+      "strength": {
+        "weak": "Weak",
+        "medium": "Medium",
+        "strong": "Strong"
+      },
+      "validation": {
+        "required": "Password is required",
+        "min_length": "Minimum 8 characters",
+        "lowercase": "Missing a lowercase letter",
+        "uppercase": "Missing an uppercase letter",
+        "number": "Missing a number",
+        "special": "Missing a special character (@$!%*?&._-)"
+      },
+      "req": {
+        "min_chars": "Minimum 8 characters",
+        "uppercase": "At least one uppercase letter",
+        "lowercase": "At least one lowercase letter",
+        "number": "At least one number",
+        "special": "At least one special character"
+      }
+    },
+    "errors": {
+      "no_id": "User could not be identified.",
+      "not_found": "User not found.",
+      "load_failed": "Error loading user data."
+    },
+    "fields": {
+      "name": "Name",
+      "lastname": "Last Name",
+      "email": "Email",
+      "username": "Username",
+      "country": "Country",
+      "city": "City"
+    },
+    "info_readonly": "This information is managed by the system. Contact support if you need to correct your name or location."
+  }
+}

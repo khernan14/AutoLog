@@ -1,4 +1,6 @@
+// src/pages/Settings/sections/modals/PreviewPanel.jsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Card, Box, Typography, Button } from "@mui/joy";
 
 const PreviewPanel = React.memo(function PreviewPanel({
@@ -6,9 +8,15 @@ const PreviewPanel = React.memo(function PreviewPanel({
   themeMode,
   fontFamily,
 }) {
+  const { t } = useTranslation();
+
+  // Obtenemos solo el nombre principal de la fuente para mostrarlo
+  const fontName = String(fontFamily).split(",")[0].replace(/['"]/g, "");
+
   return (
     <Card
       variant="outlined"
+      color="primary"
       sx={{
         borderRadius: 12,
         p: 2,
@@ -16,7 +24,7 @@ const PreviewPanel = React.memo(function PreviewPanel({
         boxShadow: "sm",
       }}>
       <Typography level="title-sm" mb={1}>
-        Vista previa
+        {t("settings.preview.title")}
       </Typography>
       <Box
         sx={{
@@ -39,16 +47,17 @@ const PreviewPanel = React.memo(function PreviewPanel({
               boxShadow: "sm",
             }}
           />
-          <Typography level="body-sm">Color de acento</Typography>
+          <Typography level="body-sm">
+            {t("settings.preview.accent_label")}
+          </Typography>
         </Box>
 
         <Typography level="h6" sx={{ fontFamily, fontSize: 18 }}>
-          Ejemplo — Título con {String(fontFamily).split(",")[0]}
+          {t("settings.preview.example_title", { font: fontName })}
         </Typography>
 
         <Typography level="body-md" sx={{ fontFamily }}>
-          Este es un párrafo de ejemplo para ver cómo se aplica la fuente y el
-          color de acento. Cuando guardes, verás una confirmación.
+          {t("settings.preview.example_text")}
         </Typography>
 
         <Button
@@ -60,7 +69,7 @@ const PreviewPanel = React.memo(function PreviewPanel({
             alignSelf: "flex-start",
             mt: 1,
           }}>
-          Acción de ejemplo
+          {t("settings.preview.example_btn")}
         </Button>
       </Box>
     </Card>

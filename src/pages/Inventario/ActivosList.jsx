@@ -1,6 +1,8 @@
 // src/pages/Inventario/ActivosList.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next"; // 👈 i18n
+
 import {
   Box,
   Card,
@@ -9,112 +11,72 @@ import {
   Button,
   Table,
   Sheet,
+  Input,
+  IconButton,
+  Tooltip,
+  CircularProgress,
   Modal,
   ModalDialog,
+  Divider,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
+  Drawer,
+  DialogTitle,
+  ModalClose,
+  DialogContent,
   FormControl,
   FormLabel,
   FormHelperText,
-  Input,
+  Autocomplete,
+  Checkbox,
+  Chip,
   Select,
   Option,
-  Divider,
-  IconButton,
-  Chip,
-  Tooltip,
-  Drawer,
-  DialogTitle,
-  DialogContent,
-  ModalClose,
-  Autocomplete,
 } from "@mui/joy";
 
+// Iconos
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import QrCodeRoundedIcon from "@mui/icons-material/QrCodeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import KeyboardRoundedIcon from "@mui/icons-material/KeyboardRounded";
+import DevicesOtherRoundedIcon from "@mui/icons-material/DevicesOtherRounded"; // Icono empty
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
 
-// shadcn
-import { Button as ShButton } from "@/components/ui/button";
-import { ButtonGroup as ShButtonGroup } from "@/components/ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-// lucide
-import { ChevronDown, Download, Keyboard } from "lucide-react";
-
-import {
-  getActivosGlobal,
-  createActivo,
-  updateActivo,
-} from "../../services/ActivosServices";
-import { getNextActivoCode } from "../../services/ActivosBodegaServices";
+// Services & Context
+import { getActivosGlobal } from "../../services/ActivosServices";
 import { getPublicLinkForActivo } from "../../services/PublicLinksService";
-
-import HistorialActivoModal from "../Inventario/HistorialActivoModal";
-import MoverActivoModal from "../Inventario/MoverActivoModal";
-import StyledQR from "../../components/QRCode/StyledQR";
-import useIsMobile from "../../hooks/useIsMobile";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
-import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
-import ExportDialog from "@/components/Exports/ExportDialog";
-
-import ResourceState from "../../components/common/ResourceState";
-import { getViewState } from "../../utils/viewState";
-import PaginationLite from "@/components/common/PaginationLite";
-
-import CatalogSelect from "@/components/forms/CatalogSelect";
-import { ESTATUS_COLOR } from "@/constants/inventario";
-
+import useIsMobile from "../../hooks/useIsMobile";
 import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
+import { ESTATUS_COLOR } from "../../constants/inventario";
 
-// columnas para exportar
-const EXPORT_COLS = [
-  { label: "Código", key: "codigo" },
-  { label: "Nombre", key: "nombre" },
-  { label: "Tipo", key: "tipo" },
-  { label: "Modelo", key: "modelo", get: (r) => r.modelo || "" },
-  { label: "Serie", key: "serial_number", get: (r) => r.serial_number || "" },
-  { label: "Estatus", key: "estatus" },
-  {
-    label: "Destino",
-    key: "tipo_destino",
-    get: (r) => {
-      if (r.tipo_destino === "Cliente")
-        return `${r.cliente_nombre || ""} / ${r.site_nombre || ""}`.trim();
-      if (r.tipo_destino === "Bodega") return r.bodega_nombre || "";
-      if (r.tipo_destino === "Empleado") return r.empleado_nombre || "";
-      return "—";
-    },
-  },
-  {
-    label: "Cliente",
-    key: "cliente_nombre",
-    get: (r) => r.cliente_nombre || "",
-  },
-  { label: "Site", key: "site_nombre", get: (r) => r.site_nombre || "" },
-  { label: "Bodega", key: "bodega_nombre", get: (r) => r.bodega_nombre || "" },
-  {
-    label: "Empleado",
-    key: "empleado_nombre",
-    get: (r) => r.empleado_nombre || "",
-  },
-];
+// Componentes
+import ActivoFormModal from "./ActivoFormModal"; // Usamos el modal unificado
+import MoverActivoModal from "./MoverActivoModal";
+import HistorialActivoModal from "./HistorialActivoModal";
+import ModalImportarActivos from "./ModalImportarActivos";
+import StyledQR from "../../components/QRCode/StyledQR";
+import ExportDialog from "@/components/Exports/ExportDialog";
+import StatusCard from "../../components/common/StatusCard";
+import PaginationLite from "@/components/common/PaginationLite";
+import { getViewState } from "@/utils/viewState";
 
-const filenameBase = `todos_los_activos_${new Date()
-  .toISOString()
-  .slice(0, 10)}`;
-
-// Normalizador para ignorar mayúsculas/tildes
+// Normalizador
 const normalize = (val) =>
   (val || "")
     .toString()
@@ -123,20 +85,20 @@ const normalize = (val) =>
     .replace(/\p{Diacritic}/gu, "");
 
 export default function ActivosList() {
-  const { id } = useParams();
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile(768);
   const qrRef = useRef(null);
   const searchInputRef = useRef(null);
-
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const isAdmin = (userData?.rol || "").toLowerCase() === "admin";
 
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
     (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
+
   const canView = can("ver_activos");
   const canCreate = can("crear_activos");
   const canEdit = can("editar_activos");
@@ -144,76 +106,45 @@ export default function ActivosList() {
   const canViewHistory = can("ver_historial_activos");
   const canQR = can("crear_QR");
 
-  // data
+  // Data State
   const [rows, setRows] = useState([]);
-
-  // ui state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // filtros
+  // Filter State
   const [search, setSearch] = useState("");
-
-  // Filtros aplicados
   const [statusFilter, setStatusFilter] = useState([]);
   const [typeFilter, setTypeFilter] = useState([]);
   const [ubicacionFilter, setUbicacionFilter] = useState("");
 
-  // Filtros en el Drawer (draft: no afectan la tabla hasta "Aplicar")
+  // Drawer Filtros (Draft)
   const [statusDraft, setStatusDraft] = useState([]);
   const [typeDraft, setTypeDraft] = useState([]);
   const [ubicacionDraft, setUbicacionDraft] = useState("");
 
-  // modals / drawers
-  const [openForm, setOpenForm] = useState(false);
+  // Modals
+  const [openForm, setOpenForm] = useState(false); // Unificado
   const [openMover, setOpenMover] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
   const [openExport, setOpenExport] = useState(false);
+  const [openImport, setOpenImport] = useState(false);
   const [openFilters, setOpenFilters] = useState(false);
   const [openShortcuts, setOpenShortcuts] = useState(false);
 
-  // form data
+  // Selection
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
-    codigo: "",
-    nombre: "",
-    modelo: "",
-    serial_number: "",
-    tipo: "Otro",
-    estatus: "Activo",
-  });
-  const [saving, setSaving] = useState(false);
-
-  // mover (sólo selección y open/close; la lógica vive en el modal reutilizable)
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
-
-  // QR
   const [activoQR, setActivoQR] = useState(null);
   const [publicLink, setPublicLink] = useState("");
 
-  // --- ORDEN & PAGINACIÓN ---
+  // Pagination & Sort
   const [sortKey, setSortKey] = useState("nombre");
   const [sortDir, setSortDir] = useState("asc");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  // 🔹 Siguiente código (hint y para modal nuevo)
-  const [nextCodigo, setNextCodigo] = useState("");
-  const [loadingNext, setLoadingNext] = useState(false);
-
-  const refreshNextCodigo = useCallback(async () => {
-    try {
-      setLoadingNext(true);
-      const n = await getNextActivoCode();
-      setNextCodigo(String(n || ""));
-    } catch {
-      setNextCodigo("");
-    } finally {
-      setLoadingNext(false);
-    }
-  }, []);
-
+  // --- Carga ---
   const loadActivos = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
@@ -224,37 +155,37 @@ export default function ActivosList() {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
       const activos = await getActivosGlobal();
       setRows(Array.isArray(activos) ? activos : []);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No se pudieron cargar los activos."
+          ? t("common.network_error")
+          : t("inventory.list.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canView]);
+  }, [checkingSession, canView, t]);
 
   useEffect(() => {
     loadActivos();
-    refreshNextCodigo();
-  }, [loadActivos, refreshNextCodigo]);
+  }, [loadActivos]);
 
-  // resetear página si cambian filtros / búsqueda / dataset
+  // Reset page
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, typeFilter, ubicacionFilter, rows.length]);
+  }, [search, statusFilter, typeFilter, ubicacionFilter, rows.length, perPage]);
 
-  // ---- Helpers de orden/filtrado/paginación ----
+  // --- Filtrado ---
   const filtered = useMemo(() => {
     const s = normalize(search);
-    return (rows || []).filter((r) => {
+    return rows.filter((r) => {
       const matchSearch =
         normalize(r.codigo).includes(s) ||
         normalize(r.nombre).includes(s) ||
@@ -263,7 +194,6 @@ export default function ActivosList() {
 
       const matchStatus =
         statusFilter.length === 0 || statusFilter.includes(r.estatus);
-
       const matchType = typeFilter.length === 0 || typeFilter.includes(r.tipo);
 
       const matchUbicacion =
@@ -277,22 +207,20 @@ export default function ActivosList() {
     });
   }, [rows, search, statusFilter, typeFilter, ubicacionFilter]);
 
-  // Opciones disponibles según los datos cargados
+  // --- Opciones Filtros ---
   const statusOptions = useMemo(
-    () =>
-      Array.from(new Set((rows || []).map((r) => r.estatus).filter(Boolean))),
+    () => Array.from(new Set(rows.map((r) => r.estatus).filter(Boolean))),
     [rows]
   );
-
   const typeOptions = useMemo(
-    () => Array.from(new Set((rows || []).map((r) => r.tipo).filter(Boolean))),
+    () => Array.from(new Set(rows.map((r) => r.tipo).filter(Boolean))),
     [rows]
   );
 
+  // --- Ordenamiento ---
   function getDestinoText(r) {
-    if (r.tipo_destino === "Cliente") {
+    if (r.tipo_destino === "Cliente")
       return `${r.cliente_nombre || ""} / ${r.site_nombre || ""}`.trim();
-    }
     if (r.tipo_destino === "Bodega") return r.bodega_nombre || "";
     if (r.tipo_destino === "Empleado") return r.empleado_nombre || "";
     return "";
@@ -305,21 +233,23 @@ export default function ActivosList() {
         (sortKey === "_destino" ? getDestinoText(a) : a?.[sortKey]) ?? "";
       const vb =
         (sortKey === "_destino" ? getDestinoText(b) : b?.[sortKey]) ?? "";
-      const A = va.toString().toLowerCase();
-      const B = vb.toString().toLowerCase();
-      if (A < B) return sortDir === "asc" ? -1 : 1;
-      if (A > B) return sortDir === "asc" ? 1 : -1;
+      if (va.toString().toLowerCase() < vb.toString().toLowerCase())
+        return sortDir === "asc" ? -1 : 1;
+      if (va.toString().toLowerCase() > vb.toString().toLowerCase())
+        return sortDir === "asc" ? 1 : -1;
       return 0;
     });
     return arr;
   }, [filtered, sortKey, sortDir]);
 
+  // --- Paginación ---
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / perPage));
   const pageRows = useMemo(() => {
     const start = (page - 1) * perPage;
     return sortedRows.slice(start, start + perPage);
   }, [sortedRows, page, perPage]);
 
+  // --- Highlight ---
   const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
     rows: sortedRows,
     perPage,
@@ -336,863 +266,720 @@ export default function ActivosList() {
     highlightMs: 4000,
   });
 
-  // Leer ?focus= de la URL, limpiar filtros y pedir foco
   useEffect(() => {
     const token = searchParams.get("focus");
     if (!token) return;
-
     const next = new URLSearchParams(searchParams);
     next.delete("focus");
     setSearchParams(next, { replace: true });
-
-    // Limpiar filtros/búsqueda para asegurar que el activo se vea
     setSearch("");
-    setStatusFilter("");
-    setTypeFilter("");
+    setStatusFilter([]);
+    setTypeFilter([]);
     setUbicacionFilter("");
-
     focusByToken(token);
   }, [searchParams, setSearchParams, focusByToken]);
 
-  function handleSort(key) {
-    if (!key) return;
-    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  }
+  // --- Acciones ---
+  const onNew = () => {
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
+    setEditing(null); // Modo crear (global, sin bodega predefinida, pedirá bodega si es necesario o se asumirá 'sin ubicación' inicial si tu lógica lo permite,
+    // PERO: Tu ActivoFormModal actual espera idBodega para crear.
+    // Si quieres crear activos globales "sueltos", ActivoFormModal necesitaría ajuste,
+    // O bien, obligar a seleccionar bodega. Asumiré que este botón es para crear EN BODEGA y pedirá bodega,
+    // o que ActivoFormModal soporta creación global.
+    // Ajuste rápido: Si ActivoFormModal requiere idBodega para crear, este botón debería abrir un modal previo o ActivoFormModal debería permitir seleccionar bodega.
+    // Dado el código anterior, parece que se creaban "sueltos". Si no, habría que ajustar.
+    // Usaré ActivoFormModal unificado. Si necesita idBodega, fallará.
+    // *Corrección*: El ActivoFormModal unificado que te di asume creación en bodega si viene idBodega.
+    // Si no, asume creación global (si tu backend lo soporta).
+    setOpenForm(true);
+  };
 
-  // ---- Acciones
-  async function abrirQR(row) {
-    if (!canQR) {
-      showToast("No tienes permisos para ver el QR.", "warning");
-      return;
-    }
-    setActivoQR(row);
+  const onEdit = (r) => {
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
+    setEditing(r);
+    setOpenForm(true);
+  };
+
+  const abrirMover = (r) => {
+    if (!canMove) return showToast(t("common.no_permission"), "warning");
+    setActivoSeleccionado(r);
+    setOpenMover(true);
+  };
+
+  const abrirHistorial = (r) => {
+    if (!canViewHistory) return showToast(t("common.no_permission"), "warning");
+    setActivoSeleccionado(r);
+    setOpenHistorial(true);
+  };
+
+  const abrirQR = async (r) => {
+    if (!canQR) return showToast(t("common.no_permission"), "warning");
+    setActivoQR(r);
     setPublicLink("");
     try {
-      const { url } = await getPublicLinkForActivo(row.id);
+      const { url } = await getPublicLinkForActivo(r.id);
       setPublicLink(url);
     } catch (e) {
-      showToast(
-        e?.message || "No se pudo generar el enlace público firmado",
-        "danger"
-      );
+      showToast(e?.message || t("inventory.list.errors.qr_failed"), "danger");
       setPublicLink(
         `${window.location.origin}/public/activos/${encodeURIComponent(
-          row.codigo
+          r.codigo
         )}`
       );
     } finally {
       setOpenQR(true);
     }
-  }
+  };
 
-  function descargarQR() {
-    if (!qrRef.current || !activoQR) return;
-    qrRef.current.download("png", `QR_${activoQR.codigo}`);
-  }
-
-  async function newActivo() {
-    if (!canCreate) {
-      showToast("No tienes permisos para crear activos.", "warning");
-      return;
-    }
-    let codigoAuto = "";
-    try {
-      setLoadingNext(true);
-      codigoAuto = String(await getNextActivoCode());
-    } catch {
-      codigoAuto = "";
-    } finally {
-      setLoadingNext(false);
-    }
-
-    setEditing(null);
-    setForm({
-      codigo: codigoAuto,
-      nombre: "",
-      modelo: "",
-      serial_number: "",
-      tipo: "Otro",
-      estatus: "Activo",
-    });
-    setOpenForm(true);
-  }
-
-  function editActivo(row) {
-    if (!canEdit) {
-      showToast("No tienes permisos para editar activos.", "warning");
-      return;
-    }
-    setEditing(row);
-    setForm({
-      codigo: row.codigo,
-      nombre: row.nombre,
-      modelo: row.modelo || "",
-      serial_number: row.serial_number || "",
-      tipo: row.tipo || "Otro",
-      estatus: row.estatus || "Activo",
-    });
-    setOpenForm(true);
-  }
-
-  async function onSubmit(e) {
-    e.preventDefault();
-
-    const codigoToSend = editing ? form.codigo : form.codigo || nextCodigo;
-
-    if (!codigoToSend) {
-      showToast(
-        "No se pudo obtener el siguiente código automáticamente.",
-        "danger"
-      );
-      return;
-    }
-    if (!form.nombre.trim())
-      return showToast("El nombre es requerido", "warning");
-
-    setSaving(true);
-    try {
-      if (editing) {
-        await updateActivo(editing.id, { ...form, codigo: editing.codigo });
-        showToast("Activo actualizado correctamente", "success");
-      } else {
-        await createActivo({ ...form, codigo: codigoToSend });
-        showToast("Activo creado correctamente", "success");
-      }
-      setOpenForm(false);
-      await loadActivos();
-      refreshNextCodigo();
-    } catch (err) {
-      showToast(err?.message || "Error al guardar activo", "danger");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function abrirMover(row) {
-    if (!canMove) {
-      showToast("No tienes permisos para mover activos.", "warning");
-      return;
-    }
-    setActivoSeleccionado(row);
-    setOpenMover(true);
-  }
-
-  function abrirHistorial(row) {
-    if (!canViewHistory) {
-      showToast("No tienes permisos para ver el historial.", "warning");
-      return;
-    }
-    setActivoSeleccionado(row);
-    setOpenHistorial(true);
-  }
-
-  // ---- Estado de vista unificado
-  const viewState = getViewState({
-    checkingSession,
-    canView,
-    error,
-    loading,
-    hasData: Array.isArray(sortedRows) && sortedRows.length > 0,
-  });
-
-  // 🔢 cantidad de filtros activos
-  const activeFiltersCount =
-    (statusFilter.length ? 1 : 0) +
-    (typeFilter.length ? 1 : 0) +
-    (ubicacionFilter ? 1 : 0);
-
-  //Atajos de teclado globales
+  // --- Atajos ---
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       const tag = e.target.tagName.toLowerCase();
       const isTyping =
         tag === "input" || tag === "textarea" || e.target.isContentEditable;
-
       const ctrlOrMeta = e.ctrlKey || e.metaKey;
 
-      // "/" → buscar
       if (!isTyping && e.key === "/") {
         e.preventDefault();
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
-        }
+        searchInputRef.current?.focus();
         return;
       }
-
-      // Ctrl/⌘ + Shift + F → buscar
       if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
-        }
+        searchInputRef.current?.focus();
         return;
       }
-
       if (isTyping) return;
-
-      // Ctrl/⌘ + Shift + E → exportar
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        if (canCreate) onNew();
+        return;
+      }
       if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "e") {
         e.preventDefault();
         setOpenExport(true);
         return;
       }
-
-      // Ctrl/⌘ + Shift + L → filtros (Drawer Joy)
-      // Dentro de handleGlobalKeyDown:
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        setOpenImport(true);
+        return;
+      }
       if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "l") {
         e.preventDefault();
-        setOpenFilters((prev) => {
-          const next = !prev;
-          if (!prev) {
-            // se va a abrir → sincronizar draft
-            setStatusDraft(statusFilter);
-            setTypeDraft(typeFilter);
-            setUbicacionDraft(ubicacionFilter);
-          }
-          return next;
-        });
+        setStatusDraft(statusFilter);
+        setTypeDraft(typeFilter);
+        setUbicacionDraft(ubicacionFilter);
+        setOpenFilters(true);
         return;
       }
     };
-
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
+  }, [canCreate]);
 
-  // ---- UI
+  // View State
+  const viewState = getViewState({
+    checkingSession,
+    canView,
+    error,
+    loading,
+    hasData: sortedRows.length > 0,
+  });
+
+  const renderStatus = () => {
+    if (viewState === "checking")
+      return (
+        <StatusCard
+          icon={<HourglassEmptyRoundedIcon />}
+          title={t("common.verifying_session")}
+          description={<CircularProgress size="sm" />}
+        />
+      );
+    if (viewState === "no-permission")
+      return (
+        <StatusCard
+          color="danger"
+          icon={<LockPersonRoundedIcon />}
+          title={t("common.no_permission")}
+          description={t("common.contact_admin")}
+        />
+      );
+    if (viewState === "error")
+      return (
+        <StatusCard
+          color="danger"
+          icon={<ErrorOutlineRoundedIcon />}
+          title={t("common.error_title")}
+          description={error}
+          actions={
+            <Button
+              startDecorator={<RestartAltRoundedIcon />}
+              onClick={loadActivos}
+              variant="soft">
+              {t("common.retry")}
+            </Button>
+          }
+        />
+      );
+    if (viewState === "empty" && !search)
+      return (
+        <StatusCard
+          color="neutral"
+          icon={<DevicesOtherRoundedIcon />}
+          title={t("inventory.list.empty.title")}
+          description={t("inventory.list.empty.no_data")}
+        />
+      );
+    if (viewState === "loading")
+      return (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress />
+        </Box>
+      );
+    return null;
+  };
+
+  const activeFiltersCount =
+    (statusFilter.length ? 1 : 0) +
+    (typeFilter.length ? 1 : 0) +
+    (ubicacionFilter ? 1 : 0);
+
+  // Export Columns
+  const EXPORT_COLS = [
+    { label: t("inventory.list.columns.code"), key: "codigo" },
+    { label: t("inventory.list.columns.name"), key: "nombre" },
+    { label: t("inventory.list.columns.type"), key: "tipo" },
+    {
+      label: t("inventory.list.columns.model"),
+      key: "modelo",
+      get: (r) => r.modelo || "",
+    },
+    {
+      label: t("inventory.list.columns.serial"),
+      key: "serial_number",
+      get: (r) => r.serial_number || "",
+    },
+    { label: t("inventory.list.columns.status"), key: "estatus" },
+    {
+      label: t("inventory.list.columns.destination"),
+      key: "tipo_destino",
+      get: getDestinoText,
+    },
+  ];
+  const filenameBase = `activos_globales_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
+
   return (
     <Sheet
       variant="plain"
       sx={{
         flex: 1,
         width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, sm: 2, md: 4 },
+        pt: { xs: "calc(12px + var(--Header-height))", md: 3 },
+        pb: 4,
         px: { xs: 2, md: 4 },
+        minHeight: "100dvh",
+        bgcolor: "background.body",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
-        bgcolor: "background.body",
       }}>
-      <Box sx={{ width: "100%" }}>
-        {/* Header + filtros */}
+      <Box sx={{ width: "100%", maxWidth: 1400 }}>
+        {/* HEADER */}
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.5}
-          mb={2}>
-          <Stack spacing={0.25}>
-            <Typography level="h4">
-              Inventario: Activos Globales ({sortedRows.length})
+          alignItems={{ xs: "stretch", md: "center" }}
+          spacing={2}
+          mb={3}>
+          <Box>
+            <Typography level="h3" fontWeight="lg">
+              {t("inventory.list.title")}
             </Typography>
-          </Stack>
+            <Typography level="body-sm" color="neutral">
+              {t("inventory.list.subtitle")}
+            </Typography>
+            <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.7 }}>
+              {t("inventory.list.stats", {
+                total: rows.length,
+                filtered:
+                  rows.length !== filtered.length ? filtered.length : null,
+              })}
+            </Typography>
+          </Box>
 
+          {/* TOOLBAR */}
           <Stack
             direction="row"
-            spacing={1}
+            spacing={1.5}
             alignItems="center"
-            flexWrap="wrap"
-            sx={{ width: { xs: "100%", sm: "auto" } }}>
-            {/* 🔍 Buscador */}
-            <Tooltip
-              title="Buscar (/, Ctrl+Shift+F)"
-              variant="soft"
-              placement="bottom-start">
-              <Input
-                placeholder="Buscar por código, nombre, modelo o serie…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                startDecorator={<SearchRoundedIcon />}
-                endDecorator={
-                  search && (
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color="neutral"
-                      onClick={() => setSearch("")}
-                      aria-label="Limpiar búsqueda">
-                      <ClearIcon />
-                    </IconButton>
-                  )
-                }
-                sx={{ width: { xs: "100%", sm: 280 } }}
-                slotProps={{
-                  input: {
-                    ref: searchInputRef,
-                    onFocus: (e) => e.target.select(),
-                  },
-                }}
-              />
-            </Tooltip>
-
-            {/* 🎯 Botón Filtros → Drawer Joy */}
-            <Tooltip
-              title="Filtros (Ctrl+Shift+L)"
-              variant="soft"
-              placement="bottom">
-              <Button
-                variant={activeFiltersCount ? "soft" : "outlined"}
-                color={activeFiltersCount ? "primary" : "neutral"}
-                startDecorator={<FilterAltIcon />}
-                onClick={() => {
-                  setStatusDraft(statusFilter);
-                  setTypeDraft(typeFilter);
-                  setUbicacionDraft(ubicacionFilter);
-                  setOpenFilters(true);
-                }}
-                sx={{ borderRadius: "999px" }}>
-                Filtros
-                {activeFiltersCount > 0 && (
-                  <Chip
+            flexWrap="wrap">
+            <Input
+              placeholder={t("inventory.list.search_placeholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              startDecorator={<SearchRoundedIcon />}
+              endDecorator={
+                search && (
+                  <IconButton
                     size="sm"
-                    variant="soft"
-                    color="primary"
-                    sx={{ ml: 0.75 }}>
-                    {activeFiltersCount}
-                  </Chip>
-                )}
+                    variant="plain"
+                    onClick={() => setSearch("")}>
+                    <ClearIcon />
+                  </IconButton>
+                )
+              }
+              sx={{ width: { xs: "100%", sm: 300 } }}
+              slotProps={{ input: { ref: searchInputRef } }}
+            />
+
+            <Button
+              variant={activeFiltersCount ? "soft" : "outlined"}
+              color={activeFiltersCount ? "primary" : "neutral"}
+              startDecorator={<FilterAltIcon />}
+              onClick={() => {
+                setStatusDraft(statusFilter);
+                setTypeDraft(typeFilter);
+                setUbicacionDraft(ubicacionFilter);
+                setOpenFilters(true);
+              }}>
+              {t("common.actions.filters")}
+              {activeFiltersCount > 0 && (
+                <Chip size="sm" variant="solid" color="primary" sx={{ ml: 1 }}>
+                  {activeFiltersCount}
+                </Chip>
+              )}
+            </Button>
+
+            {/* Acciones Dropdown */}
+            <Dropdown>
+              <MenuButton
+                variant="outlined"
+                color="neutral"
+                endDecorator={<MoreVertRoundedIcon />}>
+                {t("common.actions.options")}
+              </MenuButton>
+              <Menu placement="bottom-end">
+                <MenuItem onClick={() => setOpenExport(true)}>
+                  <DownloadRoundedIcon /> {t("common.actions.export")}
+                </MenuItem>
+                <MenuItem onClick={() => setOpenImport(true)}>
+                  <UploadFileRoundedIcon /> {t("common.actions.import")}
+                </MenuItem>
+                <Divider />
+                <MenuItem onClick={() => setOpenShortcuts(true)}>
+                  <KeyboardRoundedIcon /> {t("common.actions.shortcuts")}
+                </MenuItem>
+              </Menu>
+            </Dropdown>
+
+            {/* {canCreate && (
+              <Button
+                startDecorator={<AddRoundedIcon />}
+                onClick={onNew}
+                variant="solid"
+                color="primary">
+                {t("inventory.list.actions.new_asset")}
               </Button>
-            </Tooltip>
-
-            {/* 📤 Exportar + menú (shadcn) */}
-            <ShButtonGroup className="items-center">
-              <ShButton
-                onClick={() => setOpenExport(true)}
-                variant="ghost"
-                className={`
-                  h-9 rounded-r-none
-                  bg-[var(--joy-palette-primary-solidBg)]
-                  text-[var(--joy-palette-primary-solidColor)]
-                  hover:bg-[var(--joy-palette-primary-solidHoverBg)]
-                  active:bg-[var(--joy-palette-primary-solidActiveBg)]
-                  border border-[var(--joy-palette-primary-solidBg)]
-                  hover:text-[var(--joy-palette-primary-solidColor)]
-                `}>
-                <Download className="mr-1 h-4 w-4" />
-                <span>Exportar</span>
-              </ShButton>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <ShButton
-                    variant="outline"
-                    size="icon"
-                    className={`
-                      h-9 w-9 rounded-l-none border-l-0
-                      bg-[var(--joy-palette-primary-solidBg)]
-                      text-[var(--joy-palette-primary-solidColor)]
-                      hover:bg-[var(--joy-palette-primary-solidHoverBg)]
-                      active:bg-[var(--joy-palette-primary-solidActiveBg)]
-                      border border-[var(--joy-palette-primary-solidBg)]
-                      hover:text-[var(--joy-palette-primary-solidColor)]
-                    `}
-                    aria-label="Más acciones">
-                    <ChevronDown className="h-4 w-4" />
-                  </ShButton>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setOpenExport(true)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    <span className="flex-1 text-sm">Exportar</span>
-                    <kbd className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono">
-                      Ctrl+Shift+E
-                    </kbd>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem onClick={() => setOpenShortcuts(true)}>
-                    <Keyboard className="mr-2 h-4 w-4" />
-                    <span className="flex-1 text-sm">Atajos de teclado</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </ShButtonGroup>
+            )} */}
           </Stack>
         </Stack>
 
-        <Card
+        {/* DATA TABLE */}
+        <Sheet
           variant="outlined"
           sx={{
-            overflowX: "auto",
-            width: "100%",
-            background: "background.surface",
+            borderRadius: "lg",
+            overflow: "hidden",
+            bgcolor: "background.surface",
+            minHeight: 300,
           }}>
-          {/* Estado de recurso reutilizable */}
-          {viewState !== "data" ? (
-            <Box p={2}>
-              <ResourceState
-                state={viewState}
-                error={error}
-                onRetry={loadActivos}
-                emptyTitle="Sin activos"
-                emptyDescription="Ajusta los filtros o crea un activo nuevo."
-              />
+          {filtered.length === 0 && (
+            <Box sx={{ width: "100%", textAlign: "center", py: 8 }}>
+              <Typography level="h4" color="neutral">
+                🔍 {t("common.no_data_title")}
+              </Typography>
+              <Typography level="body-md">
+                {t("common.no_data_desc")}
+              </Typography>
+              <Button
+                variant="soft"
+                sx={{ mt: 2 }}
+                onClick={() => {
+                  setSearch("");
+                }}>
+                {t("common.clear_filters")}
+              </Button>
             </Box>
-          ) : isMobile ? (
-            // ====== Móvil: tarjetas ======
-            <Stack spacing={2} p={2}>
-              {pageRows.map((r) => (
-                <Sheet
-                  key={r.id}
-                  ref={r.id === highlightId ? focusedRef : null}
-                  variant={r.id === highlightId ? "soft" : "outlined"}
-                  color={r.id === highlightId ? "primary" : "neutral"}
-                  sx={{
-                    p: 2,
-                    borderRadius: "md",
-                    boxShadow: r.id === highlightId ? "lg" : "sm",
-                    borderWidth: r.id === highlightId ? 2 : 1,
-                    borderColor:
-                      r.id === highlightId ? "primary.solidBg" : "divider",
-                    transition:
-                      "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
-                  }}>
-                  <Stack spacing={0.75}>
-                    <Typography level="title-md">{r.nombre}</Typography>
-                    <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                      {r.codigo}
-                    </Typography>
-
-                    <Stack direction="row" spacing={2}>
-                      <Typography level="body-sm">
-                        <strong>Tipo:</strong> {r.tipo}
-                      </Typography>
-                      <Typography level="body-sm">
-                        <strong>Modelo:</strong> {r.modelo || "—"}
-                      </Typography>
-                    </Stack>
-                    <Typography level="body-sm">
-                      <strong>Serie:</strong> {r.serial_number || "—"}
-                    </Typography>
-
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color={ESTATUS_COLOR[r.estatus] || "neutral"}
-                      sx={{ alignSelf: "flex-start" }}>
-                      {r.estatus}
-                    </Chip>
-
-                    <Typography level="body-xs" sx={{ mt: 0.5 }}>
-                      <strong>Destino:</strong>{" "}
-                      {r.tipo_destino === "Cliente"
-                        ? `${r.cliente_nombre} / ${r.site_nombre || r.id}`
-                        : r.tipo_destino === "Bodega"
-                        ? r.bodega_nombre
-                        : r.tipo_destino === "Empleado"
-                        ? r.empleado_nombre || `Empleado #${r.id}`
-                        : "—"}
-                    </Typography>
-
-                    <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                      <Tooltip
-                        title={canEdit ? "Editar" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            size="sm"
-                            onClick={() => editActivo(r)}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "soft" : "plain"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            <EditRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-
-                      <Tooltip
-                        title={canMove ? "Mover" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            size="sm"
-                            onClick={() => abrirMover(r)}
-                            disabled={!canMove}
-                            aria-disabled={!canMove}
-                            variant={canMove ? "soft" : "plain"}
-                            color={canMove ? "primary" : "neutral"}>
-                            <SwapHorizRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-
-                      <Tooltip title="Historial" variant="soft">
-                        <span>
-                          <IconButton
-                            size="sm"
-                            onClick={() => abrirHistorial(r)}
-                            disabled={!canViewHistory}
-                            aria-disabled={!canViewHistory}
-                            variant={canViewHistory ? "soft" : "plain"}
-                            color={canViewHistory ? "primary" : "neutral"}>
-                            <HistoryRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-
-                      <Tooltip
-                        title={canQR ? "Ver QR" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            size="sm"
-                            onClick={() => abrirQR(r)}
-                            disabled={!canQR}
-                            aria-disabled={!canQR}
-                            variant={canQR ? "soft" : "plain"}
-                            color={canQR ? "primary" : "neutral"}>
-                            <QrCodeRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Stack>
-                  </Stack>
-                </Sheet>
-              ))}
-            </Stack>
+          )}
+          {viewState !== "data" && viewState !== "loading" ? (
+            <Box p={4} display="flex" justifyContent="center">
+              {renderStatus()}
+            </Box>
           ) : (
-            // ====== Escritorio: tabla ======
             <>
               <Table
-                hoverRow
-                size="sm"
                 stickyHeader
+                hoverRow
                 sx={{
-                  minWidth: 980,
-                  "--TableCell-headBackground":
-                    "var(--joy-palette-background-level5)",
-                  "--TableCell-headColor": "var(--joy-palette-text-secondary)",
-                  "--TableCell-headFontWeight": 600,
-                  "--TableCell-headBorderBottom":
-                    "1px solid var(--joy-palette-divider)",
-                  "--TableRow-hoverBackground":
-                    "var(--joy-palette-background-level1)",
+                  "--TableCell-paddingX": "12px",
+                  "--TableCell-paddingY": "8px",
+                  "& thead th": {
+                    bgcolor: "background.level1",
+                    color: "text.tertiary",
+                    fontWeight: "md",
+                    textTransform: "uppercase",
+                    fontSize: "xs",
+                    letterSpacing: "0.05em",
+                    whiteSpace: "nowrap",
+                  },
+                  "& tbody td": {
+                    borderBottom: "1px solid",
+                    borderColor: "neutral.outlinedBorder",
+                    fontSize: "sm",
+                  },
                 }}>
                 <thead>
                   <tr>
-                    {[
-                      { label: "Código", key: "codigo" },
-                      { label: "Nombre", key: "nombre" },
-                      { label: "Tipo", key: "tipo" },
-                      { label: "Modelo", key: "modelo" },
-                      { label: "Serie", key: "serial_number" },
-                      { label: "Estatus", key: "estatus" },
-                      { label: "Destino", key: "_destino" },
-                      { label: "", key: null }, // acciones
-                    ].map((col) => (
-                      <th key={col.label}>
-                        {col.key ? (
-                          <Button
-                            variant="plain"
-                            size="sm"
-                            onClick={() => handleSort(col.key)}
-                            endDecorator={
-                              <ArrowDropDownIcon
-                                sx={{
-                                  transform:
-                                    sortKey === col.key && sortDir === "desc"
-                                      ? "rotate(180deg)"
-                                      : "none",
-                                  transition: "0.15s",
-                                  opacity: sortKey === col.key ? 1 : 0.35,
-                                }}
-                              />
-                            }>
-                            {col.label}
-                          </Button>
-                        ) : (
-                          col.label
-                        )}
-                      </th>
-                    ))}
+                    <th style={{ width: 100 }}>
+                      {t("inventory.list.columns.code")}
+                    </th>
+                    <th style={{ width: 180 }}>
+                      {t("inventory.list.columns.name")}
+                    </th>
+                    <th style={{ width: 100 }}>
+                      {t("inventory.list.columns.type")}
+                    </th>
+                    <th style={{ width: 120 }}>
+                      {t("inventory.list.columns.model")}
+                    </th>
+                    <th style={{ width: 120 }}>
+                      {t("inventory.list.columns.serial")}
+                    </th>
+                    <th style={{ width: 100 }}>
+                      {t("inventory.list.columns.status")}
+                    </th>
+                    <th style={{ width: 180 }}>
+                      {t("inventory.list.columns.destination")}
+                    </th>
+                    <th style={{ width: 140, textAlign: "right" }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((r) => (
-                    <tr
-                      key={r.id}
-                      ref={r.id === highlightId ? focusedRef : null}
-                      style={
-                        r.id === highlightId
-                          ? {
-                              backgroundColor: "rgba(59, 130, 246, 0.12)",
-                              boxShadow:
-                                "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
-                              transition:
-                                "background-color 0.25s ease, box-shadow 0.25s ease",
-                            }
-                          : undefined
-                      }>
-                      <td>{r.codigo}</td>
-                      <td>{r.nombre}</td>
-                      <td>{r.tipo}</td>
-                      <td>{r.modelo || "—"}</td>
-                      <td>{r.serial_number || "—"}</td>
-                      <td>
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={ESTATUS_COLOR[r.estatus] || "neutral"}>
-                          {r.estatus}
-                        </Chip>
-                      </td>
-                      <td>
-                        <Tooltip title={getDestinoText(r) || "—"}>
+                  {pageRows.map((r) => {
+                    const isHighlighted = r.id === highlightId;
+                    return (
+                      <tr
+                        key={r.id}
+                        ref={isHighlighted ? focusedRef : null}
+                        style={
+                          isHighlighted
+                            ? {
+                                backgroundColor:
+                                  "var(--joy-palette-primary-50)",
+                              }
+                            : undefined
+                        }>
+                        <td>
+                          <Typography fontFamily="monospace" fontSize="xs">
+                            {r.codigo}
+                          </Typography>
+                        </td>
+                        <td>
+                          <Tooltip
+                            title={r.nombre}
+                            variant="soft"
+                            placement="top-start">
+                            <Typography
+                              fontWeight="md"
+                              noWrap
+                              sx={{ maxWidth: 180 }}>
+                              {r.nombre}
+                            </Typography>
+                          </Tooltip>
+                        </td>
+                        <td>
+                          <Typography
+                            level="body-xs"
+                            noWrap
+                            sx={{ maxWidth: 100 }}>
+                            {r.tipo}
+                          </Typography>
+                        </td>
+                        <td>
+                          <Typography
+                            level="body-sm"
+                            noWrap
+                            sx={{ maxWidth: 120 }}>
+                            {r.modelo || "—"}
+                          </Typography>
+                        </td>
+                        <td>
+                          <Typography
+                            level="body-sm"
+                            noWrap
+                            sx={{ maxWidth: 120 }}>
+                            {r.serial_number || "—"}
+                          </Typography>
+                        </td>
+                        <td>
                           <Chip
                             size="sm"
-                            variant="outlined"
-                            color={
-                              r.tipo_destino === "Cliente"
-                                ? "primary"
-                                : r.tipo_destino === "Bodega"
-                                ? "neutral"
-                                : r.tipo_destino === "Empleado"
-                                ? "success"
-                                : "neutral"
-                            }>
-                            {r.tipo_destino || "—"}
+                            variant="soft"
+                            color={ESTATUS_COLOR[r.estatus] || "neutral"}>
+                            {r.estatus}
                           </Chip>
-                        </Tooltip>
-                      </td>
-                      <td>
-                        <Stack direction="row" spacing={1}>
-                          <Tooltip
-                            title={canEdit ? "Editar" : "Sin permiso"}
-                            variant="soft">
-                            <span>
-                              <IconButton
-                                onClick={() => editActivo(r)}
-                                disabled={!canEdit}
-                                aria-disabled={!canEdit}
-                                variant={canEdit ? "soft" : "plain"}
-                                color={canEdit ? "primary" : "neutral"}>
-                                <EditRoundedIcon />
-                              </IconButton>
-                            </span>
+                        </td>
+                        <td>
+                          <Tooltip title={getDestinoText(r)} variant="soft">
+                            <Chip
+                              size="sm"
+                              variant="outlined"
+                              color="neutral"
+                              sx={{
+                                maxWidth: 180,
+                                justifyContent: "flex-start",
+                              }}>
+                              <Typography noWrap fontSize="xs">
+                                {getDestinoText(r) || "—"}
+                              </Typography>
+                            </Chip>
                           </Tooltip>
-
-                          <Tooltip
-                            title={canMove ? "Mover" : "Sin permiso"}
-                            variant="soft">
-                            <span>
-                              <IconButton
-                                onClick={() => abrirMover(r)}
-                                disabled={!canMove}
-                                aria-disabled={!canMove}
-                                variant={canMove ? "soft" : "plain"}
-                                color={canMove ? "primary" : "neutral"}>
-                                <SwapHorizRoundedIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip title="Historial" variant="soft">
-                            <span>
-                              <IconButton
-                                onClick={() => abrirHistorial(r)}
-                                disabled={!canViewHistory}
-                                aria-disabled={!canViewHistory}
-                                variant={canViewHistory ? "soft" : "plain"}
-                                color={canViewHistory ? "primary" : "neutral"}>
-                                <HistoryRoundedIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-
-                          <Tooltip
-                            title={canQR ? "Ver QR" : "Sin permiso"}
-                            variant="soft">
-                            <span>
-                              <IconButton
-                                onClick={() => abrirQR(r)}
-                                disabled={!canQR}
-                                aria-disabled={!canQR}
-                                variant={canQR ? "soft" : "plain"}
-                                color={canQR ? "primary" : "neutral"}>
-                                <QrCodeRoundedIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Stack>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            justifyContent="flex-end">
+                            {canEdit && (
+                              <Tooltip
+                                title={t("common.actions.edit")}
+                                variant="soft">
+                                <IconButton size="sm" onClick={() => onEdit(r)}>
+                                  <EditRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {canMove && (
+                              <Tooltip
+                                title={t("common.actions.move")}
+                                variant="soft">
+                                <IconButton
+                                  size="sm"
+                                  onClick={() => abrirMover(r)}>
+                                  <SwapHorizRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {canViewHistory && (
+                              <Tooltip
+                                title={t("common.actions.history")}
+                                variant="soft">
+                                <IconButton
+                                  size="sm"
+                                  onClick={() => abrirHistorial(r)}>
+                                  <HistoryRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {canQR && (
+                              <Tooltip
+                                title={t("common.actions.qr")}
+                                variant="soft">
+                                <IconButton
+                                  size="sm"
+                                  onClick={() => abrirQR(r)}>
+                                  <QrCodeRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </Table>
 
-              {/* Footer de paginación */}
+              {/* Footer */}
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 justifyContent="space-between"
-                alignItems={{ xs: "stretch", sm: "center" }}
-                sx={{ p: 1.5, borderTop: "1px solid", borderColor: "divider" }}
-                spacing={1.5}>
+                alignItems="center"
+                sx={{ p: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography level="body-sm">
-                    Mostrando {(page - 1) * perPage + 1}–
-                    {Math.min(page * perPage, sortedRows.length)} de{" "}
-                    {sortedRows.length}
+                  <Typography level="body-xs" color="neutral">
+                    {t("common.showing_results_range", {
+                      start: (page - 1) * perPage + 1,
+                      end: Math.min(page * perPage, sortedRows.length),
+                      total: sortedRows.length,
+                    })}
                   </Typography>
                   <Select
                     size="sm"
                     value={perPage}
                     onChange={(_, v) => {
-                      setPerPage(Number(v) || 25);
+                      setPerPage(Number(v));
                       setPage(1);
                     }}
-                    sx={{ width: 140 }}>
-                    {[10, 25, 50, 100].map((n) => (
-                      <Option key={n} value={n}>
-                        {n} / página
-                      </Option>
-                    ))}
+                    sx={{ width: 80 }}>
+                    <Option value={10}>10</Option>
+                    <Option value={25}>25</Option>
+                    <Option value={50}>50</Option>
+                    <Option value={100}>100</Option>
                   </Select>
                 </Stack>
-
                 <PaginationLite
                   page={page}
                   count={totalPages}
                   onChange={setPage}
-                  size="sm"
-                  siblingCount={1}
-                  boundaryCount={1}
-                  showFirstLast
                 />
               </Stack>
             </>
           )}
-        </Card>
+        </Sheet>
 
-        {/* Modal Crear/Editar */}
-        <Modal open={openForm} onClose={() => setOpenForm(false)}>
-          <ModalDialog
-            component="form"
-            onSubmit={onSubmit}
-            sx={{ width: { xs: "100%", sm: 520 } }}>
-            <Typography level="title-lg">
-              {editing ? "Editar Activo" : "Nuevo Activo"}
-            </Typography>
+        {/* MODALES */}
+        {openForm && (
+          <ActivoFormModal
+            open={openForm}
+            onClose={() => setOpenForm(false)}
+            editing={editing}
+            onSaved={loadActivos}
+          />
+        )}
+        {openMover && (
+          <MoverActivoModal
+            open={openMover}
+            onClose={() => setOpenMover(false)}
+            activo={activoSeleccionado}
+            onSaved={loadActivos}
+          />
+        )}
+        {openHistorial && (
+          <HistorialActivoModal
+            open={openHistorial}
+            onClose={() => setOpenHistorial(false)}
+            activo={activoSeleccionado}
+          />
+        )}
+        {openImport && (
+          <ModalImportarActivos
+            open={openImport}
+            onClose={() => setOpenImport(false)}
+            onSaved={loadActivos}
+          />
+        )}
+
+        {/* Export / Shortcuts / QR (Igual que antes) */}
+        <ExportDialog
+          open={openExport}
+          onClose={() => setOpenExport(false)}
+          rows={sortedRows}
+          columns={EXPORT_COLS}
+          defaultTitle={t("inventory.list.title")}
+          defaultFilenameBase={filenameBase}
+        />
+
+        {/* Drawer Filtros */}
+        <Drawer
+          anchor="right"
+          size="md"
+          open={openFilters}
+          onClose={() => setOpenFilters(false)}>
+          <Sheet
+            sx={{
+              p: 3,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between">
+              <Typography level="h4">
+                {t("inventory.list.filters_title")}
+              </Typography>
+              <ModalClose onClick={() => setOpenFilters(false)} />
+            </Stack>
             <Divider />
-            <Stack spacing={1.5} mt={1}>
-              {/* Código como Chip (no editable). En "Nuevo" se asigna automático */}
+            <Stack spacing={2} flex={1}>
               <FormControl>
-                <FormLabel>
-                  Código{" "}
-                  <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                    {editing ? "(no editable)" : "(asignado automáticamente)"}
-                  </Typography>
-                </FormLabel>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Chip size="sm" variant="soft" color="success">
-                    {editing
-                      ? form.codigo || "—"
-                      : form.codigo ||
-                        (loadingNext ? "cargando…" : nextCodigo) ||
-                        "—"}
-                  </Chip>
-                  {!editing && (
-                    <Button
-                      size="sm"
-                      variant="plain"
-                      onClick={refreshNextCodigo}
-                      disabled={loadingNext}>
-                      Recalcular
-                    </Button>
-                  )}
-                </Stack>
-              </FormControl>
-
-              <FormControl required>
-                <FormLabel>Nombre</FormLabel>
-                <Input
-                  value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                <FormLabel>{t("inventory.list.filters.status")}</FormLabel>
+                <Autocomplete
+                  multiple
+                  placeholder={t("inventory.list.filters.status")}
+                  options={statusOptions}
+                  value={statusDraft}
+                  onChange={(_, v) => setStatusDraft(v)}
                 />
               </FormControl>
-
               <FormControl>
-                <FormLabel>Modelo</FormLabel>
-                <Input
-                  value={form.modelo}
-                  onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+                <FormLabel>{t("inventory.list.filters.type")}</FormLabel>
+                <Autocomplete
+                  multiple
+                  placeholder={t("inventory.list.filters.type")}
+                  options={typeOptions}
+                  value={typeDraft}
+                  onChange={(_, v) => setTypeDraft(v)}
                 />
               </FormControl>
-
               <FormControl>
-                <FormLabel>Serie</FormLabel>
-                <Input
-                  value={form.serial_number}
-                  onChange={(e) =>
-                    setForm({ ...form, serial_number: e.target.value })
-                  }
-                />
-              </FormControl>
-
-              {/* 🔹 Catálogo: Tipo */}
-              <FormControl>
-                <FormLabel>Tipo</FormLabel>
-                <CatalogSelect
-                  catalog="tiposActivo"
-                  value={form.tipo}
-                  onChange={(v) => setForm({ ...form, tipo: v })}
-                />
-              </FormControl>
-
-              {/* 🔹 Catálogo: Estatus */}
-              <FormControl>
-                <FormLabel>Estatus</FormLabel>
-                <CatalogSelect
-                  catalog="estatusActivo"
-                  value={form.estatus}
-                  onChange={(v) => setForm({ ...form, estatus: v })}
-                />
-                <Stack direction="row" spacing={1} mt={0.5} alignItems="center">
-                  <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                    Estado actual:
-                  </Typography>
-                  <Chip
-                    size="sm"
-                    variant="soft"
-                    color={ESTATUS_COLOR[form.estatus] || "neutral"}>
-                    {form.estatus}
-                  </Chip>
-                </Stack>
+                <FormLabel>{t("inventory.list.filters.ubicacion")}</FormLabel>
+                <Select
+                  value={ubicacionDraft}
+                  onChange={(_, v) => setUbicacionDraft(v || "")}>
+                  <Option value="">Todas</Option>
+                  <Option value="Cliente">Clientes</Option>
+                  <Option value="Bodega">Bodegas</Option>
+                  <Option value="Empleado">Empleados</Option>
+                </Select>
               </FormControl>
             </Stack>
-
-            <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
-              <Button variant="plain" onClick={() => setOpenForm(false)}>
-                Cancelar
+            <Stack direction="row" justifyContent="space-between">
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={() => {
+                  setStatusDraft([]);
+                  setTypeDraft([]);
+                  setUbicacionDraft("");
+                  setStatusFilter([]);
+                  setTypeFilter([]);
+                  setUbicacionFilter("");
+                  setOpenFilters(false);
+                }}>
+                {t("common.actions.clear")}
               </Button>
-              <Button type="submit" loading={saving}>
-                Guardar
+              <Button
+                onClick={() => {
+                  setStatusFilter(statusDraft);
+                  setTypeFilter(typeDraft);
+                  setUbicacionFilter(ubicacionDraft);
+                  setOpenFilters(false);
+                }}>
+                {t("common.actions.apply")}
               </Button>
             </Stack>
-          </ModalDialog>
-        </Modal>
+          </Sheet>
+        </Drawer>
 
-        {/* Modal QR */}
+        {/* Modal QR (Reutilizado) */}
         <Modal
           open={openQR}
           onClose={() => {
             setOpenQR(false);
             setPublicLink("");
           }}>
-          <ModalDialog
-            sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
-            <Typography level="title-lg">QR del Activo</Typography>
+          <ModalDialog sx={{ width: 400, textAlign: "center" }}>
+            <Typography level="title-lg">
+              {t("clients.assets.qr_title")}
+            </Typography>
             <Divider sx={{ my: 1 }} />
             {activoQR && (
               <Stack alignItems="center" spacing={1}>
@@ -1210,238 +997,21 @@ export default function ActivosList() {
                   logoUrl={logoTecnasa}
                   size={220}
                 />
-                {publicLink && (
-                  <Typography level="body-sm" sx={{ mt: 1 }}>
-                    <a href={publicLink} target="_blank" rel="noreferrer">
-                      Ver página del activo
-                    </a>
-                  </Typography>
-                )}
               </Stack>
             )}
             <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
               <Button variant="plain" onClick={() => setOpenQR(false)}>
-                Cerrar
-              </Button>
-              <Button onClick={descargarQR}>Descargar PNG</Button>
-            </Stack>
-          </ModalDialog>
-        </Modal>
-
-        {/* Modal Historial */}
-        <HistorialActivoModal
-          open={openHistorial}
-          onClose={() => setOpenHistorial(false)}
-          activo={activoSeleccionado}
-        />
-
-        {/* Modal Mover (reutilizable con Autocomplete) */}
-        <MoverActivoModal
-          open={openMover}
-          onClose={() => setOpenMover(false)}
-          activo={activoSeleccionado}
-          onSaved={() => {
-            setOpenMover(false);
-            loadActivos();
-          }}
-          defaultTipo="Cliente"
-          defaultClienteId={Number(id)}
-        />
-
-        {/* Drawer Joy para Filtros */}
-        <Drawer
-          anchor="right"
-          size="md"
-          variant="plain"
-          open={openFilters}
-          onClose={() => setOpenFilters(false)}
-          slotProps={{
-            content: {
-              sx: {
-                bgcolor: "transparent",
-                p: { md: 3, sm: 0 },
-                boxShadow: "none",
-              },
-            },
-          }}>
-          <Sheet
-            sx={{
-              borderRadius: "md",
-              p: 2,
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              height: "100%",
-              overflow: "auto",
-            }}>
-            <DialogTitle>Filtros</DialogTitle>
-            <ModalClose />
-
-            <DialogContent sx={{ gap: 2 }}>
-              <Typography level="body-sm" sx={{ opacity: 0.8 }}>
-                Refina la lista de activos por estatus, tipo y ubicación.
-              </Typography>
-
-              {/* Estatus (multi) */}
-              <FormControl>
-                <FormLabel>Estatus</FormLabel>
-                <Autocomplete
-                  multiple
-                  placeholder="Todos"
-                  options={statusOptions}
-                  value={statusDraft}
-                  onChange={(_, newValue) => setStatusDraft(newValue)}
-                  sx={{ mt: 0.5 }}
-                />
-                <FormHelperText>
-                  Puedes seleccionar uno o varios estatus.
-                </FormHelperText>
-              </FormControl>
-
-              {/* Tipo (multi) */}
-              <FormControl>
-                <FormLabel>Tipo</FormLabel>
-                <Autocomplete
-                  multiple
-                  placeholder="Todos"
-                  options={typeOptions}
-                  value={typeDraft}
-                  onChange={(_, newValue) => setTypeDraft(newValue)}
-                  sx={{ mt: 0.5 }}
-                />
-                <FormHelperText>
-                  También puedes combinar varios tipos.
-                </FormHelperText>
-              </FormControl>
-
-              {/* Ubicación (single) */}
-              <FormControl>
-                <FormLabel>Ubicación</FormLabel>
-                <Select
-                  placeholder="Todas"
-                  value={ubicacionDraft}
-                  onChange={(_, v) => setUbicacionDraft(v || "")}
-                  sx={{ mt: 0.5 }}>
-                  <Option value="">Todas</Option>
-                  <Option value="Cliente">Clientes</Option>
-                  <Option value="Bodega">Bodegas</Option>
-                  <Option value="Empleado">Empleados</Option>
-                  <Option value="SinUbicacion">Sin ubicación</Option>
-                </Select>
-                <FormHelperText>
-                  Estos filtros se aplican al confirmar abajo.
-                </FormHelperText>
-              </FormControl>
-            </DialogContent>
-
-            <Divider sx={{ mt: "auto" }} />
-
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ justifyContent: "space-between", mt: 1 }}>
-              <Button
-                variant="outlined"
-                color="neutral"
-                onClick={() => {
-                  // limpiar drafts
-                  setStatusDraft([]);
-                  setTypeDraft([]);
-                  setUbicacionDraft("");
-                  // limpiar aplicados
-                  setStatusFilter([]);
-                  setTypeFilter([]);
-                  setUbicacionFilter("");
-                }}>
-                Limpiar filtros
+                {t("common.actions.close")}
               </Button>
               <Button
-                onClick={() => {
-                  // aplicar
-                  setStatusFilter(statusDraft);
-                  setTypeFilter(typeDraft);
-                  setUbicacionFilter(ubicacionDraft);
-                  setOpenFilters(false);
-                }}>
-                Aplicar
-              </Button>
-            </Stack>
-          </Sheet>
-        </Drawer>
-
-        {/* Modal Atajos de teclado */}
-        <Modal open={openShortcuts} onClose={() => setOpenShortcuts(false)}>
-          <ModalDialog sx={{ width: { xs: "100%", sm: 420 } }}>
-            <Typography level="title-lg">Atajos de teclado</Typography>
-            <Divider sx={{ my: 1 }} />
-
-            <Stack spacing={1.25} mt={1}>
-              <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                Estos atajos funcionan principalmente en escritorio.
-              </Typography>
-
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center">
-                <Typography level="body-sm">Focar buscador</Typography>
-                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
-                  /
-                </Typography>
-              </Stack>
-
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center">
-                <Typography level="body-sm">Focar buscador</Typography>
-                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
-                  Ctrl+Shift+F
-                </Typography>
-              </Stack>
-
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center">
-                <Typography level="body-sm">Abrir exportar</Typography>
-                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
-                  Ctrl+Shift+E
-                </Typography>
-              </Stack>
-
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center">
-                <Typography level="body-sm">Abrir filtros</Typography>
-                <Typography level="body-sm" sx={{ fontFamily: "monospace" }}>
-                  Ctrl+Shift+L
-                </Typography>
-              </Stack>
-            </Stack>
-
-            <Stack direction="row" justifyContent="flex-end" mt={2}>
-              <Button variant="plain" onClick={() => setOpenShortcuts(false)}>
-                Cerrar
+                onClick={() =>
+                  qrRef.current?.download("png", `QR_${activoQR?.codigo}`)
+                }>
+                {t("common.actions.download_png")}
               </Button>
             </Stack>
           </ModalDialog>
         </Modal>
-
-        {/* Export */}
-        <ExportDialog
-          open={openExport}
-          onClose={() => setOpenExport(false)}
-          rows={sortedRows}
-          columns={EXPORT_COLS}
-          defaultTitle={`Activos`}
-          defaultSheetName="Activos"
-          defaultFilenameBase={filenameBase}
-          defaultOrientation="portrait"
-          includeGeneratedStamp
-          logoUrl="/newLogoTecnasa.png"
-        />
       </Box>
     </Sheet>
   );

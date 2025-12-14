@@ -10,24 +10,28 @@ import {
   Input,
   CircularProgress,
   Alert,
-  Dropdown,
-  Menu,
-  MenuButton,
-  MenuItem,
+  IconButton,
   Chip,
+  Divider,
 } from "@mui/joy";
+import { useTranslation } from "react-i18next"; // 👈 i18n
+import { useNavigate, useLocation } from "react-router-dom";
+
+// Iconos
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { useNavigate, useLocation } from "react-router-dom";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
+import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 
+// Componentes
 import PaginationLite from "@/components/common/PaginationLite";
-import { getRegistrosPorUbicacionReport } from "@/services/ReportServices";
-import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
 import ExportDialog from "@/components/Exports/ExportDialog";
+import { getRegistrosPorUbicacionReport } from "@/services/ReportServices";
 
-/* === Helpers UI === */
+/* === Helpers === */
 const debounced = (fn, ms = 250) => {
   let t;
   return (...args) => {
@@ -35,7 +39,7 @@ const debounced = (fn, ms = 250) => {
     t = setTimeout(() => fn(...args), ms);
   };
 };
-const fmtDateTime = (d) => (d ? new Date(d).toLocaleString("es-HN") : "N/A");
+const fmtDateTime = (d) => (d ? new Date(d).toLocaleString() : "—");
 const fmtDateInput = (d) => {
   if (!d) return "";
   const pad = (n) => String(n).padStart(2, "0");
@@ -49,20 +53,15 @@ const addDays = (date, days) => {
   return d;
 };
 
-/* === Componente === */
 export default function RegistrosPorUbicacion() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { search } = useLocation();
   const qs = useMemo(() => new URLSearchParams(search), [search]);
 
-  // Texto de búsqueda
+  // Filtros
   const [query, setQuery] = useState(qs.get("q") || "");
-
-  // Rango de fechas (por defecto: "all")
-  // valores: 'all' | 'today' | '7d' | 'month' | 'custom'
   const [range, setRange] = useState(qs.get("range") || "all");
-
-  // from/to visibles SOLO en 'custom'
   const [from, setFrom] = useState(qs.get("from") || "");
   const [to, setTo] = useState(qs.get("to") || "");
 
@@ -74,10 +73,9 @@ export default function RegistrosPorUbicacion() {
   const [raw, setRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-
   const [openExport, setOpenExport] = useState(false);
 
-  // Sincroniza parámetros en URL (si range === 'all', no setearlo para URL limpia)
+  // Sync URL
   useEffect(() => {
     const params = new URLSearchParams(search);
     query ? params.set("q", query) : params.delete("q");
@@ -89,9 +87,9 @@ export default function RegistrosPorUbicacion() {
     window.history.replaceState(null, "", s ? `?${s}` : "");
   }, [query, page, range, from, to, search]);
 
-  // Cuando cambia a preset (no 'custom'):
+  // Presets Rango
   useEffect(() => {
-    if (range === "custom") return; // el usuario controla from/to
+    if (range === "custom") return;
     if (range === "all") {
       setFrom("");
       setTo("");
@@ -112,7 +110,7 @@ export default function RegistrosPorUbicacion() {
     setPage(1);
   }, [range]);
 
-  // Carga (ideal: que el service acepte {from,to}, si no, igual filtramos en front)
+  // Carga
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -125,14 +123,14 @@ export default function RegistrosPorUbicacion() {
         setRaw(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error(e);
-        setErr("No se pudo cargar el reporte de registros por ubicación.");
+        setErr(t("reports.errors.load_failed"));
       } finally {
         setLoading(false);
       }
     })();
-  }, [from, to]);
+  }, [from, to, t]);
 
-  // Búsqueda (debounce)
+  // Búsqueda
   const onChangeQuery = useRef(
     debounced((v) => {
       setPage(1);
@@ -140,11 +138,9 @@ export default function RegistrosPorUbicacion() {
     }, 250)
   ).current;
 
-  // Filtro por texto + rango (front fallback)
+  // Filtrado Front
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-
-    // si no hay from/to => no aplicar filtro de fechas (modo Todos)
     const fromTs = from ? new Date(from + "T00:00:00").getTime() : null;
     const toTs = to ? new Date(to + "T23:59:59").getTime() : null;
 
@@ -154,9 +150,10 @@ export default function RegistrosPorUbicacion() {
         [r.nombre_empleado, r.vehiculo, r.ubicacion_salida, r.ubicacion_regreso]
           .map((v) => String(v ?? "").toLowerCase())
           .some((s) => s.includes(q));
+
       if (!textOk) return false;
 
-      if (!fromTs && !toTs) return true; // sin filtro de fechas
+      if (!fromTs && !toTs) return true;
       const salidaTs = r.fecha_salida
         ? new Date(r.fecha_salida).getTime()
         : null;
@@ -175,253 +172,335 @@ export default function RegistrosPorUbicacion() {
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, pageSafe, rowsPerPage]);
 
-  // Columnas para export (formato de exporters.js)
+  // Limpiar filtros
+  const clearFilters = () => {
+    setQuery("");
+    setRange("all");
+    setFrom("");
+    setTo("");
+    setPage(1);
+  };
+
+  // Export config
   const columnsExport = [
     {
       label: "#",
       key: "__rownum",
       get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
     },
-    { label: "Empleado", key: "nombre_empleado" },
-    { label: "Vehículo", key: "vehiculo" },
-    { label: "Ubicación salida", key: "ubicacion_salida" },
-    { label: "Ubicación regreso", key: "ubicacion_regreso" },
+    { label: t("reports.columns.employee"), key: "nombre_empleado" },
+    { label: t("reports.columns.vehicle"), key: "vehiculo" },
+    { label: t("reports.columns.location_out"), key: "ubicacion_salida" },
+    { label: t("reports.columns.location_in"), key: "ubicacion_regreso" },
     {
-      label: "F. salida",
+      label: t("reports.columns.departure_date"),
       key: "fecha_salida",
       get: (r) => fmtDateTime(r.fecha_salida),
     },
     {
-      label: "F. regreso",
+      label: t("reports.columns.return_date"),
       key: "fecha_regreso",
       get: (r) => fmtDateTime(r.fecha_regreso),
     },
-    { label: "Km salida", key: "km_salida" },
-    { label: "Km regreso", key: "km_regreso" },
+    { label: t("reports.columns.km_out"), key: "km_salida" },
+    { label: t("reports.columns.km_in"), key: "km_regreso" },
   ];
 
-  const filenameBase = `kilometraje_por_empleado_${new Date()
-    .toISOString()
-    .slice(0, 10)}`;
+  const filenameBase = `ubicacion_registros_${from || "all"}_${to || "all"}`;
 
+  // --- Render ---
   if (loading) {
     return (
       <Box
         sx={{
-          minHeight: "70vh",
-          display: "grid",
-          placeItems: "center",
-          gap: 1,
-          background:
-            "linear-gradient(180deg, var(--joy-palette-background-level1), transparent 40%)",
-          borderRadius: "xl",
+          py: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
         }}>
-        <CircularProgress size="lg" />
-        <Typography>Cargando reporte…</Typography>
+        <CircularProgress size="lg" thickness={3} />
+        <Typography level="body-md" color="neutral">
+          {t("common.loading")}
+        </Typography>
       </Box>
     );
   }
 
   if (err) {
     return (
-      <Alert color="danger" variant="soft">
-        <Typography>{err}</Typography>
-      </Alert>
+      <Box sx={{ maxWidth: 1200, mx: "auto", p: 2 }}>
+        <Alert color="danger" variant="soft">
+          {err}
+        </Alert>
+      </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        background:
-          "radial-gradient(1200px 200px at 50% -20%, var(--joy-palette-primary-softBg), transparent), radial-gradient(1200px 200px at 50% 120%, var(--joy-palette-neutral-softBg), transparent)",
-        borderRadius: "xl",
-        p: { xs: 1.5, md: 2 },
-      }}>
+    <Box sx={{ maxWidth: 1400, mx: "auto", px: { xs: 2, md: 4 }, py: 3 }}>
+      {/* --- HEADER --- */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        alignItems={{ md: "center" }}
+        justifyContent="space-between"
+        mb={3}
+        spacing={2}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton
+            onClick={() => navigate("/admin/reports")}
+            variant="plain"
+            color="neutral">
+            <ArrowBackRoundedIcon />
+          </IconButton>
+          <Box>
+            <Typography level="h2" fontSize="lg" fontWeight="lg">
+              {t("reports.report_items.ubicacion_vehiculo.title")}
+            </Typography>
+            <Typography level="body-sm" color="neutral">
+              {t("reports.total_records", { count: filtered.length })}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Button
+          variant="solid"
+          color="primary"
+          startDecorator={<DownloadRoundedIcon />}
+          onClick={() => setOpenExport(true)}
+          disabled={filtered.length === 0}>
+          {t("reports.actions.export")}
+        </Button>
+      </Stack>
+
+      {/* --- FILTERS BAR --- */}
       <Sheet
         variant="outlined"
         sx={{
           p: 2,
-          borderRadius: "xl",
-          borderColor: "neutral.outlinedBorder",
+          borderRadius: "lg",
+          mb: 3,
           boxShadow: "sm",
-          backgroundColor: "background.body",
+          bgcolor: "background.surface",
         }}>
-        {/* Header */}
         <Stack
           direction={{ xs: "column", lg: "row" }}
-          spacing={1}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", lg: "center" }}
-          sx={{ mb: 1.5 }}>
+          spacing={2}
+          alignItems={{ lg: "center" }}>
+          {/* Buscador */}
+          <Input
+            placeholder={t("reports.search_placeholder")}
+            startDecorator={<SearchRoundedIcon />}
+            value={query}
+            onChange={(e) => onChangeQuery(e.target.value)}
+            sx={{ minWidth: 240, flex: 1 }}
+            endDecorator={
+              query && (
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setQuery("")}>
+                  <ClearRoundedIcon />
+                </IconButton>
+              )
+            }
+          />
+
+          <Divider
+            orientation="vertical"
+            sx={{ display: { xs: "none", lg: "block" }, height: 24 }}
+          />
+
+          {/* Rango de Fechas */}
           <Stack
             direction="row"
             spacing={1}
             alignItems="center"
-            sx={{ flexWrap: "wrap" }}>
-            <Button
-              startDecorator={<ArrowBackRoundedIcon />}
-              variant="soft"
-              onClick={() => navigate("/admin/reports")}
-              sx={{ borderRadius: "999px" }}>
-              Regresar
-            </Button>
-            <Typography level="h3" sx={{ fontWeight: 800, ml: 0.5 }}>
-              Registros por ubicación
-            </Typography>
-          </Stack>
-
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={1}
-            alignItems="center">
-            {/* Presets de rango */}
-            <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap" }}>
-              <Chip
-                variant={range === "all" ? "solid" : "soft"}
-                onClick={() => setRange("all")}
-                sx={{ borderRadius: "999px" }}>
-                Todos
-              </Chip>
-              <Chip
-                variant={range === "today" ? "solid" : "soft"}
-                onClick={() => setRange("today")}
-                sx={{ borderRadius: "999px" }}>
-                Hoy
-              </Chip>
-              <Chip
-                variant={range === "7d" ? "solid" : "soft"}
-                onClick={() => setRange("7d")}
-                sx={{ borderRadius: "999px" }}>
-                Últimos 7 días
-              </Chip>
-              <Chip
-                variant={range === "month" ? "solid" : "soft"}
-                onClick={() => setRange("month")}
-                sx={{ borderRadius: "999px" }}>
-                Este mes
-              </Chip>
-              <Chip
-                variant={range === "custom" ? "solid" : "soft"}
-                onClick={() => setRange("custom")}
-                sx={{ borderRadius: "999px" }}>
-                Personalizado
-              </Chip>
-            </Stack>
-
-            {/* Fechas: solo visibles en 'custom' */}
-            {range === "custom" && (
-              <Stack direction="row" spacing={0.75} alignItems="center">
-                <Input
-                  type="date"
-                  value={from || ""}
-                  onChange={(e) => {
-                    setFrom(e.target.value);
-                    setPage(1);
-                  }}
-                  slotProps={{ input: { max: to || undefined } }}
-                  sx={{ minWidth: 160 }}
-                />
-                <Typography level="body-sm">a</Typography>
-                <Input
-                  type="date"
-                  value={to || ""}
-                  onChange={(e) => {
-                    setTo(e.target.value);
-                    setPage(1);
-                  }}
-                  slotProps={{ input: { min: from || undefined } }}
-                  sx={{ minWidth: 160 }}
-                />
-              </Stack>
-            )}
-
-            {/* Búsqueda */}
-            <Input
-              startDecorator={<SearchRoundedIcon />}
-              placeholder="Buscar: empleado, vehículo, ubicación…"
-              onChange={(e) => onChangeQuery(e.target.value)}
-              defaultValue={query}
-              sx={{ minWidth: { xs: 220, md: 260 } }}
+            sx={{ overflowX: "auto", pb: { xs: 1, lg: 0 } }}>
+            <CalendarTodayRoundedIcon
+              sx={{ color: "text.tertiary", fontSize: 20 }}
             />
-
-            {/* Exportar */}
-            <Button
-              variant="soft"
-              startDecorator={<DownloadRoundedIcon />}
-              onClick={() => setOpenExport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Exportar
-            </Button>
+            {["all", "today", "7d", "month", "custom"].map((r) => (
+              <Chip
+                key={r}
+                variant={range === r ? "solid" : "soft"}
+                color={range === r ? "primary" : "neutral"}
+                onClick={() => setRange(r)}
+                sx={{
+                  cursor: "pointer",
+                  fontWeight: range === r ? "lg" : "md",
+                }}>
+                {t(`reports.ranges.${r}`)}
+              </Chip>
+            ))}
           </Stack>
-        </Stack>
 
-        {/* Tabla */}
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "neutral.outlinedBorder",
-            borderRadius: "lg",
-            overflow: "hidden",
-          }}>
+          {range === "custom" && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Input
+                type="date"
+                size="sm"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                sx={{ width: 130 }}
+              />
+              <Typography level="body-sm">-</Typography>
+              <Input
+                type="date"
+                size="sm"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                sx={{ width: 130 }}
+              />
+            </Stack>
+          )}
+
+          {(query || range !== "all") && (
+            <Button
+              variant="plain"
+              color="danger"
+              size="sm"
+              onClick={clearFilters}>
+              {t("reports.actions.clear_filters")}
+            </Button>
+          )}
+        </Stack>
+      </Sheet>
+
+      {/* --- DATA TABLE --- */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          boxShadow: "sm",
+          overflow: "hidden",
+          bgcolor: "background.surface",
+        }}>
+        <Box sx={{ overflowX: "auto" }}>
           <Table
-            aria-label="Tabla de registros por ubicación"
-            stickyHeader
+            aria-label={t("reports.report_items.ubicacion_vehiculo.title")}
             hoverRow
+            stickyHeader
             sx={{
               "--TableCell-paddingX": "12px",
               "--TableCell-paddingY": "10px",
               "& thead th": {
                 bgcolor: "background.level1",
-                fontWeight: 700,
-                color: "text.primary",
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.05em",
                 borderBottom: "1px solid",
                 borderColor: "divider",
-                whiteSpace: "nowrap",
+                whiteSpace: "nowrap", // Evitar saltos de línea en encabezados largos
               },
-              "& tbody tr:nth-of-type(odd)": {
-                bgcolor: "background.level2",
-              },
-              "& tbody td": {
-                borderBottom: "1px solid",
-                borderColor: "divider",
-              },
+              "& tbody tr:last-child td": { borderBottom: 0 },
             }}>
             <thead>
               <tr>
-                <th style={{ width: 56 }}>#</th>
-                <th>Empleado</th>
-                <th>Vehículo</th>
-                <th>Ubicación salida</th>
-                <th>Ubicación regreso</th>
-                <th>F. salida</th>
-                <th>F. regreso</th>
-                <th style={{ textAlign: "right" }}>Km salida</th>
-                <th style={{ textAlign: "right" }}>Km regreso</th>
+                <th style={{ width: 60, textAlign: "center" }}>#</th>
+                <th>{t("reports.columns.employee")}</th>
+                <th>{t("reports.columns.vehicle")}</th>
+                <th>{t("reports.columns.location_out")}</th>
+                <th>{t("reports.columns.location_in")}</th>
+                <th>{t("reports.columns.departure_date")}</th>
+                <th>{t("reports.columns.return_date")}</th>
+                <th style={{ textAlign: "right" }}>
+                  {t("reports.columns.km_out")}
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  {t("reports.columns.km_in")}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {pageItems.map((r, i) => (
-                <tr key={`${r.nombre_empleado}-${r.vehiculo}-${i}`}>
-                  <td>{(pageSafe - 1) * rowsPerPage + i + 1}</td>
-                  <td>{r.nombre_empleado ?? "—"}</td>
-                  <td>{r.vehiculo ?? "—"}</td>
-                  <td>{r.ubicacion_salida ?? "N/A"}</td>
-                  <td>{r.ubicacion_regreso ?? "N/A"}</td>
-                  <td>{fmtDateTime(r.fecha_salida)}</td>
-                  <td>{fmtDateTime(r.fecha_regreso)}</td>
-                  <td style={{ textAlign: "right" }}>{r.km_salida ?? "—"}</td>
-                  <td style={{ textAlign: "right" }}>{r.km_regreso ?? "—"}</td>
-                </tr>
-              ))}
-              {pageItems.length === 0 && (
+              {pageItems.length > 0 ? (
+                pageItems.map((r, i) => {
+                  const globalIndex = (pageSafe - 1) * rowsPerPage + i + 1;
+
+                  return (
+                    <tr key={`${r.id || i}`}>
+                      <td
+                        style={{
+                          textAlign: "center",
+                          color: "var(--joy-palette-text-tertiary)",
+                        }}>
+                        {globalIndex}
+                      </td>
+                      <td>
+                        <Typography fontWeight="md">
+                          {r.nombre_empleado || "—"}
+                        </Typography>
+                      </td>
+                      <td>{r.vehiculo || "—"}</td>
+
+                      {/* Ubicaciones destacadas con icono */}
+                      <td>
+                        {r.ubicacion_salida ? (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center">
+                            <PlaceRoundedIcon
+                              fontSize="small"
+                              sx={{ color: "primary.400", opacity: 0.7 }}
+                            />
+                            <span>{r.ubicacion_salida}</span>
+                          </Stack>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        {r.ubicacion_regreso ? (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center">
+                            <PlaceRoundedIcon
+                              fontSize="small"
+                              sx={{ color: "success.400", opacity: 0.7 }}
+                            />
+                            <span>{r.ubicacion_regreso}</span>
+                          </Stack>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+
+                      <td>{fmtDateTime(r.fecha_salida)}</td>
+                      <td>{fmtDateTime(r.fecha_regreso)}</td>
+                      <td
+                        style={{ textAlign: "right", fontFamily: "monospace" }}>
+                        {r.km_salida ?? "—"}
+                      </td>
+                      <td
+                        style={{ textAlign: "right", fontFamily: "monospace" }}>
+                        {r.km_regreso ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
                 <tr>
-                  <td colSpan={9}>
-                    <Alert variant="soft" color="neutral">
+                  <td
+                    colSpan={9}
+                    style={{ textAlign: "center", padding: "40px" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 1,
+                        color: "neutral.400",
+                      }}>
+                      <FilterListOffRoundedIcon sx={{ fontSize: 40 }} />
                       <Typography level="body-sm">
-                        No hay registros para ese rango/búsqueda.
+                        {t("reports.no_data_desc")}
                       </Typography>
-                    </Alert>
+                    </Box>
                   </td>
                 </tr>
               )}
@@ -429,42 +508,50 @@ export default function RegistrosPorUbicacion() {
           </Table>
         </Box>
 
-        {/* Footer: contador + paginación */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mt: 1.25, gap: 1 }}>
-          <Typography level="body-sm" color="neutral">
-            Mostrando{" "}
-            <b>
-              {pageItems.length} de {filtered.length}
-            </b>{" "}
-            registros
-          </Typography>
-
-          <PaginationLite
-            page={pageSafe}
-            count={totalPages}
-            onChange={setPage}
-            size="sm"
-            showFirstLast
-          />
-        </Stack>
-        <ExportDialog
-          open={openExport}
-          onClose={() => setOpenExport(false)}
-          rows={filtered} // todo el filtro
-          pageRows={pageItems} // página actual
-          columns={columnsExport}
-          defaultTitle="Registros por ubicación"
-          defaultSheetName="Registros_Por_Ubicacion"
-          defaultFilenameBase={filenameBase}
-          defaultOrientation="portrait"
-          includeGeneratedStamp
-          logoUrl="/newLogoTecnasa.png"
-        />
+        {/* --- FOOTER PAGINATION --- */}
+        {pageItems.length > 0 && (
+          <Box
+            sx={{
+              p: 2,
+              borderTop: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.surface",
+            }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems="center"
+              spacing={2}>
+              <Typography level="body-sm" color="neutral">
+                {t("reports.showing_page", {
+                  page: pageSafe,
+                  total: totalPages,
+                })}
+              </Typography>
+              <PaginationLite
+                page={pageSafe}
+                count={totalPages}
+                onChange={setPage}
+                size="sm"
+              />
+            </Stack>
+          </Box>
+        )}
       </Sheet>
+
+      {/* --- EXPORT MODAL --- */}
+      <ExportDialog
+        open={openExport}
+        onClose={() => setOpenExport(false)}
+        rows={filtered}
+        pageRows={pageItems}
+        columns={columnsExport}
+        defaultTitle={t("reports.report_items.ubicacion_vehiculo.title")}
+        defaultSheetName="Ubicaciones"
+        defaultFilenameBase={filenameBase}
+        defaultOrientation="landscape" // Landscape porque son muchas columnas
+        includeGeneratedStamp
+      />
     </Box>
   );
 }

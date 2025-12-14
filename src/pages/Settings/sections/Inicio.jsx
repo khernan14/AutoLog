@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Card,
@@ -94,35 +95,42 @@ function InfoCard({
 }
 
 export default function Inicio({ allSettings, onNavigate }) {
+  const { t } = useTranslation(); // 👈 Hook
+
   // Leemos la configuración de seguridad del objeto global
   const seg = allSettings?.seguridad || {};
 
   // Calculamos el nivel de seguridad
   const has2FA = !!seg.tfa_enabled;
-  const hasAlerts = !!seg.login_alerts; // Asumimos true por defecto en DB, pero valida tu lógica
+  const hasAlerts = !!seg.login_alerts;
 
   // Lógica de estado de seguridad
   const isSecure = has2FA && hasAlerts;
   const securityScore = (has2FA ? 50 : 0) + (hasAlerts ? 50 : 0);
 
+  // Determinamos el texto de la acción faltante para la traducción
+  const missingActionText = !has2FA
+    ? t("settings.home.security.action_2fa")
+    : t("settings.home.security.action_alerts");
+
   const securityConfig = isSecure
     ? {
         icon: ShieldCheck,
         color: "success",
-        title: "Cuenta Protegida",
-        badge: "100% Seguro",
-        desc: "¡Excelente! Tienes la verificación en dos pasos y las alertas activadas.",
-        label: "Ver detalles",
+        title: t("settings.home.security.secure_title"),
+        badge: t("settings.home.security.secure_badge"),
+        desc: t("settings.home.security.secure_desc"),
+        label: t("settings.home.security.btn_details"),
       }
     : {
         icon: ShieldAlert,
         color: "warning",
-        title: "Seguridad Pendiente",
-        badge: "Acción requerida",
-        desc: `Tu cuenta no está totalmente segura. ${
-          !has2FA ? "Activa el 2FA" : "Activa las alertas"
-        } para máxima protección.`,
-        label: "Mejorar seguridad",
+        title: t("settings.home.security.warning_title"),
+        badge: t("settings.home.security.warning_badge"),
+        desc: t("settings.home.security.warning_desc", {
+          action: missingActionText,
+        }),
+        label: t("settings.home.security.btn_improve"),
       };
 
   return (
@@ -144,20 +152,20 @@ export default function Inicio({ allSettings, onNavigate }) {
           <Box>
             <Typography level="h4" textColor="text.primary">
               {isSecure
-                ? "Todo se ve bien por aquí"
-                : "Completa tu configuración"}
+                ? t("settings.home.welcome_secure")
+                : t("settings.home.welcome_warning")}
             </Typography>
             <Typography level="body-sm" textColor="text.secondary">
               {isSecure
-                ? "Tu cuenta cumple con todos los estándares de seguridad recomendados."
-                : "Hemos detectado que puedes mejorar la seguridad de tu acceso."}
+                ? t("settings.home.welcome_desc_secure")
+                : t("settings.home.welcome_desc_warning")}
             </Typography>
           </Box>
         </Stack>
       </Card>
 
       <Typography level="title-sm" sx={{ mt: 1 }}>
-        Accesos Directos
+        {t("settings.home.shortcuts")}
       </Typography>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={2}>
@@ -172,22 +180,22 @@ export default function Inicio({ allSettings, onNavigate }) {
           onAction={() => onNavigate("seguridad")}
         />
 
-        {/* 2. Tarjeta de Apariencia (Mantenida) */}
+        {/* 2. Tarjeta de Apariencia */}
         <InfoCard
           icon={Palette}
-          title="Apariencia"
-          desc="Personaliza el tema (Claro/Oscuro) y la densidad de la interfaz."
-          actionLabel="Personalizar"
+          title={t("settings.home.appearance.title")}
+          desc={t("settings.home.appearance.desc")}
+          actionLabel={t("settings.home.appearance.btn")}
           color="primary"
           onAction={() => onNavigate("apariencia")}
         />
 
-        {/* 3. Tarjeta de Privacidad (Nueva - Reemplaza notificaciones) */}
+        {/* 3. Tarjeta de Privacidad */}
         <InfoCard
           icon={Fingerprint}
-          title="Privacidad"
-          desc="Gestiona quién puede ver tu actividad y el uso de tus datos."
-          actionLabel="Revisar privacidad"
+          title={t("settings.home.privacy.title")}
+          desc={t("settings.home.privacy.desc")}
+          actionLabel={t("settings.home.privacy.btn")}
           color="neutral"
           onAction={() => onNavigate("privacidad")}
         />
@@ -198,12 +206,14 @@ export default function Inicio({ allSettings, onNavigate }) {
       {/* Sección opcional de 'Nivel de Perfil' gamificado */}
       <Card variant="outlined">
         <SectionHeader
-          title="Salud de la Cuenta"
-          subtitle="Estado general de tu configuración"
+          title={t("settings.home.health.title")}
+          subtitle={t("settings.home.health.subtitle")}
         />
         <Stack spacing={2} mt={1}>
           <Stack direction="row" justifyContent="space-between">
-            <Typography level="body-sm">Seguridad configurada</Typography>
+            <Typography level="body-sm">
+              {t("settings.home.health.label")}
+            </Typography>
             <Typography
               level="body-sm"
               fontWeight="bold"
@@ -222,8 +232,9 @@ export default function Inicio({ allSettings, onNavigate }) {
             <Typography
               level="body-xs"
               startDecorator={<ShieldAlert size={14} />}>
-              Recomendación: Ve a la pestaña <b>Seguridad</b> y activa las
-              opciones faltantes.
+              {t("settings.home.health.recommendation_prefix")}{" "}
+              <b>{t("settings.menu.security")}</b>{" "}
+              {t("settings.home.health.recommendation_suffix")}
             </Typography>
           )}
         </Stack>

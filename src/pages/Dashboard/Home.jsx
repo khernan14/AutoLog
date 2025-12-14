@@ -1,116 +1,177 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { motion } from "framer-motion";
 import {
   Box,
   Typography,
   Card,
-  CardContent,
   Grid,
-  Sheet,
-  CircularProgress,
-  Alert,
   Stack,
-  IconButton,
-  Divider,
-  Table,
-  Chip,
   Button,
+  Divider,
+  Chip,
+  Sheet,
+  Skeleton,
 } from "@mui/joy";
-import { motion } from "framer-motion";
 
+// Iconos
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
-import PeopleIcon from "@mui/icons-material/People";
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import PendingActionsIcon from "@mui/icons-material/PendingActions";
-import BuildIcon from "@mui/icons-material/Build";
-import AccessTimeFilledIcon from "@mui/icons-material/AccessTimeFilled";
+import NightlightIcon from "@mui/icons-material/Nightlight";
 import PushPinRoundedIcon from "@mui/icons-material/PushPinRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import NotificationsActiveRoundedIcon from "@mui/icons-material/NotificationsActiveRounded";
 
-import {
-  getEmpleadosMasSalidasReport,
-  getVehiculosMasUtilizadosReport,
-  getRegisterReport,
-  getTotalEmpleados,
-  getTotalVehiculos,
-  getVehiculosEnUso,
-  getVehiculosEnMantenimiento,
-} from "@/services/ReportServices";
-
-import { getPinnedChangelogs, statusToJoyColor } from "@/services/help.api";
+// Contextos y Servicios
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
+import { getPinnedChangelogs } from "@/services/help.api";
+import { useNavigate } from "react-router-dom";
 
-const MotionCard = motion(Card);
-
-const getFormattedDate = () => {
-  const now = new Date();
-  return now.toLocaleDateString("es-HN", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
-
-// util para elegir “destacado del día” estable
-function pickStableItem(arr) {
-  if (!arr?.length) return null;
-  const seed = new Date().toDateString(); // cambia 1 vez por día
-  const hash = [...seed].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0);
-  const idx = Math.abs(hash) % arr.length;
-  return arr[idx];
-}
-
-export default function Home() {
-  const { userData } = useAuth();
-  const userName = (userData?.nombre && String(userData.nombre)) || "Usuario";
-
-  const today = getFormattedDate();
-  const navigate = useNavigate();
-
-  // ---- estado clima
-  const [weather, setWeather] = useState(null);
-  const weatherKey = import.meta.env.VITE_OWM_KEY || "REEMPLAZA_TU_APIKEY";
-
-  // ---- estado métricas
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [dashboardMetrics, setDashboardMetrics] = useState({
-    totalEmpleados: 0,
-    totalVehiculos: 0,
-    vehiculosEnUso: 0,
-    vehiculosEnMantenimiento: 0,
-    registrosPendientes: 0,
-    ultimosRegistros: [],
-    topEmpleadosActivos: [],
-    topVehiculosUsados: [],
-  });
-
-  // ---- estado novedades (pinned)
-  const [pinned, setPinned] = useState([]);
-  const pinnedAbortRef = useRef();
+// --- RELOJ MANUAL (A PRUEBA DE FALLOS) ---
+// Usamos lógica manual porque Intl a veces ignora 'hour12' dependiendo del locale del navegador
+const LiveClock = ({ timeFormat, dateFormat, locale, timezone }) => {
+  const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    // === Cargar clima (opcional) ===
-    if (
-      weatherKey &&
-      weatherKey !== "REEMPLAZA_TU_APIKEY" &&
-      navigator.geolocation
-    ) {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedTime = useMemo(() => {
+    try {
+      // 1. Ajustar fecha a la zona horaria (si existe)
+      let dateInZone = time;
+      if (timezone) {
+        // Truco para cambiar zona horaria manteniendo el objeto Date válido
+        const strTime = time.toLocaleString("en-US", { timeZone: timezone });
+        dateInZone = new Date(strTime);
+      }
+
+      let hours = dateInZone.getHours();
+      const minutes = dateInZone.getMinutes().toString().padStart(2, "0");
+      const seconds = dateInZone.getSeconds().toString().padStart(2, "0");
+
+      // 2. Formateo Manual Estricto
+      if (timeFormat === "24h") {
+        // Formato militar directo: 13:00:00
+        const hh = hours.toString().padStart(2, "0");
+        return `${hh}:${minutes}:${seconds}`;
+      } else {
+        // Formato 12h manual: 01:00:00 PM
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12;
+        hours = hours ? hours : 12; // el 0 se vuelve 12
+        const hh = hours.toString().padStart(2, "0");
+        return `${hh}:${minutes}:${seconds} ${ampm}`;
+      }
+    } catch (e) {
+      console.error("Error reloj:", e);
+      return "--:--:--";
+    }
+  }, [time, timeFormat, timezone]);
+
+  const formattedDate = useMemo(() => {
+    try {
+      const options = {
+        timeZone: timezone,
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      };
+      return new Intl.DateTimeFormat(locale, options).format(time);
+    } catch {
+      return "";
+    }
+  }, [time, dateFormat, locale, timezone]);
+
+  return (
+    <Stack spacing={0.5}>
+      <Typography
+        level="h1"
+        sx={{
+          fontSize: { xs: "3rem", md: "4.5rem" },
+          fontWeight: 800,
+          lineHeight: 1,
+          background:
+            "linear-gradient(45deg, var(--joy-palette-primary-400), var(--joy-palette-primary-600))",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          fontVariantNumeric: "tabular-nums", // Evita saltos al cambiar números
+          letterSpacing: "-1px",
+        }}>
+        {formattedTime}
+      </Typography>
+      <Typography
+        level="h4"
+        textColor="text.secondary"
+        sx={{ textTransform: "capitalize", fontWeight: 400 }}>
+        {formattedDate}
+      </Typography>
+    </Stack>
+  );
+};
+
+export default function Home() {
+  const { t, i18n } = useTranslation();
+  const { userData } = useAuth();
+  const { settings, loading } = useSettings();
+  const navigate = useNavigate();
+
+  const [weather, setWeather] = useState(null);
+  const [pinned, setPinned] = useState([]);
+
+  const userName = userData?.nombre?.split(" ")[0] || "Usuario";
+  const weatherKey = import.meta.env.VITE_OWM_KEY;
+
+  // --- LECTURA SEGURA DE SETTINGS ---
+  // Si está cargando, usamos defaults. Si ya cargó, leemos directo.
+  // Nota: "12h" es el default si falla la lectura.
+  const configTimeFormat = settings?.timeFormat || "12h";
+  const configDateFormat = settings?.dateFormat || "DD/MM/YYYY";
+  const configLanguage = settings?.language || i18n.language || "es-HN";
+  const configTimezone = settings?.timezone;
+
+  // Saludo dinámico
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12)
+      return {
+        text: t("home.greeting.morning"),
+        icon: <WbSunnyIcon sx={{ color: "#FDB813", fontSize: 40 }} />,
+      };
+    if (hour < 18)
+      return {
+        text: t("home.greeting.afternoon"),
+        icon: <WbSunnyIcon sx={{ color: "#F57C00", fontSize: 40 }} />,
+      };
+    return {
+      text: t("home.greeting.evening"),
+      icon: <NightlightIcon sx={{ color: "#5C6BC0", fontSize: 40 }} />,
+    };
+  };
+
+  const greeting = getGreeting();
+
+  useEffect(() => {
+    // 1. Cargar Clima
+    if (weatherKey && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
-          const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=es&appid=${weatherKey}`;
-          fetch(url)
+          const langCode = configLanguage.split("-")[0];
+
+          fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=${langCode}&appid=${weatherKey}`
+          )
             .then((r) => r.json())
             .then((data) => {
-              if (data?.main?.temp != null && data?.weather?.[0]) {
+              if (data.main) {
                 setWeather({
-                  temperatura: Math.round(data.main.temp),
-                  descripcion: data.weather[0].description,
-                  icono: data.weather[0].icon,
+                  temp: Math.round(data.main.temp),
+                  desc: data.weather[0].description,
+                  icon: data.weather[0].icon,
+                  city: data.name,
                 });
               }
             })
@@ -120,507 +181,234 @@ export default function Home() {
       );
     }
 
-    // === Cargar métricas del dashboard ===
-    const loadMetrics = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [
-          totalEmpleados,
-          totalVehiculos,
-          vehiculosEnUso,
-          vehiculosEnMantenimiento,
-          allRegistros,
-          empleadosMasSalidas,
-          vehiculosMasUtilizados,
-        ] = await Promise.all([
-          getTotalEmpleados(),
-          getTotalVehiculos(),
-          getVehiculosEnUso(),
-          getVehiculosEnMantenimiento(),
-          getRegisterReport(),
-          getEmpleadosMasSalidasReport(),
-          getVehiculosMasUtilizadosReport(),
-        ]);
-
-        const pendientes = (allRegistros || []).filter((r) => !r.fecha_regreso);
-        const ultimos = (allRegistros || []).slice(0, 5);
-
-        setDashboardMetrics({
-          totalEmpleados: totalEmpleados?.total || 0,
-          totalVehiculos: totalVehiculos?.total || 0,
-          vehiculosEnUso: vehiculosEnUso?.total || 0,
-          vehiculosEnMantenimiento: vehiculosEnMantenimiento?.total || 0,
-          registrosPendientes: pendientes.length,
-          ultimosRegistros: ultimos,
-          topEmpleadosActivos: (empleadosMasSalidas || []).slice(0, 3),
-          topVehiculosUsados: (vehiculosMasUtilizados || []).slice(0, 3),
-        });
-      } catch (err) {
-        setError(
-          "No se pudieron cargar las métricas principales. Por favor, intente de nuevo."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMetrics();
-  }, [weatherKey]);
-
-  // === Novedades/pinned ===
-  useEffect(() => {
-    const loadPinned = async () => {
-      try {
-        pinnedAbortRef.current?.abort();
-        const controller = new AbortController();
-        pinnedAbortRef.current = controller;
-        const data = await getPinnedChangelogs(6, controller.signal);
-        setPinned(Array.isArray(data) ? data : []);
-      } catch (e) {
-        if (e?.name !== "AbortError") {
-          // silencioso
-        }
-      }
-    };
-    loadPinned();
-    return () => pinnedAbortRef.current?.abort();
-  }, []);
-
-  const highlight = useMemo(() => pickStableItem(pinned), [pinned]);
-
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          p: { xs: 2, md: 4 },
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "70vh",
-        }}>
-        <CircularProgress size="lg" />
-        <Typography level="body-lg" sx={{ ml: 2 }}>
-          Cargando información principal...
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: { xs: 2, md: 4 } }}>
-        <Alert color="danger" variant="soft">
-          <Typography level="body-lg">{error}</Typography>
-        </Alert>
-      </Box>
-    );
-  }
-
-  const go = (to) => (e) => {
-    e?.preventDefault?.();
-    navigate(to);
-  };
+    // 2. Cargar Novedades
+    getPinnedChangelogs(3)
+      .then((data) => setPinned(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [weatherKey, configLanguage]);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      {/* Saludo + fecha */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}>
-        <Typography level="h2" sx={{ mb: 1, fontWeight: "bold" }}>
-          ¡Hola, {userName}! 👋
-        </Typography>
-        <Typography level="body-lg" sx={{ mb: 2, color: "text.secondary" }}>
-          Hoy es {today}
-        </Typography>
-      </motion.div>
-
-      {/* Bloque: Novedades (pinned) */}
-      <MotionCard
-        whileHover={{ scale: 1.01 }}
-        variant="outlined"
-        sx={{
-          mb: 3,
-          borderRadius: "xl",
-          borderColor: "neutral.outlinedBorder",
-          boxShadow: "sm",
-          p: 2,
-        }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-          <PushPinRoundedIcon />
-          <Typography level="title-lg">Novedades destacadas</Typography>
-          <Chip size="sm" variant="soft" color="neutral">
-            {pinned.length} fijas
-          </Chip>
-          <Box sx={{ flex: 1 }} />
-          <Button
-            size="sm"
-            variant="plain"
-            endDecorator={<ChevronRightRoundedIcon />}
-            onClick={go("/admin/help/changelog")}>
-            Ver todas
-          </Button>
-        </Stack>
-
-        {highlight ? (
-          <Sheet
-            variant="soft"
-            color="neutral"
-            sx={{
-              p: 2,
-              borderRadius: "lg",
-              mb: pinned.length > 1 ? 2 : 0,
-            }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Chip
-                size="sm"
-                variant="soft"
-                color={
-                  highlight.type
-                    ? {
-                        Added: "success",
-                        Changed: "warning",
-                        Fixed: "success",
-                        Removed: "danger",
-                        Deprecated: "warning",
-                        Security: "danger",
-                        Performance: "success",
-                      }[highlight.type] || "neutral"
-                    : "neutral"
-                }>
-                {highlight.type || "Update"}
-              </Chip>
-              {highlight.pinned ? (
-                <Chip size="sm" variant="soft" color="primary">
-                  Pinned
-                </Chip>
-              ) : null}
-              <Typography level="title-md" sx={{ ml: 0.5, flex: 1 }}>
-                {highlight.title}
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1600, mx: "auto" }}>
+      {/* SECCIÓN HERO */}
+      <Grid container spacing={4} sx={{ mb: 4 }} alignItems="center">
+        <Grid xs={12} md={7}>
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}>
+            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+              {greeting.icon}
+              <Typography level="h2">
+                {greeting.text}, {userName}.
               </Typography>
-              <Button
-                size="sm"
-                variant="soft"
-                onClick={go(`/admin/help/changelog/${highlight.slug}`)}>
-                Abrir
-              </Button>
             </Stack>
-            {highlight.description ? (
-              <Typography level="body-sm" sx={{ mt: 0.75 }}>
-                {highlight.description}
+
+            {/* Si está cargando, mostramos Skeleton */}
+            {loading ? (
+              <Stack spacing={1}>
+                <Skeleton variant="text" level="h1" width={300} height={80} />
+                <Skeleton variant="text" level="h4" width={200} />
+              </Stack>
+            ) : (
+              /* KEY IMPORTANTE: Fuerza el re-renderizado si cambia el formato */
+              <LiveClock
+                key={configTimeFormat}
+                timeFormat={configTimeFormat}
+                dateFormat={configDateFormat}
+                locale={configLanguage}
+                timezone={configTimezone}
+              />
+            )}
+          </motion.div>
+        </Grid>
+
+        <Grid xs={12} md={5}>
+          {/* Widget Clima */}
+          {weather ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}>
+              <Sheet
+                variant="soft"
+                color="primary"
+                sx={{
+                  borderRadius: "xl",
+                  p: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "md",
+                }}>
+                <Box>
+                  <Typography level="h2" textColor="primary.700">
+                    {weather.temp}°C
+                  </Typography>
+                  <Typography
+                    level="body-md"
+                    fontWeight="lg"
+                    textColor="primary.600"
+                    sx={{ textTransform: "capitalize" }}>
+                    {weather.desc}
+                  </Typography>
+                  <Typography level="body-xs" textColor="primary.500">
+                    {weather.city}
+                  </Typography>
+                </Box>
+                <img
+                  src={`https://openweathermap.org/img/wn/${weather.icon}@4x.png`}
+                  alt="weather"
+                  style={{
+                    width: 100,
+                    height: 100,
+                    filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.2))",
+                  }}
+                />
+              </Sheet>
+            </motion.div>
+          ) : (
+            <Sheet
+              variant="outlined"
+              sx={{
+                borderRadius: "xl",
+                p: 3,
+                height: 140,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderStyle: "dashed",
+              }}>
+              <Typography level="body-sm" color="neutral">
+                {t("home.weather_not_available")}
               </Typography>
-            ) : null}
-          </Sheet>
-        ) : (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1 }}>
-            <InfoOutlinedIcon />
-            <Typography level="body-sm">
-              No hay novedades destacadas por ahora.
-            </Typography>
-          </Stack>
-        )}
-
-        {pinned.length > 1 && (
-          <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
-            {pinned
-              .filter((x) => x.slug !== highlight?.slug)
-              .map((item) => (
-                <Grid key={item.id} xs={12} sm={6} lg={4}>
-                  <Card
-                    variant="outlined"
-                    sx={{
-                      borderRadius: "lg",
-                      height: "100%",
-                      cursor: "pointer",
-                    }}
-                    onClick={go(`/admin/help/changelog/${item.slug}`)}>
-                    <CardContent sx={{ gap: 0.75 }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={
-                            item.type
-                              ? {
-                                  Added: "success",
-                                  Changed: "warning",
-                                  Fixed: "success",
-                                  Removed: "danger",
-                                  Deprecated: "warning",
-                                  Security: "danger",
-                                  Performance: "success",
-                                }[item.type] || "neutral"
-                              : "neutral"
-                          }>
-                          {item.type || "Update"}
-                        </Chip>
-                        <Typography level="title-sm" sx={{ flex: 1 }} noWrap>
-                          {item.title}
-                        </Typography>
-                      </Stack>
-                      {item.description ? (
-                        <Typography level="body-xs" color="neutral" noWrap>
-                          {item.description}
-                        </Typography>
-                      ) : null}
-                      {item.date ? (
-                        <Typography level="body-xs" sx={{ mt: 0.25 }}>
-                          {new Date(item.date).toLocaleDateString("es-HN")}
-                        </Typography>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-          </Grid>
-        )}
-      </MotionCard>
-
-      {/* Métricas clave */}
-      <Typography level="h3" sx={{ mb: 2, fontWeight: "medium" }}>
-        Resumen rápido
-      </Typography>
-
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid xs={12} sm={6} md={3}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              backgroundColor: "primary.softBg",
-            }}>
-            <CardContent
-              orientation="horizontal"
-              sx={{ alignItems: "center", gap: 2 }}>
-              <IconButton variant="solid" color="primary" size="lg">
-                <PeopleIcon fontSize="xl" />
-              </IconButton>
-              <Box>
-                <Typography level="title-md">Total Empleados</Typography>
-                <Typography level="h3">
-                  {dashboardMetrics.totalEmpleados}
-                </Typography>
-              </Box>
-            </CardContent>
-          </MotionCard>
-        </Grid>
-
-        <Grid xs={12} sm={6} md={3}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              backgroundColor: "success.softBg",
-            }}>
-            <CardContent
-              orientation="horizontal"
-              sx={{ alignItems: "center", gap: 2 }}>
-              <IconButton variant="solid" color="success" size="lg">
-                <DirectionsCarIcon fontSize="xl" />
-              </IconButton>
-              <Box>
-                <Typography level="title-md">Total Vehículos</Typography>
-                <Typography level="h3">
-                  {dashboardMetrics.totalVehiculos}
-                </Typography>
-              </Box>
-            </CardContent>
-          </MotionCard>
-        </Grid>
-
-        <Grid xs={12} sm={6} md={3}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              backgroundColor: "warning.softBg",
-            }}>
-            <CardContent
-              orientation="horizontal"
-              sx={{ alignItems: "center", gap: 2 }}>
-              <IconButton variant="solid" color="warning" size="lg">
-                <DirectionsCarIcon fontSize="xl" />
-              </IconButton>
-              <Box>
-                <Typography level="title-md">Vehículos en Uso</Typography>
-                <Typography level="h3">
-                  {dashboardMetrics.vehiculosEnUso}
-                </Typography>
-              </Box>
-            </CardContent>
-          </MotionCard>
-        </Grid>
-
-        <Grid xs={12} sm={6} md={3}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{
-              boxShadow: "md",
-              borderRadius: "lg",
-              p: 2,
-              backgroundColor: "danger.softBg",
-            }}>
-            <CardContent
-              orientation="horizontal"
-              sx={{ alignItems: "center", gap: 2 }}>
-              <IconButton variant="solid" color="danger" size="lg">
-                <PendingActionsIcon fontSize="xl" />
-              </IconButton>
-              <Box>
-                <Typography level="title-md">Registros Pendientes</Typography>
-                <Typography level="h3">
-                  {dashboardMetrics.registrosPendientes}
-                </Typography>
-              </Box>
-            </CardContent>
-          </MotionCard>
+            </Sheet>
+          )}
         </Grid>
       </Grid>
 
-      <Divider sx={{ my: 2 }} />
+      <Divider sx={{ mb: 4 }} />
 
-      {/* Quick glance: clima, actividad, top empleados */}
+      {/* SECCIÓN NOVEDADES Y ACCESOS */}
       <Grid container spacing={3}>
-        {/* Clima (opcional) */}
-        <Grid xs={12} md={4}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                <WbSunnyIcon />
-                <Typography level="title-md">Clima Actual</Typography>
-              </Stack>
-              {weather ? (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  {weather.icono && (
-                    <img
-                      src={`https://openweathermap.org/img/wn/${weather.icono}@2x.png`}
-                      alt={weather.descripcion}
-                      style={{ width: 50, height: 50 }}
+        <Grid xs={12} lg={8}>
+          <Typography
+            level="title-lg"
+            startDecorator={<PushPinRoundedIcon color="warning" />}
+            mb={2}>
+            {t("home.news_title")}
+          </Typography>
+
+          <Stack spacing={2}>
+            {pinned.length > 0 ? (
+              pinned.map((news) => (
+                <Card
+                  key={news.id}
+                  variant="outlined"
+                  sx={{
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: 2,
+                    transition: "0.2s",
+                    "&:hover": { borderColor: "primary.400", boxShadow: "sm" },
+                  }}>
+                  <Box
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: "md",
+                      bgcolor: "background.level1",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                    <NotificationsActiveRoundedIcon
+                      sx={{ color: "text.tertiary" }}
                     />
-                  )}
-                  <Box>
-                    <Typography level="h3">{weather.temperatura}°C</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start">
+                      <Typography level="title-md" mb={0.5}>
+                        {news.title}
+                      </Typography>
+                      <Chip
+                        size="sm"
+                        color={news.type === "Important" ? "danger" : "neutral"}
+                        variant="soft">
+                        {news.type || "Update"}
+                      </Chip>
+                    </Stack>
                     <Typography
-                      level="body-md"
-                      sx={{ textTransform: "capitalize" }}>
-                      {weather.descripcion}
+                      level="body-sm"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}>
+                      {news.description}
                     </Typography>
                   </Box>
-                </Stack>
-              ) : (
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    onClick={() =>
+                      navigate(`/admin/help/changelog/${news.slug}`)
+                    }>
+                    {t("home.read_more")}
+                  </Button>
+                </Card>
+              ))
+            ) : (
+              <Sheet
+                variant="soft"
+                sx={{ p: 4, borderRadius: "md", textAlign: "center" }}>
                 <Typography level="body-md" color="neutral">
-                  No disponible.
+                  {t("home.no_news")}
                 </Typography>
-              )}
-            </CardContent>
-          </MotionCard>
+              </Sheet>
+            )}
+          </Stack>
         </Grid>
 
-        {/* Actividad reciente */}
-        <Grid xs={12} md={4}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                <AccessTimeFilledIcon />
-                <Typography level="title-md">Actividad Reciente</Typography>
-              </Stack>
-              {dashboardMetrics.ultimosRegistros.length > 0 ? (
-                <Sheet variant="soft" sx={{ borderRadius: "md", p: 1 }}>
-                  <Table borderAxis="none" size="sm">
-                    <tbody>
-                      {dashboardMetrics.ultimosRegistros.map((r, i) => (
-                        <tr key={r.id || i}>
-                          <td>
-                            <Typography level="body-sm" fontWeight="md" noWrap>
-                              {r.empleado?.nombre || "N/A"}
-                            </Typography>
-                            <Typography level="body-xs" noWrap>
-                              {r.vehiculo?.marca || "N/A"} (
-                              {r.vehiculo?.placa || "N/A"})
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography
-                              level="body-xs"
-                              sx={{ whiteSpace: "nowrap" }}>
-                              {r.fecha_salida
-                                ? new Date(r.fecha_salida).toLocaleDateString(
-                                    "es-HN"
-                                  )
-                                : "-"}
-                            </Typography>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              ) : (
-                <Typography level="body-md" color="text.secondary">
-                  No hay registros recientes.
-                </Typography>
-              )}
-            </CardContent>
-          </MotionCard>
-        </Grid>
-
-        {/* Top empleados activos */}
-        <Grid xs={12} md={4}>
-          <MotionCard
-            whileHover={{ scale: 1.02 }}
-            sx={{ boxShadow: "md", borderRadius: "lg", p: 2, minHeight: 200 }}>
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                <PeopleIcon />
-                <Typography level="title-md">
-                  Top 3 Empleados Activos
-                </Typography>
-              </Stack>
-              {dashboardMetrics.topEmpleadosActivos.length > 0 ? (
-                <Sheet variant="soft" sx={{ borderRadius: "md", p: 1 }}>
-                  <Table borderAxis="none" size="sm">
-                    <tbody>
-                      {dashboardMetrics.topEmpleadosActivos.map((e, i) => (
-                        <tr key={i}>
-                          <td>
-                            <Typography level="body-sm" fontWeight="md" noWrap>
-                              {e.nombre_empleado}
-                            </Typography>
-                            <Typography level="body-xs" noWrap>
-                              {e.puesto}
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography level="body-sm" fontWeight="bold">
-                              {e.total_salidas}
-                            </Typography>
-                            <Typography level="body-xs">salidas</Typography>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              ) : (
-                <Typography level="body-md" color="text.secondary">
-                  No hay empleados activos para mostrar.
-                </Typography>
-              )}
-            </CardContent>
-          </MotionCard>
+        <Grid xs={12} lg={4}>
+          <Typography level="title-lg" mb={2}>
+            {t("home.quick_access")}
+          </Typography>
+          <Stack spacing={1.5}>
+            <Button
+              variant="soft"
+              color="neutral"
+              fullWidth
+              size="lg"
+              justifyContent="space-between"
+              endDecorator={<ChevronRightRoundedIcon />}
+              onClick={() => navigate("/admin/dashboard")}>
+              📊 {t("menu.dashboard")}
+            </Button>
+            <Button
+              variant="soft"
+              color="neutral"
+              fullWidth
+              size="lg"
+              justifyContent="space-between"
+              endDecorator={<ChevronRightRoundedIcon />}
+              onClick={() => navigate("/admin/inventario/activos")}>
+              📦 {t("menu.inventory")}
+            </Button>
+            <Button
+              variant="soft"
+              color="neutral"
+              fullWidth
+              size="lg"
+              justifyContent="space-between"
+              endDecorator={<ChevronRightRoundedIcon />}
+              onClick={() => navigate("/admin/vehiculos")}>
+              🚗 {t("menu.fleet")}
+            </Button>
+          </Stack>
         </Grid>
       </Grid>
     </Box>

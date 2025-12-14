@@ -1,21 +1,14 @@
 // src/pages/Clientes/ClienteSites.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import {
-  getSitesByCliente,
-  createSite,
-  updateSite,
-} from "../../services/SitesServices";
-import { getCities } from "../../services/LocationServices";
+import { useTranslation } from "react-i18next";
+
 import {
   Box,
-  Card,
   Typography,
   Stack,
   Button,
   Table,
-  Modal,
-  ModalDialog,
   FormControl,
   FormLabel,
   Input,
@@ -32,6 +25,7 @@ import {
   ModalClose,
 } from "@mui/joy";
 
+// Iconos
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -45,14 +39,22 @@ import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import ToggleOnRoundedIcon from "@mui/icons-material/ToggleOnRounded";
 import ToggleOffRoundedIcon from "@mui/icons-material/ToggleOffRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import LocationCityRoundedIcon from "@mui/icons-material/LocationCityRounded";
 
-import StatusCard from "../../components/common/StatusCard";
+// Services & Context
+import {
+  getSitesByCliente,
+  createSite,
+  updateSite,
+} from "../../services/SitesServices";
+import { getCities } from "../../services/LocationServices";
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
-
+import StatusCard from "../../components/common/StatusCard";
 import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
+import PaginationLite from "../../components/common/PaginationLite"; // 👈 Importamos paginación
 
-// Normalizador para ignorar mayúsculas/tildes
+// Normalizador
 const normalize = (val) =>
   (val || "")
     .toString()
@@ -61,69 +63,70 @@ const normalize = (val) =>
     .replace(/\p{Diacritic}/gu, "");
 
 export default function ClienteSites() {
-  const { id } = useParams(); // id del cliente
+  const { t } = useTranslation();
+  const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const isAdmin = userData?.rol?.toLowerCase() === "admin";
 
-  // permisos
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
     (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
+
   const canView = can("ver_sites");
   const canCreate = can("crear_sites");
   const canEdit = can("editar_sites");
 
-  // data
+  // Data
   const [rows, setRows] = useState([]);
   const [ciudades, setCiudades] = useState([]);
-
-  // ui state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // filtros aplicados
+  // Filtros
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("activos"); // "activos" | "inactivos" | "todos"
+  const [statusFilter, setStatusFilter] = useState("activos");
 
-  // Drawer de filtros
+  // Paginación 🆕
+  const [page, setPage] = useState(1);
+  const rowsPerPage = 10;
+
+  // Drawer Filtros
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [draftCityFilter, setDraftCityFilter] = useState(cityFilter);
   const [draftStatusFilter, setDraftStatusFilter] = useState(statusFilter);
 
-  // selección múltiple
+  // Selección
   const [selectedIds, setSelectedIds] = useState([]);
   const hasSelection = selectedIds.length > 0;
 
-  // modal crear/editar
+  // Modal
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     nombre: "",
     descripcion: "",
     id_ciudad: "",
-    activo: "1", // "1" = activo, "0" = inactivo
+    activo: "1",
   });
   const [saving, setSaving] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  // helper para normalizar activo
   function isActivoVal(value) {
     return value === 1 || value === true || value === "1" || value === "true";
   }
 
+  // Carga
   const load = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
       return;
     }
-
     if (!canView) {
-      setError(null); // dejar que la tarjeta de "sin permisos" maneje el mensaje
+      setError(null);
       setLoading(false);
       return;
     }
@@ -138,42 +141,123 @@ export default function ClienteSites() {
       ]);
       setRows(Array.isArray(sitesData) ? sitesData : []);
       setCiudades(Array.isArray(ciudadesData) ? ciudadesData : []);
-      setSelectedIds([]); // limpiar selección al recargar
+      setSelectedIds([]);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No se pudieron cargar los sites."
+          ? t("common.network_error")
+          : t("clients.sites.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [id, checkingSession, canView]);
+  }, [id, checkingSession, canView, t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // acciones
+  // Reset de página al filtrar
+  useEffect(() => {
+    setPage(1);
+  }, [search, cityFilter, statusFilter]);
+
+  // Filtrado
+  const filtered = useMemo(() => {
+    const s = normalize(search);
+    return (rows || []).filter((r) => {
+      const matchSearch =
+        normalize(r.nombre).includes(s) ||
+        normalize(r.descripcion).includes(s) ||
+        normalize(r.ciudad).includes(s);
+      const matchCity =
+        !cityFilter || String(r.id_ciudad) === String(cityFilter);
+      const isActivo = isActivoVal(r.activo);
+      const matchStatus =
+        statusFilter === "activos"
+          ? isActivo
+          : statusFilter === "inactivos"
+          ? !isActivo
+          : true;
+      return matchSearch && matchCity && matchStatus;
+    });
+  }, [rows, search, cityFilter, statusFilter]);
+
+  // Paginación 🆕
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * rowsPerPage;
+    return filtered.slice(start, start + rowsPerPage);
+  }, [filtered, page]);
+
+  // Highlight Logic
+  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
+    rows: filtered, // Nota: Highlight busca en filtered, pero si la fila no está en la página actual, no se verá (esto es normal en tablas paginadas)
+    matchRow: (r, token) =>
+      String(r.id) === token || normalize(r.nombre) === normalize(token),
+    getRowId: (r) => r.id,
+    highlightMs: 4000,
+  });
+
+  useEffect(() => {
+    const token = searchParams.get("focus");
+    if (!token) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    // Reset filters to find the row
+    setSearch("");
+    setCityFilter("");
+    setStatusFilter("todos");
+    setDraftCityFilter("");
+    setDraftStatusFilter("todos");
+
+    // Nota: Si la fila está en la página 5, el highlight no saltará automáticamente de página.
+    // Eso requeriría lógica compleja de encontrar el índice. Por ahora, reseteamos filtros y asumimos que aparece.
+    focusByToken(token);
+  }, [searchParams, setSearchParams, focusByToken]);
+
+  // Selección Múltiple (Ahora sobre la PÁGINA ACTUAL) 🆕
+  const pageIds = useMemo(
+    () => paginatedRows.map((r) => r.id),
+    [paginatedRows]
+  );
+  const allSelectedInPage =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelectOne = (idSite) => {
+    setSelectedIds((prev) =>
+      prev.includes(idSite)
+        ? prev.filter((x) => x !== idSite)
+        : [...prev, idSite]
+    );
+  };
+
+  const toggleSelectAllPage = () => {
+    setSelectedIds((prev) => {
+      if (allSelectedInPage) {
+        // Quitar los de esta página
+        return prev.filter((id) => !pageIds.includes(id));
+      }
+      // Agregar los de esta página (sin duplicados)
+      const set = new Set(prev);
+      pageIds.forEach((id) => set.add(id));
+      return Array.from(set);
+    });
+  };
+
+  // Acciones CRUD
   function newSite() {
-    if (!canCreate) {
-      showToast(
-        "No tienes permiso para crear sites. Solicítalo al administrador.",
-        "warning"
-      );
-      return;
-    }
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
     setEditing(null);
     setForm({ nombre: "", descripcion: "", id_ciudad: "", activo: "1" });
     setOpen(true);
   }
 
   function editSite(row) {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar sites.", "warning");
-      return;
-    }
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     setEditing(row);
     setForm({
       nombre: row.nombre,
@@ -186,11 +270,8 @@ export default function ClienteSites() {
 
   async function onSubmit(e) {
     e.preventDefault();
-
-    if (!form.nombre.trim()) {
-      showToast("El nombre es requerido", "warning");
-      return;
-    }
+    if (!form.nombre.trim())
+      return showToast(t("clients.sites.errors.name_required"), "warning");
 
     setSaving(true);
     try {
@@ -203,157 +284,35 @@ export default function ClienteSites() {
       };
 
       if (editing) {
-        if (!canEdit) {
-          showToast("No tienes permiso para editar sites.", "warning");
-          setSaving(false);
-          return;
-        }
+        if (!canEdit) throw new Error(t("common.no_permission"));
         await updateSite(editing.id, payload);
-        showToast("Site actualizado correctamente", "success");
+        showToast(t("clients.sites.success.updated"), "success");
       } else {
-        if (!canCreate) {
-          showToast("No tienes permiso para crear sites.", "warning");
-          setSaving(false);
-          return;
-        }
+        if (!canCreate) throw new Error(t("common.no_permission"));
         await createSite(payload);
-        showToast("Site creado correctamente", "success");
+        showToast(t("clients.sites.success.created"), "success");
       }
       setOpen(false);
       setEditing(null);
       load();
     } catch (err) {
-      showToast(err?.message || "Error al guardar site", "danger");
+      showToast(
+        err?.message || t("clients.sites.errors.save_failed"),
+        "danger"
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  // 🔎 Filtrar rows con buscador + ciudad + estado (con normalize)
-  const filtered = useMemo(() => {
-    const s = normalize(search);
-
-    return (rows || []).filter((r) => {
-      const matchSearch =
-        normalize(r.nombre).includes(s) ||
-        normalize(r.descripcion).includes(s) ||
-        normalize(r.ciudad).includes(s);
-
-      const matchCity =
-        !cityFilter || String(r.id_ciudad) === String(cityFilter);
-
-      const isActivo = isActivoVal(r.activo);
-
-      const matchStatus =
-        statusFilter === "activos"
-          ? isActivo
-          : statusFilter === "inactivos"
-          ? !isActivo
-          : true; // "todos"
-
-      return matchSearch && matchCity && matchStatus;
-    });
-  }, [rows, search, cityFilter, statusFilter]);
-
-  // ⭐ Hook de focus/highlight
-  const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
-    rows: filtered,
-    matchRow: (r, token) => {
-      const t = normalize(token);
-      return (
-        String(r.id) === token || normalize(r.nombre) === t // por si se usa el nombre como token
-      );
-    },
-    getRowId: (r) => r.id,
-    highlightMs: 4000,
-  });
-
-  // Leer ?focus= de la URL, limpiar filtros y pedir foco
-  useEffect(() => {
-    const token = searchParams.get("focus");
-    if (!token) return;
-
-    const next = new URLSearchParams(searchParams);
-    next.delete("focus");
-    setSearchParams(next, { replace: true });
-
-    // Limpiar filtros para asegurar que el site se vea
-    setSearch("");
-    setCityFilter("");
-    setStatusFilter("todos");
-    setDraftCityFilter("");
-    setDraftStatusFilter("todos");
-
-    focusByToken(token);
-  }, [searchParams, setSearchParams, focusByToken]);
-
-  // IDs visibles según filtros
-  const allVisibleIds = useMemo(
-    () => (filtered || []).map((r) => r.id),
-    [filtered]
-  );
-
-  const allSelectedInPage =
-    allVisibleIds.length > 0 &&
-    allVisibleIds.every((idSite) => selectedIds.includes(idSite));
-
-  // 🔀 selección múltiple
-  const toggleSelectOne = (idSite) => {
-    setSelectedIds((prev) =>
-      prev.includes(idSite)
-        ? prev.filter((x) => x !== idSite)
-        : [...prev, idSite]
-    );
-  };
-
-  const toggleSelectAllVisible = () => {
-    setSelectedIds((prev) => {
-      if (allSelectedInPage) {
-        // quitar todos los de esta vista
-        return prev.filter((idSite) => !allVisibleIds.includes(idSite));
-      }
-      // agregar todos los visibles (sin duplicados)
-      const set = new Set(prev);
-      allVisibleIds.forEach((idSite) => set.add(idSite));
-      return Array.from(set);
-    });
-  };
-
-  // Ciudades únicas de los sites de este cliente
-  const availableCities = useMemo(() => {
-    const seen = new Map();
-    (rows || []).forEach((r) => {
-      if (r.id_ciudad && r.ciudad) {
-        seen.set(String(r.id_ciudad), r.ciudad);
-      }
-    });
-    return Array.from(seen, ([idCity, nombre]) => ({
-      id: idCity,
-      nombre,
-    }));
-  }, [rows]);
-
-  // Métricas
-  const totalSites = rows.length;
-  const totalActivos = useMemo(
-    () => (rows || []).filter((r) => isActivoVal(r.activo)).length,
-    [rows]
-  );
-  const totalInactivos = totalSites - totalActivos;
-
-  // 🔁 BULK: activar / inactivar seleccionados
+  // Bulk Actions
   async function bulkUpdateActivo(newActivo) {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar sites.", "warning");
-      return;
-    }
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     if (!selectedIds.length) return;
-
     setBulkSaving(true);
     try {
-      const ids = [...selectedIds];
       await Promise.all(
-        ids.map((idSite) => {
+        selectedIds.map((idSite) => {
           const row = rows.find((r) => r.id === idSite);
           if (!row) return null;
           return updateSite(idSite, {
@@ -365,16 +324,12 @@ export default function ClienteSites() {
           });
         })
       );
-      showToast(
-        `Sites ${newActivo ? "activados" : "inactivados"} correctamente`,
-        "success"
-      );
+      showToast(t("clients.sites.success.bulk_updated"), "success");
       setSelectedIds([]);
       load();
     } catch (err) {
       showToast(
-        err?.message ||
-          `Error al ${newActivo ? "activar" : "inactivar"} los sites`,
+        err?.message || t("clients.sites.errors.bulk_failed"),
         "danger"
       );
     } finally {
@@ -382,7 +337,7 @@ export default function ClienteSites() {
     }
   }
 
-  // view state
+  // View State
   const viewState = checkingSession
     ? "checking"
     : !canView
@@ -396,358 +351,388 @@ export default function ClienteSites() {
     : "data";
 
   const renderStatus = () => {
-    if (viewState === "checking") {
+    if (viewState === "checking")
       return (
         <StatusCard
           icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
+          title={t("common.verifying_session")}
+          description={<CircularProgress size="sm" />}
         />
       );
-    }
-    if (viewState === "no-permission") {
+    if (viewState === "no-permission")
       return (
         <StatusCard
           color="danger"
           icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver sites"
-          description="Consulta con un administrador para obtener acceso."
+          title={t("common.no_permission")}
+          description={t("common.contact_admin")}
         />
       );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
+    if (viewState === "error")
       return (
         <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
-          }
+          color="danger"
+          icon={<ErrorOutlineRoundedIcon />}
+          title={t("common.error_title")}
           description={error}
           actions={
             <Button
               startDecorator={<RestartAltRoundedIcon />}
               onClick={load}
               variant="soft">
-              Reintentar
+              {t("common.retry")}
             </Button>
           }
         />
       );
-    }
-    if (viewState === "empty") {
-      const noData = (rows || []).length === 0;
+    if (viewState === "empty")
       return (
         <StatusCard
           color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title={noData ? "Sin sites" : "No hay coincidencias"}
+          icon={<LocationCityRoundedIcon />}
+          title={t("clients.sites.empty.title")}
           description={
-            noData
-              ? "Aún no hay sites registrados para este cliente."
-              : "Ajusta la búsqueda o filtros para ver resultados."
+            rows.length === 0
+              ? t("clients.sites.empty.no_data")
+              : t("clients.sites.empty.no_matches")
           }
         />
       );
-    }
+    if (viewState === "loading")
+      return (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress />
+        </Box>
+      );
     return null;
   };
 
+  const availableCities = useMemo(() => {
+    const seen = new Map();
+    (rows || []).forEach((r) => {
+      if (r.id_ciudad && r.ciudad) seen.set(String(r.id_ciudad), r.ciudad);
+    });
+    return Array.from(seen, ([idCity, nombre]) => ({ id: idCity, nombre }));
+  }, [rows]);
+
+  const totalSites = rows.length;
+  const totalActivos = useMemo(
+    () => (rows || []).filter((r) => isActivoVal(r.activo)).length,
+    [rows]
+  );
   const bulkButtonIsActivate = statusFilter === "inactivos";
-
-  // Handlers Drawer filtros
-  const openFiltersDrawer = () => {
-    setDraftCityFilter(cityFilter);
-    setDraftStatusFilter(statusFilter);
-    setFilterDrawerOpen(true);
-  };
-
-  const handleCloseFiltersDrawer = () => {
-    // cerrar sin aplicar → restaurar drafts a lo que está aplicado
-    setFilterDrawerOpen(false);
-    setDraftCityFilter(cityFilter);
-    setDraftStatusFilter(statusFilter);
-  };
-
-  const handleApplyFilters = () => {
-    setCityFilter(draftCityFilter || "");
-    setStatusFilter(draftStatusFilter || "activos");
-    setFilterDrawerOpen(false);
-  };
-
-  const handleClearFilters = () => {
-    setDraftCityFilter("");
-    setDraftStatusFilter("activos");
-    setCityFilter("");
-    setStatusFilter("activos");
-    setFilterDrawerOpen(false);
-  };
 
   return (
     <Box>
-      {/* HEADER: título + totales + filtros compactos */}
-      <Stack spacing={1.5} mb={2}>
-        <Box>
-          <Typography level="h4">Sites del Cliente</Typography>
-          <Typography level="body-sm" color="neutral">
-            Puntos de servicio / instalación asociados al cliente.
-          </Typography>
-          <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
-            Total sites: {totalSites} · Activos: {totalActivos} · Inactivos:{" "}
-            {totalInactivos}
-            {totalSites !== filtered.length &&
-              ` · Con filtros: ${filtered.length}`}
-          </Typography>
-        </Box>
-
+      {/* HEADER */}
+      <Stack spacing={2} mb={3}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.25}>
-          {/* Búsqueda + botón filtros */}
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Input
-              placeholder="Buscar por nombre, descripción o ciudad…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              startDecorator={<SearchRoundedIcon />}
-              endDecorator={
-                search && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    onClick={() => setSearch("")}
-                    aria-label="Limpiar búsqueda">
-                    <ClearIcon />
-                  </IconButton>
+          alignItems="flex-start"
+          spacing={2}>
+          <Box>
+            <Typography level="h3" fontWeight="lg">
+              {t("clients.sites.title")}
+            </Typography>
+            <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
+              {t("clients.sites.stats", {
+                total: totalSites,
+                active: totalActivos,
+                inactive: totalSites - totalActivos,
+              })}
+            </Typography>
+          </Box>
+
+          {canCreate && (
+            <Button
+              startDecorator={<AddRoundedIcon />}
+              onClick={newSite}
+              variant="solid"
+              color="primary">
+              {t("clients.sites.actions.new")}
+            </Button>
+          )}
+        </Stack>
+
+        {/* TOOLBAR */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems="center">
+          {/* Input Compacto */}
+          <Input
+            placeholder={t("clients.sites.search_placeholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            startDecorator={<SearchRoundedIcon />}
+            endDecorator={
+              search && (
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  onClick={() => setSearch("")}>
+                  <ClearIcon />
+                </IconButton>
+              )
+            }
+            sx={{ width: { xs: "100%", md: 240 } }} // 👈 Ancho fijo compacto
+          />
+
+          <Button
+            variant="outlined"
+            color="neutral"
+            startDecorator={<TuneRoundedIcon />}
+            onClick={() => setFilterDrawerOpen(true)}>
+            {t("common.actions.filters")}
+            {(cityFilter || statusFilter !== "activos") && (
+              <Chip size="sm" variant="solid" color="primary" sx={{ ml: 1 }}>
+                2
+              </Chip>
+            )}
+          </Button>
+
+          {canEdit && hasSelection && (
+            <Button
+              variant="soft"
+              color={bulkButtonIsActivate ? "success" : "neutral"}
+              startDecorator={
+                bulkButtonIsActivate ? (
+                  <ToggleOnRoundedIcon />
+                ) : (
+                  <ToggleOffRoundedIcon />
                 )
               }
-              sx={{ width: { xs: "100%", sm: 300 } }}
-            />
-
-            <Button
-              size="sm"
-              variant="outlined"
-              startDecorator={<TuneRoundedIcon />}
-              onClick={openFiltersDrawer}>
-              Filtros
+              onClick={() => bulkUpdateActivo(bulkButtonIsActivate)}
+              disabled={bulkSaving}>
+              {bulkButtonIsActivate
+                ? t("clients.sites.actions.activate_selected")
+                : t("clients.sites.actions.deactivate_selected")}
             </Button>
-          </Stack>
-
-          {/* Acciones masivas + Nuevo */}
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            justifyContent="flex-end"
-            flexWrap="wrap">
-            {canEdit && hasSelection && (
-              <Tooltip
-                title={
-                  bulkButtonIsActivate
-                    ? "Activar sites seleccionados"
-                    : "Inactivar sites seleccionados"
-                }
-                variant="soft">
-                <span>
-                  <Button
-                    size="sm"
-                    variant="soft"
-                    color={bulkButtonIsActivate ? "success" : "neutral"}
-                    startDecorator={
-                      bulkButtonIsActivate ? (
-                        <ToggleOnRoundedIcon />
-                      ) : (
-                        <ToggleOffRoundedIcon />
-                      )
-                    }
-                    disabled={bulkSaving}
-                    onClick={() => bulkUpdateActivo(bulkButtonIsActivate)}>
-                    {bulkButtonIsActivate
-                      ? "Activar seleccionados"
-                      : "Inactivar seleccionados"}
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
-
-            <Tooltip
-              title={
-                canCreate
-                  ? "Crear site"
-                  : "No tienes permiso para crear. Solicítalo al administrador."
-              }
-              variant="soft"
-              placement="top-end">
-              <span>
-                <Button
-                  startDecorator={<AddRoundedIcon />}
-                  onClick={newSite}
-                  disabled={!canCreate}
-                  aria-disabled={!canCreate}
-                  variant={canCreate ? "solid" : "soft"}
-                  color={canCreate ? "primary" : "neutral"}>
-                  Nuevo
-                </Button>
-              </span>
-            </Tooltip>
-          </Stack>
+          )}
         </Stack>
       </Stack>
 
-      {/* Contenido principal */}
-      <Card variant="outlined" sx={{ overflowX: "auto" }}>
+      {/* DATA TABLE */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          overflow: "hidden",
+          bgcolor: "background.surface",
+        }}>
         {viewState !== "data" ? (
-          <Box p={2}>{renderStatus()}</Box>
+          <Box p={4} display="flex" justifyContent="center">
+            {renderStatus()}
+          </Box>
         ) : (
-          <Table size="sm" stickyHeader>
-            <thead>
-              <tr>
-                <th style={{ width: 40 }}>
-                  <Checkbox
-                    checked={allSelectedInPage}
-                    indeterminate={
-                      !allSelectedInPage && hasSelection && filtered.length > 0
-                    }
-                    onChange={toggleSelectAllVisible}
-                  />
-                </th>
-                <th>Nombre</th>
-                <th>Descripción</th>
-                <th>Ciudad</th>
-                <th>Estado</th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => {
-                const isActivo = isActivoVal(r.activo);
-                return (
-                  <tr
-                    key={r.id}
-                    ref={r.id === highlightId ? focusedRef : null}
-                    style={
-                      r.id === highlightId
-                        ? {
-                            backgroundColor: "rgba(59, 130, 246, 0.12)",
-                            boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
-                            transition:
-                              "background-color 0.25s ease, box-shadow 0.25s ease",
-                          }
-                        : undefined
-                    }>
-                    <td>
-                      <Checkbox
-                        checked={selectedIds.includes(r.id)}
-                        onChange={() => toggleSelectOne(r.id)}
-                      />
-                    </td>
-                    <td>{r.nombre}</td>
-                    <td>{r.descripcion || "—"}</td>
-                    <td>
-                      {r.ciudad ? (
-                        <Chip size="sm" variant="soft" color="primary">
-                          {r.ciudad}
+          <>
+            <Table
+              stickyHeader
+              hoverRow
+              sx={{
+                "--TableCell-paddingX": "12px",
+                "--TableCell-paddingY": "8px",
+                "& thead th": {
+                  bgcolor: "background.level1",
+                  color: "text.tertiary",
+                  fontWeight: "md",
+                  textTransform: "uppercase",
+                  fontSize: "xs",
+                  letterSpacing: "0.05em",
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  whiteSpace: "nowrap",
+                },
+                "& tbody td": {
+                  borderBottom: "1px solid",
+                  borderColor: "neutral.outlinedBorder",
+                  fontSize: "sm",
+                },
+              }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 48, textAlign: "center" }}>
+                    <Checkbox
+                      checked={allSelectedInPage}
+                      indeterminate={!allSelectedInPage && hasSelection}
+                      onChange={toggleSelectAllPage}
+                    />
+                  </th>
+                  <th>{t("clients.sites.columns.name")}</th>
+                  <th>{t("clients.sites.columns.description")}</th>
+                  <th>{t("clients.sites.columns.city")}</th>
+                  <th>{t("clients.sites.columns.status")}</th>
+                  <th style={{ width: 60 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedRows.map((r) => {
+                  const isActivo = isActivoVal(r.activo);
+                  const isHighlighted = r.id === highlightId;
+                  return (
+                    <tr
+                      key={r.id}
+                      ref={isHighlighted ? focusedRef : null}
+                      style={
+                        isHighlighted
+                          ? { backgroundColor: "var(--joy-palette-primary-50)" }
+                          : undefined
+                      }>
+                      <td style={{ textAlign: "center" }}>
+                        <Checkbox
+                          checked={selectedIds.includes(r.id)}
+                          onChange={() => toggleSelectOne(r.id)}
+                        />
+                      </td>
+                      <td>
+                        <Tooltip
+                          title={r.nombre}
+                          variant="soft"
+                          color="neutral">
+                          <Typography
+                            noWrap
+                            fontSize="xs"
+                            sx={{ display: "block" }}>
+                            {r.nombre}
+                          </Typography>
+                        </Tooltip>
+                      </td>
+                      <td>
+                        <Typography
+                          level="body-sm"
+                          color="neutral"
+                          noWrap
+                          sx={{ maxWidth: 250 }}>
+                          {r.descripcion || "—"}
+                        </Typography>
+                      </td>
+                      <td>
+                        {r.ciudad ? (
+                          // <Chip size="sm" variant="soft" color="primary">
+                          //   {r.ciudad}
+                          // </Chip>
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="primary"
+                            startDecorator={<LocationCityRoundedIcon />}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center">
+                              <span>{r.ciudad}</span>
+                            </Stack>
+                          </Chip>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={isActivo ? "success" : "neutral"}
+                          startDecorator={
+                            isActivo && (
+                              <Box
+                                sx={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  bgcolor: "success.500",
+                                }}
+                              />
+                            )
+                          }>
+                          {isActivo
+                            ? t("common.status.active")
+                            : t("common.status.inactive")}
                         </Chip>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <Chip
-                        size="sm"
-                        variant="soft"
-                        color={isActivo ? "success" : "neutral"}>
-                        {isActivo ? "Activo" : "Inactivo"}
-                      </Chip>
-                    </td>
+                      </td>
+                      <td>
+                        {canEdit && (
+                          <Tooltip
+                            title={t("common.actions.edit")}
+                            variant="soft">
+                            <IconButton
+                              size="sm"
+                              variant="plain"
+                              color="neutral"
+                              onClick={() => editSite(r)}>
+                              <EditRoundedIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
 
-                    <td>
-                      <Tooltip
-                        title={canEdit ? "Editar" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            onClick={() => editSite(r)}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "soft" : "plain"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            <EditRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
+            {/* Footer Paginación */}
+            {rows.length > 0 && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "background.surface",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}>
+                <Typography level="body-xs" color="neutral">
+                  {t("common.showing_results", {
+                    count: paginatedRows.length,
+                    total: filtered.length,
+                  })}
+                </Typography>
+                <PaginationLite
+                  page={page}
+                  count={totalPages}
+                  onChange={setPage}
+                />
+              </Box>
+            )}
+          </>
         )}
-      </Card>
+      </Sheet>
 
-      {/* Drawer de filtros */}
+      {/* DRAWER FILTROS */}
       <Drawer
         open={filterDrawerOpen}
-        onClose={handleCloseFiltersDrawer}
+        onClose={() => setFilterDrawerOpen(false)}
         anchor="right"
-        size="md"
-        variant="plain"
-        slotProps={{
-          content: {
-            sx: {
-              bgcolor: "transparent",
-              p: { xs: 0, sm: 2 },
-              boxShadow: "none",
-            },
-          },
-        }}>
+        size="sm">
         <Sheet
           sx={{
-            borderRadius: { xs: 0, sm: "md" },
-            p: 2,
+            p: 3,
+            height: "100%",
             display: "flex",
             flexDirection: "column",
-            gap: 1.5,
-            height: "100%",
-            minWidth: { xs: "100dvw", sm: 360 },
-            bgcolor: "background.surface",
-            boxShadow: "lg",
+            gap: 2,
           }}>
           <Stack
             direction="row"
             alignItems="center"
             justifyContent="space-between">
-            <Typography level="title-lg">Filtros de sites</Typography>
-            <ModalClose onClick={handleCloseFiltersDrawer} />
+            <Typography level="h4">
+              {t("clients.sites.filters_title")}
+            </Typography>
+            <ModalClose onClick={() => setFilterDrawerOpen(false)} />
           </Stack>
           <Divider />
 
-          <Stack spacing={1.5} sx={{ flex: 1, overflow: "auto", mt: 1 }}>
+          <Stack spacing={2} flex={1}>
             <FormControl>
-              <FormLabel>Ciudad</FormLabel>
+              <FormLabel>{t("clients.sites.columns.city")}</FormLabel>
               <Select
-                placeholder="Todas las ciudades"
                 value={draftCityFilter}
-                onChange={(_, v) => setDraftCityFilter(v || "")}>
-                <Option value="">Todas las ciudades</Option>
+                onChange={(_, v) => setDraftCityFilter(v || "")}
+                placeholder={t("common.all_cities")}>
+                <Option value="">{t("common.all_cities")}</Option>
                 {availableCities.map((c) => (
                   <Option key={c.id} value={String(c.id)}>
                     {c.nombre}
@@ -755,92 +740,83 @@ export default function ClienteSites() {
                 ))}
               </Select>
             </FormControl>
-
             <FormControl>
-              <FormLabel>Estado</FormLabel>
+              <FormLabel>{t("clients.sites.columns.status")}</FormLabel>
               <Select
                 value={draftStatusFilter}
                 onChange={(_, v) => setDraftStatusFilter(v || "activos")}>
-                <Option value="activos">Activos</Option>
-                <Option value="inactivos">Inactivos</Option>
-                <Option value="todos">Todos</Option>
+                <Option value="activos">{t("common.status.active")}</Option>
+                <Option value="inactivos">{t("common.status.inactive")}</Option>
+                <Option value="todos">{t("common.status.all")}</Option>
               </Select>
             </FormControl>
-
-            <Typography level="body-xs" sx={{ opacity: 0.75, mt: 1 }}>
-              Los filtros se aplican solo al presionar{" "}
-              <strong>“Aplicar filtros”</strong>.
-            </Typography>
           </Stack>
 
-          <Divider sx={{ mt: "auto", mb: 1 }} />
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
+          <Stack direction="row" spacing={1} justifyContent="space-between">
             <Button
               variant="outlined"
               color="neutral"
-              onClick={handleClearFilters}>
-              Limpiar
+              onClick={() => {
+                setDraftCityFilter("");
+                setDraftStatusFilter("activos");
+                setCityFilter("");
+                setStatusFilter("activos");
+                setFilterDrawerOpen(false);
+              }}>
+              {t("common.actions.clear")}
             </Button>
-            <Button onClick={handleApplyFilters}>Aplicar filtros</Button>
+            <Button
+              onClick={() => {
+                setCityFilter(draftCityFilter || "");
+                setStatusFilter(draftStatusFilter || "activos");
+                setFilterDrawerOpen(false);
+              }}>
+              {t("common.actions.apply")}
+            </Button>
           </Stack>
         </Sheet>
       </Drawer>
-      {/* Drawer para nuevo/editar */}
+
+      {/* DRAWER CREAR/EDITAR */}
       <Drawer
         open={open}
         onClose={() => !saving && setOpen(false)}
         anchor="right"
-        size="md"
-        variant="plain"
-        slotProps={{
-          content: {
-            sx: {
-              bgcolor: "transparent",
-              p: { xs: 0, sm: 2 },
-              boxShadow: "none",
-            },
-          },
-        }}>
+        size="ms">
         <Sheet
           component="form"
           onSubmit={onSubmit}
           sx={{
+            p: 3,
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            gap: 1.5,
-            borderRadius: { xs: 0, sm: "md" },
-            p: 2,
-            boxShadow: "lg",
-            bgcolor: "background.surface",
-            minWidth: { xs: "100dvw", sm: 420 },
+            gap: 2,
           }}>
-          {/* Header */}
           <Stack
             direction="row"
             alignItems="center"
-            justifyContent="space-between"
-            sx={{ mb: 0.5 }}>
-            <Typography level="title-lg">
-              {editing ? "Editar Site" : "Nuevo Site"}
+            justifyContent="space-between">
+            <Typography level="h4">
+              {editing
+                ? t("clients.sites.edit_title")
+                : t("clients.sites.create_title")}
             </Typography>
-            <ModalClose disabled={saving} />
+            <ModalClose disabled={saving} onClick={() => setOpen(false)} />
           </Stack>
           <Divider />
 
-          {/* Contenido */}
-          <Stack spacing={1.5} mt={1} sx={{ flex: 1, overflow: "auto" }}>
+          <Stack spacing={2} flex={1} overflow="auto">
             <FormControl required>
-              <FormLabel>Nombre</FormLabel>
+              <FormLabel>{t("clients.sites.form.name")}</FormLabel>
               <Input
                 disabled={saving}
                 value={form.nombre}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
               />
             </FormControl>
-
             <FormControl>
-              <FormLabel>Descripción</FormLabel>
+              <FormLabel>{t("clients.sites.form.description")}</FormLabel>
               <Input
                 disabled={saving}
                 value={form.descripcion}
@@ -849,9 +825,8 @@ export default function ClienteSites() {
                 }
               />
             </FormControl>
-
             <FormControl>
-              <FormLabel>Ciudad</FormLabel>
+              <FormLabel>{t("clients.sites.form.city")}</FormLabel>
               <Select
                 disabled={saving}
                 value={form.id_ciudad}
@@ -863,29 +838,27 @@ export default function ClienteSites() {
                 ))}
               </Select>
             </FormControl>
-
             <FormControl>
-              <FormLabel>Estado</FormLabel>
+              <FormLabel>{t("clients.sites.form.status")}</FormLabel>
               <Select
                 disabled={saving}
                 value={form.activo}
                 onChange={(_, v) => setForm({ ...form, activo: v })}>
-                <Option value="1">Activo</Option>
-                <Option value="0">Inactivo</Option>
+                <Option value="1">{t("common.status.active")}</Option>
+                <Option value="0">{t("common.status.inactive")}</Option>
               </Select>
             </FormControl>
           </Stack>
 
-          {/* Footer */}
-          <Stack direction="row" justifyContent="flex-end" spacing={1} mt={1}>
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
             <Button
               variant="plain"
               onClick={() => setOpen(false)}
               disabled={saving}>
-              Cancelar
+              {t("common.actions.cancel")}
             </Button>
-            <Button type="submit" loading={saving} disabled={saving}>
-              Guardar
+            <Button type="submit" loading={saving}>
+              {t("common.actions.save")}
             </Button>
           </Stack>
         </Sheet>

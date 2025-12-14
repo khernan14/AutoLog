@@ -1,30 +1,21 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   Stack,
   Typography,
   Divider,
   Box,
-  Sheet,
   Radio,
   RadioGroup,
   Select,
   Option,
-  AspectRatio,
   Tooltip,
   Button,
   Alert,
   Snackbar,
 } from "@mui/joy";
-import {
-  Sun,
-  Moon,
-  Monitor,
-  Check,
-  Type,
-  Palette,
-  LayoutTemplate,
-} from "lucide-react";
+import { Check, Type, Palette, LayoutTemplate } from "lucide-react";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
@@ -56,12 +47,11 @@ const FONTS = [
   { value: "'Fira Code', monospace", label: "Fira Code" },
 ];
 
-/* ----- Helpers ----- */
 const getHex = (val) =>
   BRAND_COLORS.find((c) => c.value === val)?.hex ?? BRAND_COLORS[0].hex;
 
-/* ----- Componente principal ----- */
 export default function Apariencia({ initialData = {}, onSave }) {
+  const { t } = useTranslation(); // 👈 Hook
   const { reload } = useSettings();
   const { mode, setMode } = useColorScheme();
   const { brand, setBrand, font, setFont } = useAppTheme();
@@ -69,19 +59,16 @@ export default function Apariencia({ initialData = {}, onSave }) {
   const [selectedFont, setSelectedFont] = useState(font);
   const [savingFont, setSavingFont] = useState(false);
 
-  // Snackbar state
   const [snack, setSnack] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  // Logs controlados: solo cuando cambia brand/font (útil en dev)
   useEffect(() => {
-    console.log("AppTheme (Apariencia):", { brand, font });
+    // console.log("AppTheme (Apariencia):", { brand, font });
   }, [brand, font]);
 
-  // Inicialización con initialData
   useEffect(() => {
     if (initialData) {
       if (initialData.mode && initialData.mode !== mode)
@@ -93,31 +80,24 @@ export default function Apariencia({ initialData = {}, onSave }) {
         setSelectedFont(initialData.font);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
 
-  /* ---------- Handlers memoizados ---------- */
   const handleModeChange = useCallback(
     async (event) => {
       const newMode = event.target.value;
       setMode(newMode);
       try {
         await onSave({ mode: newMode });
-        // setSnack({
-        //   open: true,
-        //   message: `Tema guardado: ${newMode}`,
-        //   severity: "success",
-        // });
       } catch (e) {
         console.error(e);
         setSnack({
           open: true,
-          message: "Error guardando tema",
+          message: t("settings.appearance.errors.save_theme"),
           severity: "danger",
         });
       }
     },
-    [onSave, setMode]
+    [onSave, setMode, t]
   );
 
   const handleBrandChange = useCallback(
@@ -125,18 +105,8 @@ export default function Apariencia({ initialData = {}, onSave }) {
       setBrand(newBrand);
       try {
         await onSave({ brand: newBrand });
-        // setSnack({
-        //   open: true,
-        //   message: `Color guardado: ${newBrand}`,
-        //   severity: "success",
-        // });
       } catch (e) {
         console.error(e);
-        // setSnack({
-        //   open: true,
-        //   message: "Error guardando color",
-        //   severity: "danger",
-        // });
       }
     },
     [onSave, setBrand]
@@ -150,32 +120,23 @@ export default function Apariencia({ initialData = {}, onSave }) {
     setSavingFont(true);
     try {
       await onSave({ font: selectedFont });
-      // setSnack({
-      //   open: true,
-      //   message: `Fuente guardada: ${selectedFont.split(",")[0]}`,
-      //   severity: "success",
-      // });
-      // Forzar reload para aplicar la fuente globalmente
       window.location.reload();
     } catch (error) {
       console.error("Error guardando fuente:", error);
       setSavingFont(false);
       setSnack({
         open: true,
-        message: "Error guardando fuente",
+        message: t("settings.appearance.errors.save_font"),
         severity: "danger",
       });
     }
-  }, [onSave, selectedFont]);
+  }, [onSave, selectedFont, t]);
 
   const hasPendingFontChange = selectedFont !== font;
-
-  /* ---------- Memoizaciones locales ---------- */
   const brandHex = useMemo(() => getHex(brand), [brand]);
   const fontsMemo = useMemo(() => FONTS, []);
   const brandColorsMemo = useMemo(() => BRAND_COLORS, []);
 
-  /* ---------- Helpers para accesibilidad de swatches ---------- */
   const makeOnBrandClick = useCallback(
     (value) => (e) => {
       e.preventDefault();
@@ -188,27 +149,48 @@ export default function Apariencia({ initialData = {}, onSave }) {
     setSnack((s) => ({ ...s, open: false }));
   }, []);
 
+  // Opciones de tema traducidas
+  const themeOptions = [
+    {
+      value: "system",
+      label: t("settings.appearance.theme.system"),
+      desc: t("settings.appearance.theme.system_desc"),
+      previewType: "system",
+      badge: "AUTO",
+    },
+    {
+      value: "dark",
+      label: t("settings.appearance.theme.dark"),
+      desc: t("settings.appearance.theme.dark_desc"),
+      previewType: "dark",
+    },
+    {
+      value: "light",
+      label: t("settings.appearance.theme.light"),
+      desc: t("settings.appearance.theme.light_desc"),
+      previewType: "light",
+    },
+  ];
+
   return (
     <Stack spacing={2}>
       <Card variant="outlined" sx={{ borderRadius: 16, boxShadow: "sm" }}>
         <SectionHeader
-          title="Apariencia del Sistema"
-          subtitle="Personaliza la interfaz visual para adaptarla a tus preferencias."
+          title={t("settings.appearance.title")}
+          subtitle={t("settings.appearance.subtitle")}
         />
 
         <Divider sx={{ my: 2 }} />
 
         <Box>
-          {/* ------------------ COLUMNA PRINCIPAL ------------------ */}
           <Stack spacing={4}>
             {/* TEMA */}
-            {/* ---------- TEMA (tarjetas estilo imagen: contorno acento, preview y accesible) ---------- */}
             <Box>
               <Typography
                 level="title-md"
                 mb={2}
                 startDecorator={<LayoutTemplate size={20} />}>
-                Tema
+                {t("settings.appearance.theme.title")}
               </Typography>
 
               <RadioGroup
@@ -221,41 +203,19 @@ export default function Apariencia({ initialData = {}, onSave }) {
                   flexWrap: "wrap",
                   alignItems: "stretch",
                 }}>
-                {[
-                  {
-                    value: "system",
-                    label: "Sistema",
-                    desc: "Se ajusta a tu dispositivo",
-                    previewType: "system",
-                    badge: "AUTO",
-                  },
-                  {
-                    value: "dark",
-                    label: "Modo Oscuro",
-                    desc: "Ideal para poca luz",
-                    previewType: "dark",
-                  },
-                  {
-                    value: "light",
-                    label: "Modo Claro",
-                    desc: "Limpio y brillante",
-                    previewType: "light",
-                  },
-                ].map((item) => {
+                {themeOptions.map((item) => {
                   const checked = mode === item.value;
-                  // brandHex viene del scope superior (memoizado)
                   return (
                     <Box
                       key={item.value}
                       component="label"
                       sx={{
-                        // tamaño y borde exterior con color de acento si está seleccionado
                         width: { xs: "100%", sm: 220 },
                         borderRadius: 18,
                         background: "background.surface",
                         p: 2,
                         boxShadow: checked
-                          ? `0 12px 40px ${brandHex}22` // glow sutil con color de acento (22 = alpha)
+                          ? `0 12px 40px ${brandHex}22`
                           : "0 6px 18px rgba(15,23,42,0.06)",
                         border: checked
                           ? `2px solid ${brandHex}`
@@ -267,11 +227,9 @@ export default function Apariencia({ initialData = {}, onSave }) {
                         flexDirection: "column",
                         gap: 1.25,
                         overflow: "hidden",
-                        // en dark mode no seleccionada, mostrar borde blanco sutil
                         ...(mode === "dark" && !checked
                           ? { border: "1px solid rgba(255,255,255,0.06)" }
                           : {}),
-                        // evitar la animación que rompía la selección; solo ligero lift en hover
                         "&:hover": {
                           boxShadow: checked
                             ? `0 18px 48px ${brandHex}22`
@@ -282,7 +240,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                         },
                         position: "relative",
                       }}>
-                      {/* Radio accesible: ocupa toda la tarjeta y permite clic en cualquier parte de ella */}
                       <Radio
                         value={item.value}
                         overlay
@@ -297,7 +254,7 @@ export default function Apariencia({ initialData = {}, onSave }) {
                         aria-label={`Seleccionar tema ${item.label}`}
                       />
 
-                      {/* Mini preview (cabecera) */}
+                      {/* Mini preview */}
                       <Box
                         aria-hidden
                         sx={{
@@ -334,8 +291,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                             </Box>
                           )}
                         </Box>
-
-                        {/* preview interior con shapes que simulan widgets */}
                         <Box
                           sx={{
                             display: "flex",
@@ -391,7 +346,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                                 />
                               </Box>
                             </Box>
-
                             <Box
                               sx={{
                                 display: "flex",
@@ -422,8 +376,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                               />
                             </Box>
                           </Box>
-
-                          {/* Bolita grande: usa el color de acento si está seleccionado, si no usa color por defecto */}
                           <Box
                             sx={{
                               width: 38,
@@ -445,7 +397,7 @@ export default function Apariencia({ initialData = {}, onSave }) {
                         </Box>
                       </Box>
 
-                      {/* Pie: título, descripción y radio-indicador */}
+                      {/* Info */}
                       <Box
                         sx={{
                           display: "flex",
@@ -461,8 +413,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                             {item.desc}
                           </Typography>
                         </Box>
-
-                        {/* indicador circular */}
                         <Box
                           sx={{
                             display: "flex",
@@ -520,9 +470,8 @@ export default function Apariencia({ initialData = {}, onSave }) {
                 level="title-md"
                 mb={2}
                 startDecorator={<Palette size={20} />}>
-                Color de acento
+                {t("settings.appearance.accent.title")}
               </Typography>
-
               <Stack
                 direction="row"
                 gap={2}
@@ -585,16 +534,14 @@ export default function Apariencia({ initialData = {}, onSave }) {
               </Stack>
             </Box>
 
-            {/* TIPOGRAFÍA (AHORA CON PREVIEW AL LADO DEL SELECT) */}
+            {/* TIPOGRAFÍA */}
             <Box>
               <Typography
                 level="title-md"
                 mb={2}
                 startDecorator={<Type size={20} />}>
-                Tipografía
+                {t("settings.appearance.typography.title")}
               </Typography>
-
-              {/* Grid: selector + preview al lado */}
               <Box
                 sx={{
                   display: "grid",
@@ -602,7 +549,6 @@ export default function Apariencia({ initialData = {}, onSave }) {
                   gap: 2,
                   alignItems: "start",
                 }}>
-                {/* Columna izquierda: Select, descripción, y alerta/botón */}
                 <Box>
                   <Select
                     value={selectedFont}
@@ -635,9 +581,7 @@ export default function Apariencia({ initialData = {}, onSave }) {
                   </Select>
 
                   <Typography level="body-xs" color="neutral" sx={{ mt: 1 }}>
-                    Define el estilo de letra para toda la aplicación. El panel
-                    a la derecha muestra una vista previa de la fuente
-                    seleccionada.
+                    {t("settings.appearance.typography.desc")}
                   </Typography>
 
                   {hasPendingFontChange && (
@@ -648,11 +592,10 @@ export default function Apariencia({ initialData = {}, onSave }) {
                       sx={{ alignItems: "flex-start", gap: 2, mt: 2 }}>
                       <Box>
                         <Typography level="title-sm" color="warning">
-                          Cambio pendiente
+                          {t("settings.appearance.typography.pending_title")}
                         </Typography>
                         <Typography level="body-sm" mb={1}>
-                          Es necesario reiniciar la aplicación para aplicar la
-                          nueva fuente correctamente.
+                          {t("settings.appearance.typography.pending_desc")}
                         </Typography>
                         <Button
                           size="sm"
@@ -661,14 +604,14 @@ export default function Apariencia({ initialData = {}, onSave }) {
                           startDecorator={<RestartAltRoundedIcon />}
                           onClick={handleApplyFont}
                           loading={savingFont}>
-                          Aplicar y Reiniciar
+                          {t("settings.appearance.typography.apply_btn")}
                         </Button>
                       </Box>
                     </Alert>
                   )}
                 </Box>
 
-                {/* Columna derecha: Preview que usa la fuente seleccionada */}
+                {/* Preview */}
                 <Box>
                   <PreviewPanel
                     brandHex={brandHex}
@@ -679,15 +622,9 @@ export default function Apariencia({ initialData = {}, onSave }) {
               </Box>
             </Box>
           </Stack>
-
-          {/* ------------------ COLUMNA DERECHA ORIGINAL (vacía ahora) ------------------ */}
-          <Box>
-            {/* Antes aquí estaba el Preview principal — ahora está pegado al select de fuentes */}
-          </Box>
         </Box>
       </Card>
 
-      {/* ------------------ SNACKBAR DE CONFIRMACIÓN ------------------ */}
       <Snackbar
         open={snack.open}
         onClose={closeSnack}

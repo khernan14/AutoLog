@@ -963,14 +963,14 @@ export default function Sidebar() {
 
             <DropdownMenuPortal>
               <DropdownMenuContent align="start" className="w-56 z-[15000]">
-                <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("sidebar.mi_cuenta")}</DropdownMenuLabel>
 
                 <DropdownMenuGroup>
                   <DropdownMenuItem
                     onSelect={() => navigate("/admin/mi-cuenta")}
                     className="gap-2">
                     <AccountCircleIcon className="h-4 w-4" fontSize="small" />
-                    <span>Mi perfil</span>
+                    <span>{t("sidebar.mi_perfil")}</span>
                   </DropdownMenuItem>
 
                   {checkPermission("ver_configuraciones") && (
@@ -981,7 +981,7 @@ export default function Sidebar() {
                         className="h-4 w-4"
                         fontSize="small"
                       />
-                      <span>Configuraciones</span>
+                      <span>{t("sidebar.configuraciones")}</span>
                       <DropdownMenuShortcut>Ctrl+,</DropdownMenuShortcut>
                     </DropdownMenuItem>
                   )}
@@ -990,7 +990,7 @@ export default function Sidebar() {
                     onSelect={() => navigate("/admin/help")}
                     className="gap-2">
                     <HelpCenterIcon className="h-4 w-4" fontSize="small" />
-                    <span>Centro de ayuda</span>
+                    <span>{t("sidebar.centro_de_ayuda")}</span>
                     <DropdownMenuShortcut>Ctrl+H</DropdownMenuShortcut>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -1006,7 +1006,7 @@ export default function Sidebar() {
                     focus:bg-red-50 dark:focus:bg-red-950
                   ">
                   <LogoutRoundedIcon className="h-4 w-4" fontSize="small" />
-                  <span>Cerrar sesión</span>
+                  <span>{t("sidebar.cerrar_sesion")}</span>
                   <DropdownMenuShortcut>Ctrl+Q</DropdownMenuShortcut>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1018,23 +1018,25 @@ export default function Sidebar() {
       {/* Command Palette shadcn (Ctrl/⌘+K) */}
       <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
         <CommandInput
-          placeholder="Buscar módulos, clientes, activos…"
+          placeholder={t("sidebar.busqueda")}
           value={commandQuery}
           onValueChange={setCommandQuery}
         />
         <CommandList>
           {!commandLoading && commandResults.length === 0 && (
-            <CommandEmpty>Sin resultados por ahora…</CommandEmpty>
+            <CommandEmpty>{t("sidebar.sin_resultados")}</CommandEmpty>
           )}
 
           {commandLoading && (
-            <CommandGroup heading="Buscando…">
-              <CommandItem disabled>Buscando resultados…</CommandItem>
+            <CommandGroup heading={t("sidebar.buscando")}>
+              <CommandItem disabled>
+                {t("sidebar.buscando_resultados")}
+              </CommandItem>
             </CommandGroup>
           )}
 
           {!commandLoading && commandResults.length > 0 && (
-            <CommandGroup heading="Resultados">
+            <CommandGroup heading={t("sidebar.resultados")}>
               {commandResults.map((r) => {
                 const allowed =
                   userRole === "Admin" || !r.perm || checkPermission(r.perm);
@@ -1059,7 +1061,7 @@ export default function Sidebar() {
                     )}
                     {!allowed && (
                       <span className="ml-auto text-[11px] text-red-500">
-                        Sin permiso
+                        {t("sidebar.sin_permiso")}
                       </span>
                     )}
                   </CommandItem>
@@ -1069,12 +1071,12 @@ export default function Sidebar() {
           )}
 
           <CommandSeparator />
-          <CommandGroup heading="Atajos">
+          <CommandGroup heading={t("sidebar.atajos")}>
             <CommandItem
               onSelect={() => navigate("/admin/help")}
               value="Centro de ayuda">
               <HelpCenterIcon className="mr-2 h-4 w-4" />
-              <span>Centro de ayuda</span>
+              <span>{t("sidebar.centro_de_ayuda")}</span>
               <CommandShortcut>Ctrl+H</CommandShortcut>
             </CommandItem>
 
@@ -1083,7 +1085,7 @@ export default function Sidebar() {
                 onSelect={() => navigate("/admin/configuraciones")}
                 value="Configuraciones">
                 <SettingsRoundedIcon className="mr-2 h-4 w-4" />
-                <span>Configuraciones</span>
+                <span>{t("sidebar.configuraciones")}</span>
                 <CommandShortcut>Ctrl+,</CommandShortcut>
               </CommandItem>
             )}
@@ -1093,7 +1095,7 @@ export default function Sidebar() {
               value="Cerrar sesión"
               className="text-red-600 dark:text-red-400">
               <LogoutRoundedIcon className="mr-2 h-4 w-4" />
-              <span>Cerrar sesión</span>
+              <span>{t("sidebar.cerrar_sesion")}</span>
               <CommandShortcut>Ctrl+Q</CommandShortcut>
             </CommandItem>
           </CommandGroup>

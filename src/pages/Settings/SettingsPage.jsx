@@ -1,5 +1,5 @@
 // src/pages/Settings/SettingsPage.jsx
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -39,7 +39,7 @@ const Sections = {
   acerca: React.lazy(() => import("./sections/Acerca.jsx")),
 };
 
-// precarga al hover
+// Precarga al hover
 const lazyLoaders = {
   inicio: () => import("./sections/Inicio.jsx"),
   seguridad: () => import("./sections/Seguridad.jsx"),
@@ -55,49 +55,75 @@ const lazyLoaders = {
 function SettingsInner() {
   const [active, setActive] = useState("inicio");
   const { settings, loading, saveSection, savingMap } = useSettings();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // --- SINCRONIZACIÓN DE IDIOMA ---
+  // Cuando cargan los settings, verificamos si el idioma guardado es diferente al actual
+  // y lo actualizamos en i18n para que la app cambie al instante.
+  useEffect(() => {
+    if (settings?.language && settings.language !== i18n.language) {
+      i18n.changeLanguage(settings.language);
+    }
+  }, [settings, i18n]);
 
   const ActiveSection = Sections[active] || Sections.inicio;
-  const initialData = settings?.[active] ?? {};
+
+  // Soporte para estructura plana o anidada
+  const initialData = settings
+    ? settings[active] || settings // Intenta buscar en la sección, si no, pasa todo (para estructuras planas)
+    : {};
 
   const NAV = [
-    { key: "inicio", label: t("settings.inicio"), icon: <Home size={16} /> },
+    { key: "inicio", label: t("settings.menu.home"), icon: <Home size={16} /> },
     {
       key: "seguridad",
-      label: t("settings.seguridad"),
+      label: t("settings.menu.security"),
       icon: <Lock size={16} />,
     },
     {
       key: "apariencia",
-      label: t("settings.apariencia"),
+      label: t("settings.menu.appearance"),
       icon: <Paintbrush size={16} />,
     },
-    { key: "idioma", label: t("settings.idioma"), icon: <Globe size={16} /> },
+    {
+      key: "idioma",
+      label: t("settings.menu.language"),
+      icon: <Globe size={16} />,
+    },
     {
       key: "accesibilidad",
-      label: t("settings.accesibilidad"),
+      label: t("settings.menu.accessibility"),
       icon: <AccessibilityIcon size={16} />,
     },
     {
       key: "integraciones",
-      label: t("settings.integraciones"),
+      label: t("settings.menu.integrations"),
       icon: <Plug size={16} />,
     },
     {
       key: "privacidad",
-      label: t("settings.privacidad"),
+      label: t("settings.menu.privacy"),
       icon: <Shield size={16} />,
     },
     {
       key: "backups",
-      label: t("settings.backups"),
+      label: t("settings.menu.backups"),
       icon: <Database size={16} />,
     },
-    { key: "acerca", label: t("settings.acerca"), icon: <Info size={16} /> },
+    {
+      key: "acerca",
+      label: t("settings.menu.about"),
+      icon: <Info size={16} />,
+    },
   ];
 
   const handleSave = async (data) => {
     try {
+      // Si estamos guardando idioma, aplicarlo inmediatamente también
+      if (active === "idioma" && data.language) {
+        await i18n.changeLanguage(data.language);
+      }
+
       const response = await saveSection(active, data);
       return response;
     } catch (err) {
@@ -108,9 +134,6 @@ function SettingsInner() {
   const handleNavigate = (key) => {
     setActive(key);
   };
-
-  // Puedes agregar un reload() aquí si quieres
-  const handleReset = () => {};
 
   if (loading) {
     return (
@@ -161,16 +184,15 @@ function SettingsInner() {
                   borderRadius: 16,
                   display: "grid",
                   placeItems: "center",
+                  minHeight: 400,
                 }}>
                 <CircularProgress />
               </Card>
             }>
-            {/* 🟢 Pasamos las props vitales */}
             <ActiveSection
               initialData={initialData}
               allSettings={settings}
               onSave={handleSave}
-              onReset={handleReset}
               onNavigate={handleNavigate}
               saving={!!savingMap[active]}
             />
@@ -192,13 +214,12 @@ export default function SettingsPage() {
         overflow: "auto",
       }}>
       <Box sx={{ maxWidth: 1200, mx: "auto", px: 2, pt: 2, pb: 1 }}>
-        <Typography level="h3">{t("settings.title")}</Typography>
+        <Typography level="h3">{t("settings.page_title")}</Typography>
         <Typography level="body-sm" color="neutral">
-          {t("settings.description")}
+          {t("settings.page_desc")}
         </Typography>
       </Box>
 
-      {/* 🟢 IMPORTANTE: El Provider envuelve todo */}
       <SettingsProvider>
         <SettingsInner />
       </SettingsProvider>

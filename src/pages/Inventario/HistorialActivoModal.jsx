@@ -1,7 +1,8 @@
+// src/pages/Inventario/HistorialActivoModal.jsx
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  Modal,
-  ModalDialog,
+  Drawer,
   Typography,
   Divider,
   Sheet,
@@ -17,47 +18,43 @@ import {
   Button,
   FormControl,
   FormLabel,
+  ModalClose,
 } from "@mui/joy";
+
+// Iconos
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded"; // Icono empty
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 
+// Services & Context
 import { getHistorialUbicaciones } from "../../services/ActivosServices";
 import { useToast } from "../../context/ToastContext";
 import useIsMobile from "../../hooks/useIsMobile";
 import ExportDialog from "@/components/Exports/ExportDialog";
 
-// Columnas para exportar historial
-const EXPORT_COLS = [
-  { label: "Destino", key: "tipo_destino" },
-  { label: "Cliente", key: "cliente_nombre" },
-  { label: "Site", key: "site_nombre" },
-  { label: "Bodega", key: "bodega_nombre" },
-  { label: "Inicio", key: "fecha_inicio" },
-  { label: "Fin", key: "fecha_fin" },
-  { label: "Motivo", key: "motivo" },
-];
-
 export default function HistorialActivoModal({ open, onClose, activo }) {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const isMobile = useIsMobile(768);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // filtros
+  // Filtros
   const [tipoFilter, setTipoFilter] = useState("");
   const [textFilter, setTextFilter] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(false);
-  const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
-  const [toDate, setToDate] = useState(""); // YYYY-MM-DD
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  // export
+  // Export
   const [openExport, setOpenExport] = useState(false);
 
+  // Carga
   useEffect(() => {
     if (open && activo) {
-      // reset filtros cada vez que se abre para este activo
       setTipoFilter("");
       setTextFilter("");
       setOnlyOpen(false);
@@ -73,13 +70,16 @@ export default function HistorialActivoModal({ open, onClose, activo }) {
       const data = await getHistorialUbicaciones(activo.id);
       setRows(data || []);
     } catch (err) {
-      showToast(err.message || "Error al obtener historial", "danger");
+      showToast(
+        err.message || t("inventory.history.errors.load_failed"),
+        "danger"
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  // opciones dinámicas de tipo destino
+  // Opciones dinámicas
   const tipoOptions = useMemo(() => {
     const set = new Set(
       (rows || []).map((r) => r.tipo_destino).filter(Boolean)
@@ -87,7 +87,7 @@ export default function HistorialActivoModal({ open, onClose, activo }) {
     return Array.from(set);
   }, [rows]);
 
-  // objetos Date para filtros de fecha
+  // Filtros de fecha
   const fromDateObj = useMemo(
     () => (fromDate ? new Date(`${fromDate}T00:00:00`) : null),
     [fromDate]
@@ -97,23 +97,18 @@ export default function HistorialActivoModal({ open, onClose, activo }) {
     [toDate]
   );
 
-  // aplicar filtros sobre el historial completo
+  // Filtrado
   const filtered = useMemo(() => {
     return (rows || []).filter((m) => {
-      // tipo destino
       if (tipoFilter && m.tipo_destino !== tipoFilter) return false;
-
-      // solo ubicación actual (fecha_fin null)
       if (onlyOpen && m.fecha_fin) return false;
 
-      // filtro por fecha_inicio
       if (fromDateObj || toDateObj) {
         const inicio = new Date(m.fecha_inicio);
         if (fromDateObj && inicio < fromDateObj) return false;
         if (toDateObj && inicio > toDateObj) return false;
       }
 
-      // filtro de texto
       const q = textFilter.trim().toLowerCase();
       if (q) {
         const haystack = [
@@ -128,362 +123,349 @@ export default function HistorialActivoModal({ open, onClose, activo }) {
           .toLowerCase();
         if (!haystack.includes(q)) return false;
       }
-
       return true;
     });
   }, [rows, tipoFilter, onlyOpen, textFilter, fromDateObj, toDateObj]);
 
-  const title =
-    activo && (activo.nombre || activo.codigo)
-      ? `Historial de Movimientos`
-      : "Historial de Movimientos";
+  // Columnas Exportación (Traducidas)
+  const EXPORT_COLS = [
+    { label: t("inventory.history.columns.destination"), key: "tipo_destino" },
+    { label: t("inventory.history.columns.client"), key: "cliente_nombre" },
+    { label: t("inventory.history.columns.site"), key: "site_nombre" },
+    { label: t("inventory.history.columns.warehouse"), key: "bodega_nombre" },
+    { label: t("inventory.history.columns.start_date"), key: "fecha_inicio" },
+    { label: t("inventory.history.columns.end_date"), key: "fecha_fin" },
+    { label: t("inventory.history.columns.reason"), key: "motivo" },
+  ];
 
   return (
-    <>
-      <Modal open={open} onClose={onClose}>
-        <ModalDialog
-          sx={{
-            width: isMobile ? "100%" : 720,
-            maxWidth: "100%",
-            maxHeight: isMobile ? "100dvh" : "80vh",
-            height: isMobile ? "100dvh" : "auto",
-            borderRadius: isMobile ? 0 : "lg",
+    <Drawer
+      anchor="right"
+      size="lg" // Un poco más ancho para el historial
+      open={open}
+      onClose={onClose}
+      slotProps={{
+        content: {
+          sx: {
+            bgcolor: "background.surface",
+            p: 0,
             display: "flex",
             flexDirection: "column",
-            p: 1.5,
-          }}>
-          {/* Header */}
-          <Stack spacing={0.25}>
-            <Typography level="title-lg">{title}</Typography>
+            boxShadow: "xl",
+          },
+        },
+      }}>
+      {/* HEADER FIJO */}
+      <Box sx={{ p: 3, borderBottom: "1px solid", borderColor: "divider" }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between">
+          <Stack spacing={0.5}>
+            <Typography level="h4">{t("inventory.history.title")}</Typography>
             {activo && (
-              <Typography level="body-sm" sx={{ opacity: 0.7 }}>
-                {activo.nombre} ({activo.codigo})
+              <Typography level="body-sm" color="neutral">
+                {activo.nombre}{" "}
+                <Typography color="primary" fontFamily="monospace">
+                  ({activo.codigo})
+                </Typography>
               </Typography>
             )}
           </Stack>
-          <Divider sx={{ my: 1 }} />
+          <ModalClose onClick={onClose} />
+        </Stack>
 
-          {/* Filtros (cuando hay datos y no está cargando) */}
-          {!loading && rows.length > 0 && (
-            <Stack spacing={1} mb={1}>
-              {/* fila 1: búsqueda + tipo */}
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-                alignItems={{ xs: "stretch", sm: "center" }}>
-                <Input
-                  size="sm"
-                  placeholder="Buscar por cliente, site, bodega, motivo…"
-                  value={textFilter}
-                  onChange={(e) => setTextFilter(e.target.value)}
-                  startDecorator={<SearchRoundedIcon />}
-                  endDecorator={
-                    textFilter && (
-                      <IconButton
-                        size="sm"
-                        variant="plain"
-                        color="neutral"
-                        onClick={() => setTextFilter("")}
-                        aria-label="Limpiar búsqueda">
-                        <ClearIcon />
-                      </IconButton>
-                    )
-                  }
-                  sx={{ flex: 1 }}
-                />
-
-                <Select
-                  size="sm"
-                  placeholder="Tipo destino"
-                  value={tipoFilter}
-                  onChange={(_, v) => setTipoFilter(v || "")}
-                  sx={{ minWidth: 160 }}>
-                  <Option value="">Todos</Option>
-                  {tipoOptions.map((t) => (
-                    <Option key={t} value={t}>
-                      {t}
-                    </Option>
-                  ))}
-                </Select>
-              </Stack>
-
-              {/* fila 2: fechas + solo abiertos + export */}
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-                alignItems={{ xs: "stretch", sm: "center" }}>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ flex: 1, width: "100%" }}>
-                  <FormControl size="sm" sx={{ flex: 1 }}>
-                    <FormLabel>Desde</FormLabel>
-                    <Input
+        {/* FILTROS (Solo si hay datos) */}
+        {!loading && rows.length > 0 && (
+          <Stack spacing={2} mt={3}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <Input
+                size="sm"
+                placeholder={t("inventory.history.search_placeholder")}
+                value={textFilter}
+                onChange={(e) => setTextFilter(e.target.value)}
+                startDecorator={<SearchRoundedIcon />}
+                endDecorator={
+                  textFilter && (
+                    <IconButton
                       size="sm"
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                    />
-                  </FormControl>
-                  <FormControl size="sm" sx={{ flex: 1 }}>
-                    <FormLabel>Hasta</FormLabel>
-                    <Input
-                      size="sm"
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                    />
-                  </FormControl>
-                </Stack>
+                      variant="plain"
+                      onClick={() => setTextFilter("")}>
+                      <ClearIcon />
+                    </IconButton>
+                  )
+                }
+                sx={{ flex: 1 }}
+              />
+              <Select
+                size="sm"
+                placeholder={t("inventory.history.filter_type")}
+                value={tipoFilter}
+                onChange={(_, v) => setTipoFilter(v || "")}
+                sx={{ minWidth: 140 }}>
+                <Option value="">{t("common.status.all")}</Option>
+                {tipoOptions.map((t) => (
+                  <Option key={t} value={t}>
+                    {t}
+                  </Option>
+                ))}
+              </Select>
+            </Stack>
 
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: { xs: 0.5, sm: 0 } }}>
-                  <Checkbox
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems="center">
+              <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
+                <FormControl size="sm" sx={{ flex: 1 }}>
+                  <FormLabel>{t("inventory.history.date_from")}</FormLabel>
+                  <Input
                     size="sm"
-                    checked={onlyOpen}
-                    onChange={(e) => setOnlyOpen(e.target.checked)}
-                    label="Solo ubicación actual"
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
                   />
-
-                  <Button
+                </FormControl>
+                <FormControl size="sm" sx={{ flex: 1 }}>
+                  <FormLabel>{t("inventory.history.date_to")}</FormLabel>
+                  <Input
                     size="sm"
-                    variant="soft"
-                    startDecorator={<DownloadRoundedIcon />}
-                    onClick={() => setOpenExport(true)}
-                    disabled={filtered.length === 0}>
-                    Exportar
-                  </Button>
-                </Stack>
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                  />
+                </FormControl>
+              </Stack>
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                sx={{ mt: { xs: 1, sm: 3 } }}>
+                <Checkbox
+                  size="sm"
+                  checked={onlyOpen}
+                  onChange={(e) => setOnlyOpen(e.target.checked)}
+                  label={t("inventory.history.only_current")}
+                />
+                <Button
+                  size="sm"
+                  variant="outlined"
+                  startDecorator={<DownloadRoundedIcon />}
+                  onClick={() => setOpenExport(true)}
+                  disabled={filtered.length === 0}>
+                  {t("common.actions.export")}
+                </Button>
               </Stack>
             </Stack>
-          )}
+          </Stack>
+        )}
+      </Box>
 
-          {/* Contenido */}
-          {loading ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}>
-              <Stack spacing={1} alignItems="center">
-                <CircularProgress size="sm" />
-                <Typography level="body-sm">Cargando…</Typography>
-              </Stack>
-            </Box>
-          ) : rows.length === 0 ? (
-            <Sheet
-              variant="soft"
-              sx={{
-                p: 2,
-                borderRadius: "md",
-                textAlign: "center",
-                mt: 1,
-              }}>
-              <Typography level="body-sm">
-                Sin movimientos registrados.
-              </Typography>
-            </Sheet>
-          ) : filtered.length === 0 ? (
-            <Sheet
-              variant="soft"
-              sx={{
-                p: 2,
-                borderRadius: "md",
-                textAlign: "center",
-                mt: 1,
-              }}>
-              <Typography level="body-sm">
-                No hay movimientos que coincidan con los filtros.
-              </Typography>
-            </Sheet>
-          ) : (
-            <Box
-              sx={{
-                mt: 1,
-                flex: 1,
-                overflow: "auto",
-                pr: 1,
-              }}>
-              <Stack spacing={2}>
-                {filtered.map((m, idx) => {
-                  const isCurrent = !m.fecha_fin;
-                  const siteActivo =
-                    m.site_activo === 1 ||
-                    m.site_activo === true ||
-                    m.site_activo === "1" ||
-                    m.site_activo === "true";
+      {/* CONTENIDO SCROLLABLE */}
+      <Box
+        sx={{ flex: 1, overflowY: "auto", p: 3, bgcolor: "background.level1" }}>
+        {loading ? (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            height="100%">
+            <CircularProgress size="lg" thickness={3} />
+            <Typography level="body-sm" mt={2}>
+              {t("common.loading")}
+            </Typography>
+          </Box>
+        ) : rows.length === 0 ? (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            height="100%"
+            color="neutral.400">
+            <HistoryRoundedIcon sx={{ fontSize: 48, mb: 1 }} />
+            <Typography level="body-md">
+              {t("inventory.history.empty.no_history")}
+            </Typography>
+          </Box>
+        ) : filtered.length === 0 ? (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            height="100%"
+            color="neutral.400">
+            <FilterListOffRoundedIcon sx={{ fontSize: 48, mb: 1 }} />
+            <Typography level="body-md">
+              {t("inventory.history.empty.no_matches")}
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={0}>
+            {" "}
+            {/* Spacing 0 para que la línea conecte bien */}
+            {filtered.map((m, idx) => {
+              const isCurrent = !m.fecha_fin;
+              const fechaInicio = new Date(m.fecha_inicio).toLocaleString();
+              const fechaFin = m.fecha_fin
+                ? new Date(m.fecha_fin).toLocaleString()
+                : null;
+              const siteActivo =
+                m.site_activo === 1 ||
+                m.site_activo === true ||
+                m.site_activo === "1";
 
-                  const fechaInicio = new Date(m.fecha_inicio).toLocaleString();
-                  const fechaFin = m.fecha_fin
-                    ? new Date(m.fecha_fin).toLocaleString()
-                    : null;
+              return (
+                <Stack key={idx} direction="row" spacing={2}>
+                  {/* TIMELINE COLUMN */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      minWidth: 24,
+                    }}>
+                    {/* Línea superior (conectar con el anterior) */}
+                    {idx > 0 && (
+                      <Box sx={{ width: 2, height: 20, bgcolor: "divider" }} />
+                    )}
 
-                  return (
-                    <Stack
-                      key={idx}
-                      direction="row"
-                      spacing={1.5}
-                      alignItems="flex-start">
-                      {/* Columna del timeline */}
+                    {/* Punto / Nodo */}
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        bgcolor: isCurrent ? "success.500" : "neutral.300",
+                        boxShadow: isCurrent
+                          ? "0 0 0 3px var(--joy-palette-success-100)"
+                          : "none",
+                        zIndex: 1,
+                        my: 0.5, // Pequeño ajuste visual
+                      }}
+                    />
+
+                    {/* Línea inferior (conectar con el siguiente) */}
+                    {idx < filtered.length - 1 && (
                       <Box
                         sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          mt: 0.5,
-                        }}>
-                        <Box
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "999px",
-                            bgcolor: isCurrent
-                              ? "success.solidBg"
-                              : "primary.solidBg",
-                            boxShadow:
-                              "0 0 0 2px var(--joy-palette-background-body)",
-                          }}
-                        />
-                        {idx < filtered.length - 1 && (
-                          <Box
-                            sx={{
-                              mt: 0.5,
-                              flex: 1,
-                              width: 2,
-                              bgcolor: "divider",
-                            }}
-                          />
-                        )}
-                      </Box>
-
-                      {/* Tarjeta del movimiento */}
-                      <Sheet
-                        variant="outlined"
-                        sx={{
+                          width: 2,
                           flex: 1,
-                          p: 1.5,
-                          borderRadius: "md",
-                          bgcolor: "background.level1",
-                        }}>
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          spacing={1}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center">
-                            <Chip
-                              size="sm"
-                              variant="soft"
-                              color={
-                                m.tipo_destino === "Cliente"
-                                  ? "primary"
-                                  : m.tipo_destino === "Bodega"
-                                  ? "neutral"
-                                  : m.tipo_destino === "Empleado"
-                                  ? "success"
-                                  : "neutral"
-                              }>
-                              {m.tipo_destino || "—"}
-                            </Chip>
+                          bgcolor: "divider",
+                          minHeight: 20,
+                        }}
+                      />
+                    )}
+                  </Box>
 
-                            {isCurrent && (
-                              <Chip size="sm" variant="solid" color="success">
-                                Ubicación actual
-                              </Chip>
-                            )}
-                          </Stack>
+                  {/* TARJETA DE MOVIMIENTO */}
+                  <Sheet
+                    variant="outlined"
+                    sx={{
+                      flex: 1,
+                      p: 2,
+                      mb: 2, // Margen inferior entre tarjetas
+                      borderRadius: "md",
+                      bgcolor: isCurrent
+                        ? "background.surface"
+                        : "background.body",
+                      borderColor: isCurrent ? "success.200" : "divider",
+                      boxShadow: isCurrent ? "sm" : "none",
+                    }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      mb={1}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="sm"
+                          variant={isCurrent ? "solid" : "soft"}
+                          color={
+                            m.tipo_destino === "Cliente"
+                              ? "primary"
+                              : m.tipo_destino === "Bodega"
+                              ? "neutral"
+                              : "success"
+                          }>
+                          {m.tipo_destino || "—"}
+                        </Chip>
+                        {isCurrent && (
+                          <Chip size="sm" variant="outlined" color="success">
+                            {t("inventory.history.current_location")}
+                          </Chip>
+                        )}
+                      </Stack>
+                      <Typography
+                        level="body-xs"
+                        textAlign="right"
+                        sx={{ whiteSpace: "nowrap", ml: 1 }}>
+                        {fechaInicio}
+                      </Typography>
+                    </Stack>
 
-                          <Typography
-                            level="body-xs"
-                            sx={{
-                              opacity: 0.8,
-                              whiteSpace: "nowrap",
-                              ml: 1,
-                            }}>
-                            {fechaInicio}
-                          </Typography>
-                        </Stack>
-
-                        {/* Fechas inicio/fin */}
-                        <Typography
-                          level="body-xs"
-                          sx={{ mt: 0.5, opacity: 0.8 }}>
-                          {fechaFin
-                            ? `Desde ${fechaInicio} hasta ${fechaFin}`
-                            : `Desde ${fechaInicio} (aún vigente)`}
-                        </Typography>
-
-                        <Divider sx={{ my: 1 }} />
-
-                        {/* Detalle de destino */}
-                        <Stack spacing={0.5}>
-                          <Typography level="body-sm">
-                            <strong>Cliente / Site:</strong>{" "}
-                            {m.cliente_nombre
-                              ? `${m.cliente_nombre} / ${m.site_nombre || "—"}`
-                              : "—"}
+                    <Stack spacing={0.5}>
+                      <Typography level="body-sm">
+                        <strong>
+                          {t("inventory.history.labels.destination")}:
+                        </strong>{" "}
+                        {m.cliente_nombre ? (
+                          <>
+                            {m.cliente_nombre} / {m.site_nombre || "—"}
                             {m.site_nombre && !siteActivo && (
                               <Chip
                                 size="sm"
                                 variant="soft"
                                 color="danger"
-                                sx={{ ml: 0.5 }}>
-                                Site inactivo
+                                sx={{ ml: 1, fontSize: "xs" }}>
+                                {t("inventory.history.labels.inactive_site")}
                               </Chip>
                             )}
-                          </Typography>
+                          </>
+                        ) : m.bodega_nombre ? (
+                          m.bodega_nombre
+                        ) : m.empleado_nombre ? (
+                          m.empleado_nombre
+                        ) : (
+                          "—"
+                        )}
+                      </Typography>
 
-                          <Typography level="body-sm">
-                            <strong>Bodega:</strong> {m.bodega_nombre || "—"}
-                          </Typography>
+                      <Typography level="body-sm" color="neutral">
+                        <strong>{t("inventory.history.labels.reason")}:</strong>{" "}
+                        {m.motivo || "—"}
+                      </Typography>
 
-                          {m.empleado_nombre && (
-                            <Typography level="body-sm">
-                              <strong>Empleado:</strong> {m.empleado_nombre}
-                            </Typography>
-                          )}
-
-                          <Typography level="body-sm">
-                            <strong>Motivo:</strong> {m.motivo || "—"}
-                          </Typography>
-                        </Stack>
-                      </Sheet>
+                      {fechaFin && (
+                        <Typography
+                          level="body-xs"
+                          color="neutral"
+                          sx={{ mt: 0.5, fontStyle: "italic" }}>
+                          {t("inventory.history.ended_at")}: {fechaFin}
+                        </Typography>
+                      )}
                     </Stack>
-                  );
-                })}
-              </Stack>
-            </Box>
-          )}
-        </ModalDialog>
-      </Modal>
+                  </Sheet>
+                </Stack>
+              );
+            })}
+          </Stack>
+        )}
+      </Box>
 
-      {/* Modal de exportación */}
+      {/* Export Dialog */}
       <ExportDialog
         open={openExport}
         onClose={() => setOpenExport(false)}
         rows={filtered}
-        pageRows={filtered}
         columns={EXPORT_COLS}
-        defaultTitle={
-          activo
-            ? `Historial de movimientos - ${activo.codigo}`
-            : "Historial de movimientos"
-        }
-        defaultSheetName="Historial"
-        defaultFilenameBase={
-          activo ? `historial_${activo.codigo}` : "historial_activo"
-        }
-        defaultOrientation="portrait"
-        logoUrl="/newLogoTecnasa.png"
+        defaultTitle={`${t("inventory.history.export_title")} - ${
+          activo?.codigo
+        }`}
+        defaultFilenameBase={`historial_${activo?.codigo}`}
       />
-    </>
+    </Drawer>
   );
 }

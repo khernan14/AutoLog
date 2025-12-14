@@ -1,13 +1,10 @@
 // src/pages/Clientes/ClientesList.jsx
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import {
-  getClientes,
-  createCliente,
-} from "../../services/ClientesServices.jsx";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   Box,
-  Card,
   Typography,
   Stack,
   Button,
@@ -24,33 +21,43 @@ import {
   Avatar,
   Tooltip,
   ModalClose,
+  IconButton,
+  CircularProgress,
 } from "@mui/joy";
 
+// Iconos
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ClearIcon from "@mui/icons-material/Clear";
+import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded"; // Nuevo icono para acciones
 
+// Context & Hooks
 import { useToast } from "../../context/ToastContext";
-import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-
-// Helpers tuyos
-import ResourceState from "../../components/common/ResourceState";
 import useIsMobile from "../../hooks/useIsMobile";
 import usePermissions from "../../hooks/usePermissions";
 import { getViewState } from "../../utils/viewState";
+import ResourceState from "../../components/common/ResourceState";
+
+// Services
+import {
+  getClientes,
+  createCliente,
+} from "../../services/ClientesServices.jsx";
 
 const ESTATUS = ["Activo", "Inactivo"];
 
 export default function ClientesList() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos"); // "todos" | "Activo" | "Inactivo"
+  const [statusFilter, setStatusFilter] = useState("todos");
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -69,14 +76,13 @@ export default function ClientesList() {
   const isMobile = useIsMobile(768);
   const { showToast } = useToast();
   const { checkingSession } = useAuth();
-
   const searchInputRef = useRef(null);
 
-  // Permisos
   const { canAny } = usePermissions();
   const canView = canAny("ver_companias");
   const canCreate = canAny("crear_companias");
 
+  // --- LOGICA DE CARGA (Igual que antes) ---
   const loadClientes = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
@@ -93,75 +99,60 @@ export default function ClientesList() {
     try {
       const data = await getClientes();
       if (data) setRows(data);
-      else setError("No se pudo obtener la lista de las compañías.");
+      else setError(t("clients.errors.load_failed"));
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
-      setError(
-        msg.toLowerCase().includes("failed to fetch")
-          ? "No hay conexión con el servidor."
-          : msg
-      );
+      const msg = err?.message || t("common.unknown_error");
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canView]);
+  }, [checkingSession, canView, t]);
 
   useEffect(() => {
     loadClientes();
   }, [loadClientes]);
 
-  // limpia blob del logo al desmontar
-  useEffect(
-    () => () => {
+  // --- LOGICA FORMULARIO (Igual que antes) ---
+  useEffect(() => {
+    return () => {
       if (logoPreview) URL.revokeObjectURL(logoPreview);
-    },
-    [logoPreview]
-  );
+    };
+  }, [logoPreview]);
 
+  // Atajos
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       const tag = e.target.tagName.toLowerCase();
       const isTyping =
         tag === "input" || tag === "textarea" || e.target.isContentEditable;
-
       const ctrlOrMeta = e.ctrlKey || e.metaKey;
 
-      // "/" → buscar
       if (!isTyping && e.key === "/") {
         e.preventDefault();
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
-        }
+        searchInputRef.current?.focus();
         return;
       }
-
-      // Ctrl/⌘ + Shift + F → buscar
       if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
-        }
+        searchInputRef.current?.focus();
         return;
       }
-
-      if (isTyping) return;
-
-      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === "n") {
+      if (
+        !isTyping &&
+        ctrlOrMeta &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "n"
+      ) {
         e.preventDefault();
-        if (canCreate) onNew();
-        return;
+        if (canCreate) newCliente();
       }
     };
-
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
+  }, [canCreate]);
 
   function newCliente() {
-    if (!canCreate)
-      return showToast("No tienes permiso para crear compañías", "warning");
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
     setForm({ codigo: "", nombre: "", descripcion: "", estatus: "Activo" });
     setLogoFile(null);
     setLogoPreview(null);
@@ -171,48 +162,46 @@ export default function ClientesList() {
   function onLogoChange(e) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!/^image\//.test(f.type)) return showToast("Solo imágenes", "warning");
-    if (f.size > 2 * 1024 * 1024) return showToast("Máx 2MB", "warning");
+    if (!/^image\//.test(f.type))
+      return showToast(t("clients.errors.image_only"), "warning");
+    if (f.size > 2 * 1024 * 1024)
+      return showToast(t("clients.errors.image_size"), "warning");
     setLogoFile(f);
     setLogoPreview(URL.createObjectURL(f));
   }
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (!canCreate)
-      return showToast("No tienes permiso para crear compañías", "warning");
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
     if (!form.codigo.trim())
-      return showToast("El código es requerido", "warning");
+      return showToast(t("clients.errors.code_required"), "warning");
     if (!form.nombre.trim())
-      return showToast("El nombre es requerido", "warning");
+      return showToast(t("clients.errors.name_required"), "warning");
 
     setSaving(true);
     try {
       await createCliente(form, logoFile);
-      showToast("Cliente creado correctamente", "success");
+      showToast(t("clients.success.created"), "success");
       setOpen(false);
       loadClientes();
     } catch (err) {
-      showToast(err?.message || "Error al crear cliente", "danger");
+      showToast(err?.message || t("clients.errors.create_failed"), "danger");
     } finally {
       setSaving(false);
     }
   }
 
-  // Filtro por búsqueda + estatus
+  // --- FILTROS Y ORDEN ---
   const filtered = useMemo(() => {
     const src = Array.isArray(rows) ? rows : [];
     const q = (search || "").trim().toLowerCase();
-
     return src.filter((r) => {
       const matchSearch =
         !q ||
         (r.codigo || "").toLowerCase().includes(q) ||
         (r.nombre || "").toLowerCase().includes(q);
-
       const matchStatus =
         statusFilter === "todos" ? true : r.estatus === statusFilter;
-
       return matchSearch && matchStatus;
     });
   }, [rows, search, statusFilter]);
@@ -238,7 +227,6 @@ export default function ClientesList() {
     }
   };
 
-  // Estado de vista
   const viewState = getViewState({
     checkingSession,
     canView,
@@ -247,445 +235,510 @@ export default function ClientesList() {
     hasData: Array.isArray(sortedRows) && sortedRows.length > 0,
   });
 
-  // --- UI ---
+  // --- RENDER ---
   return (
-    <Sheet
-      variant="plain"
+    <Box
+      component="main"
       sx={{
-        flex: 1,
-        width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, sm: 2, md: 4 },
         px: { xs: 2, md: 4 },
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
-        bgcolor: "background.body",
+        pt: 3,
+        pb: 8,
+        maxWidth: 1200,
+        mx: "auto",
+        minHeight: "100vh",
       }}>
-      <Box sx={{ width: "100%", maxWidth: 1100 }}>
-        {/* Header */}
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", md: "center" }}
-          spacing={1.5}
-          mb={2}>
-          <Box>
-            <Typography
-              level="body-xs"
-              sx={{ textTransform: "uppercase", opacity: 0.7 }}>
-              Clientes
-            </Typography>
-            <Typography level="h4">Catálogo de compañías</Typography>
-            <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.25 }}>
-              Mostrando {sortedRows.length} de {rows.length || 0}
-            </Typography>
-            {/* <Typography level="body-xs" sx={{ opacity: 0.65, mt: 0.25 }}>
-              Atajos: <strong>Ctrl+F</strong> buscar,&nbsp;
-              <strong>Ctrl+Shift+N</strong> nuevo cliente,&nbsp;
-              <strong>/</strong> enfocar búsqueda
-            </Typography> */}
-          </Box>
+      {/* HEADER SECTION */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", md: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}>
+        <Box>
+          <Typography
+            level="body-sm"
+            sx={{
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              color: "text.tertiary",
+            }}>
+            {t("clients.module_name")}
+          </Typography>
+          <Typography
+            level="h2"
+            sx={{ fontSize: "1.75rem", fontWeight: "xl", mt: 0.5 }}>
+            {t("clients.title")}
+          </Typography>
+          <Typography level="body-sm" color="neutral" sx={{ mt: 0.5 }}>
+            {t("common.showing_results", {
+              count: sortedRows.length,
+              total: rows.length,
+            })}
+          </Typography>
+        </Box>
 
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ width: { xs: "100%", md: "auto" } }}>
-            {/* Búsqueda */}
-            <Input
-              placeholder="Buscar por código o nombre…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              startDecorator={<SearchRoundedIcon />}
-              endDecorator={
-                search && (
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          flexWrap="wrap">
+          <Input
+            placeholder={t("clients.search_placeholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            startDecorator={<SearchRoundedIcon />}
+            endDecorator={
+              search && (
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setSearch("")}>
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              )
+            }
+            sx={{ minWidth: { xs: "100%", md: 260 } }}
+            inputRef={searchInputRef}
+          />
+
+          <Select
+            value={statusFilter}
+            onChange={(_, v) => setStatusFilter(v || "todos")}
+            sx={{ minWidth: 140 }}>
+            <Option value="todos">{t("common.status.all")}</Option>
+            <Option value="Activo">{t("common.status.active")}</Option>
+            <Option value="Inactivo">{t("common.status.inactive")}</Option>
+          </Select>
+
+          {canCreate && (
+            <Button
+              startDecorator={<AddRoundedIcon />}
+              onClick={newCliente}
+              variant="solid"
+              color="primary">
+              {t("clients.actions.new")}
+            </Button>
+          )}
+        </Stack>
+      </Stack>
+
+      {/* 🟢 TABLA MODERNA */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          overflow: "hidden", // Recorta bordes
+          bgcolor: "background.surface",
+          minHeight: 400,
+          border: "1px solid",
+          borderColor: "neutral.outlinedBorder",
+          boxShadow: "sm",
+        }}>
+        {viewState !== "data" ? (
+          <Box p={4} display="flex" justifyContent="center">
+            <ResourceState
+              state={viewState}
+              error={error}
+              onRetry={loadClientes}
+              emptyIcon={
+                <BusinessRoundedIcon
+                  sx={{ fontSize: 48, color: "neutral.300" }}
+                />
+              }
+              emptyTitle={t("clients.empty.title")}
+              emptyDescription={t("clients.empty.desc")}
+            />
+          </Box>
+        ) : isMobile ? (
+          // MÓVIL (Cards)
+          <Stack spacing={2} p={2}>
+            {sortedRows.map((r) => (
+              <Card key={r.id} variant="outlined" sx={{ boxShadow: "none" }}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Avatar src={r.logo_url} size="lg" variant="rounded">
+                    {r.nombre?.[0]}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography level="title-md" noWrap>
+                      {r.nombre}
+                    </Typography>
+                    <Typography level="body-xs" color="neutral">
+                      {r.codigo}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Divider />
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center">
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={r.estatus === "Activo" ? "success" : "neutral"}>
+                    {r.estatus === "Activo"
+                      ? t("common.status.active")
+                      : t("common.status.inactive")}
+                  </Chip>
                   <Button
                     size="sm"
                     variant="plain"
-                    color="neutral"
-                    onClick={() => setSearch("")}
-                    sx={{ minWidth: "auto", px: 0.5 }}>
-                    <ClearIcon fontSize="small" />
+                    component={Link}
+                    to={`/admin/clientes/${r.id}/informacion`}>
+                    {t("common.actions.view_details")}
                   </Button>
-                )
-              }
-              sx={{ width: { xs: "100%", md: 260 } }}
-              size="sm"
-              inputRef={searchInputRef}
-              onFocus={(e) => e.target.select()}
-            />
-
-            {/* Filtro estatus */}
-            <Select
-              size="sm"
-              value={statusFilter}
-              onChange={(_, v) => setStatusFilter(v || "todos")}
-              sx={{ minWidth: 150 }}>
-              <Option value="todos">Todos</Option>
-              <Option value="Activo">Activos</Option>
-              <Option value="Inactivo">Inactivos</Option>
-            </Select>
-
-            {/* Botón nuevo */}
-            <Tooltip
-              title={
-                canCreate
-                  ? "Crear cliente"
-                  : "No tienes permiso para crear. Solicítalo al administrador."
-              }
-              variant="soft"
-              placement="top-end">
-              <span>
-                <Button
-                  startDecorator={<AddRoundedIcon />}
-                  onClick={newCliente}
-                  disabled={!canCreate}
-                  aria-disabled={!canCreate}
-                  variant={canCreate ? "solid" : "soft"}
-                  color={canCreate ? "primary" : "neutral"}
-                  size="sm"
-                  sx={{ borderRadius: "999px" }}>
-                  Nuevo
-                </Button>
-              </span>
-            </Tooltip>
+                </Stack>
+              </Card>
+            ))}
           </Stack>
-        </Stack>
+        ) : (
+          // ESCRITORIO (Tabla Rediseñada)
+          <Table
+            hoverRow
+            stickyHeader
+            sx={{
+              // 1. Padding amplio para que respire
+              "--TableCell-paddingX": "24px",
+              "--TableCell-paddingY": "16px",
 
-        {/* Contenedor principal */}
-        <Card
-          variant="outlined"
-          sx={{
-            overflowX: "auto",
-            width: "100%",
-            background: "background.surface",
-          }}>
-          {viewState !== "data" ? (
-            <Box p={2}>
-              <ResourceState
-                state={viewState}
-                error={error}
-                onRetry={loadClientes}
-                emptyTitle="Sin clientes"
-                emptyDescription="Aún no hay compañías registradas."
-              />
-            </Box>
-          ) : isMobile ? (
-            // ---- MÓVIL: tarjetas ----
-            <Stack spacing={2} p={2}>
+              // 2. Encabezados sutiles y modernos
+              "& thead th": {
+                bgcolor: "background.surface", // Mismo color de fondo para que se vea limpio
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.08em",
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              },
+
+              // 3. Filas
+              "& tbody tr": {
+                transition: "background-color 0.2s",
+              },
+              "& tbody tr:hover": {
+                bgcolor: "background.level1", // Hover suave
+                cursor: "pointer",
+              },
+
+              // 4. Quitar bordes verticales para look limpio
+              "& tbody td": {
+                borderBottom: "1px solid",
+                borderColor: "neutral.outlinedBorder",
+              },
+              // Quitar el borde de la última fila
+              "& tbody tr:last-child td": {
+                borderBottom: "none",
+              },
+            }}>
+            <thead>
+              <tr>
+                {/* Columnas definidas manualmente para mejor control */}
+                <th style={{ width: "35%" }}>
+                  <Link
+                    component="button"
+                    underline="none"
+                    color="neutral"
+                    fontWeight="inherit"
+                    onClick={() => handleSort("nombre")}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      "&:hover": { color: "text.primary" },
+                    }}>
+                    {t("clients.columns.name")} / {t("clients.columns.logo")}
+                    <ArrowDropDownIcon
+                      sx={{
+                        opacity: sortKey === "nombre" ? 1 : 0,
+                        transition: "0.2s",
+                        transform:
+                          sortKey === "nombre" && sortDir === "desc"
+                            ? "rotate(180deg)"
+                            : "none",
+                      }}
+                    />
+                  </Link>
+                </th>
+                <th style={{ width: "15%" }}>
+                  <Link
+                    component="button"
+                    underline="none"
+                    color="neutral"
+                    fontWeight="inherit"
+                    onClick={() => handleSort("codigo")}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      "&:hover": { color: "text.primary" },
+                    }}>
+                    {t("clients.columns.code")}
+                    <ArrowDropDownIcon
+                      sx={{
+                        opacity: sortKey === "codigo" ? 1 : 0,
+                        transition: "0.2s",
+                        transform:
+                          sortKey === "codigo" && sortDir === "desc"
+                            ? "rotate(180deg)"
+                            : "none",
+                      }}
+                    />
+                  </Link>
+                </th>
+                <th style={{ width: "30%" }}>
+                  {t("clients.columns.description")}
+                </th>
+                <th style={{ width: "10%" }}>
+                  <Link
+                    component="button"
+                    underline="none"
+                    color="neutral"
+                    fontWeight="inherit"
+                    onClick={() => handleSort("estatus")}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      "&:hover": { color: "text.primary" },
+                    }}>
+                    {t("clients.columns.status")}
+                    <ArrowDropDownIcon
+                      sx={{
+                        opacity: sortKey === "estatus" ? 1 : 0,
+                        transition: "0.2s",
+                        transform:
+                          sortKey === "estatus" && sortDir === "desc"
+                            ? "rotate(180deg)"
+                            : "none",
+                      }}
+                    />
+                  </Link>
+                </th>
+                <th style={{ width: "10%" }}></th> {/* Acciones */}
+              </tr>
+            </thead>
+            <tbody>
               {sortedRows.map((r) => (
-                <Sheet
+                <tr
                   key={r.id}
-                  variant="outlined"
-                  sx={{ p: 2, borderRadius: "md" }}>
-                  <Stack spacing={1}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
+                  onClick={(e) => {
+                    // Navegación programática al hacer clic en la fila (excepto si clica un botón interno)
+                    if (!e.target.closest("button") && !e.target.closest("a")) {
+                      // Simulamos click en el link invisible o usamos navigate
+                      // navigate(`/admin/clientes/${r.id}/informacion`) // Si tuvieras navigate importado
+                    }
+                  }}>
+                  {/* Columna 1: Avatar + Nombre (Combinados para diseño moderno) */}
+                  <td>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                       <Avatar
-                        src={r.logo_url || undefined}
-                        sx={{ "--Avatar-size": "40px" }}>
-                        {r.nombre?.[0] || "C"}
+                        src={r.logo_url}
+                        variant="rounded"
+                        size="sm"
+                        sx={{ borderRadius: "md", boxShadow: "sm" }}>
+                        {r.nombre?.[0]}
                       </Avatar>
                       <Box>
-                        <Typography level="title-md">{r.nombre}</Typography>
-                        <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                          {r.codigo}
+                        <Typography
+                          fontWeight="lg"
+                          level="title-sm"
+                          component={Link}
+                          to={`/admin/clientes/${r.id}/informacion`}
+                          sx={{
+                            textDecoration: "none",
+                            color: "text.primary",
+                            "&:hover": { color: "primary.500" },
+                          }}>
+                          {r.nombre}
                         </Typography>
                       </Box>
-                    </Stack>
+                    </Box>
+                  </td>
 
-                    {r.descripcion && (
-                      <Typography level="body-sm" sx={{ mt: 0.5 }}>
-                        {r.descripcion}
-                      </Typography>
-                    )}
+                  {/* Columna 2: Código */}
+                  <td>
+                    <Typography
+                      level="body-sm"
+                      sx={{ fontFamily: "monospace", color: "text.secondary" }}>
+                      {r.codigo}
+                    </Typography>
+                  </td>
 
+                  {/* Columna 3: Descripción */}
+                  <td>
+                    <Typography
+                      level="body-sm"
+                      color="neutral"
+                      noWrap
+                      sx={{ maxWidth: 300 }}>
+                      {r.descripcion || "—"}
+                    </Typography>
+                  </td>
+
+                  {/* Columna 4: Estatus */}
+                  <td>
                     <Chip
                       size="sm"
                       variant="soft"
                       color={r.estatus === "Activo" ? "success" : "neutral"}
-                      sx={{ alignSelf: "flex-start", mt: 0.5 }}>
-                      {r.estatus}
+                      startDecorator={
+                        r.estatus === "Activo" ? (
+                          <Box
+                            sx={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              bgcolor: "success.500",
+                            }}
+                          />
+                        ) : null
+                      }>
+                      {r.estatus === "Activo"
+                        ? t("common.status.active")
+                        : t("common.status.inactive")}
                     </Chip>
+                  </td>
 
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        component={Link}
-                        to={`/admin/clientes/${r.id}/informacion`}>
-                        Ver detalle
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Sheet>
-              ))}
-            </Stack>
-          ) : (
-            // ---- ESCRITORIO: tabla ----
-            <Table
-              size="sm"
-              stickyHeader
-              hoverRow
-              sx={{
-                minWidth: 880,
-                "--TableCell-headBackground":
-                  "var(--joy-palette-background-level5)",
-                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
-                "--TableCell-headFontWeight": 600,
-                "--TableCell-headBorderBottom":
-                  "1px solid var(--joy-palette-divider)",
-                "--TableRow-hoverBackground":
-                  "var(--joy-palette-background-level1)",
-              }}>
-              <thead>
-                <tr>
-                  {[
-                    { label: "Código", key: "codigo" },
-                    { label: "Nombre", key: "nombre" },
-                    { label: "Descripción", key: "descripcion" },
-                    { label: "Estatus", key: "estatus" },
-                    { label: "Logo", key: null },
-                  ].map((col) => (
-                    <th key={col.label}>
-                      {col.key ? (
-                        <Button
-                          variant="plain"
-                          size="sm"
-                          onClick={() => handleSort(col.key)}
-                          endDecorator={
-                            <ArrowDropDownIcon
-                              sx={{
-                                transform:
-                                  sortKey === col.key && sortDir === "desc"
-                                    ? "rotate(180deg)"
-                                    : "none",
-                                transition: "0.15s",
-                                opacity: sortKey === col.key ? 1 : 0.35,
-                              }}
-                            />
-                          }>
-                          {col.label}
-                        </Button>
-                      ) : (
-                        col.label
-                      )}
-                    </th>
-                  ))}
+                  {/* Columna 5: Acciones rápidas */}
+                  <td style={{ textAlign: "right" }}>
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      component={Link}
+                      to={`/admin/clientes/${r.id}/informacion`}>
+                      <MoreHorizRoundedIcon />
+                    </IconButton>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <Typography
-                        component={Link}
-                        to={`/admin/clientes/${r.id}/informacion`}
-                        sx={{
-                          textDecoration: "none",
-                          color: "inherit",
-                          cursor: "pointer",
-                          fontWeight: 500,
-                          "&:hover": {
-                            textDecoration: "underline",
-                            color: "inherit",
-                          },
-                        }}>
-                        {r.codigo}
-                      </Typography>
-                    </td>
-                    <td>
-                      <Typography
-                        component={Link}
-                        to={`/admin/clientes/${r.id}/informacion`}
-                        sx={{
-                          textDecoration: "none",
-                          color: "inherit",
-                          cursor: "pointer",
-                          fontWeight: 500,
-                          "&:hover": {
-                            textDecoration: "underline",
-                            color: "inherit",
-                          },
-                        }}>
-                        {r.nombre}
-                      </Typography>
-                    </td>
-                    <td>{r.descripcion || "—"}</td>
-                    <td>
-                      <Chip
-                        size="sm"
-                        variant="soft"
-                        color={r.estatus === "Activo" ? "success" : "neutral"}>
-                        {r.estatus}
-                      </Chip>
-                    </td>
-                    <td>
-                      {r.logo_url ? (
-                        <Avatar
-                          src={r.logo_url}
-                          sx={{ "--Avatar-size": "32px" }}
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </Card>
-
-        {/* Drawer crear */}
-        {canCreate && (
-          <Drawer
-            open={open}
-            onClose={() => !saving && setOpen(false)}
-            anchor="right"
-            size="md"
-            variant="plain"
-            slotProps={{
-              content: {
-                sx: {
-                  bgcolor: "transparent",
-                  p: { xs: 0, sm: 2 },
-                  boxShadow: "none",
-                },
-              },
-            }}>
-            <Sheet
-              component="form"
-              onSubmit={onSubmit}
-              sx={{
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                gap: 1.5,
-                borderRadius: { xs: 0, sm: "md" },
-                p: 2,
-                boxShadow: "lg",
-                bgcolor: "background.surface",
-                minWidth: { xs: "100dvw", sm: 420 },
-              }}>
-              {/* Header */}
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 0.5 }}>
-                <Typography level="title-lg">Nuevo Cliente</Typography>
-                <ModalClose disabled={saving} />
-              </Stack>
-              <Divider />
-
-              {/* Contenido */}
-              <Stack spacing={1.5} mt={1} sx={{ flex: 1, overflow: "auto" }}>
-                <FormControl required>
-                  <FormLabel>Código</FormLabel>
-                  <Input
-                    disabled={saving}
-                    value={form.codigo}
-                    onChange={(e) =>
-                      setForm({ ...form, codigo: e.target.value })
-                    }
-                  />
-                </FormControl>
-                <FormControl required>
-                  <FormLabel>Nombre</FormLabel>
-                  <Input
-                    disabled={saving}
-                    value={form.nombre}
-                    onChange={(e) =>
-                      setForm({ ...form, nombre: e.target.value })
-                    }
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>Descripción</FormLabel>
-                  <Input
-                    disabled={saving}
-                    value={form.descripcion}
-                    onChange={(e) =>
-                      setForm({ ...form, descripcion: e.target.value })
-                    }
-                  />
-                </FormControl>
-                <FormControl required>
-                  <FormLabel>Estatus</FormLabel>
-                  <Select
-                    disabled={saving}
-                    value={form.estatus}
-                    onChange={(_, v) => setForm({ ...form, estatus: v })}>
-                    {ESTATUS.map((s) => (
-                      <Option key={s} value={s}>
-                        {s}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Divider />
-                <Typography level="title-sm">Logo del cliente</Typography>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Avatar
-                    src={logoPreview || undefined}
-                    sx={{ "--Avatar-size": "72px" }}>
-                    LOGO
-                  </Avatar>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      component="label"
-                      variant="outlined"
-                      disabled={saving}>
-                      Subir logo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={onLogoChange}
-                      />
-                    </Button>
-                    {logoPreview && (
-                      <Button
-                        variant="plain"
-                        color="neutral"
-                        startDecorator={<DeleteOutlineIcon />}
-                        disabled={saving}
-                        onClick={() => {
-                          setLogoFile(null);
-                          setLogoPreview(null);
-                        }}>
-                        Quitar
-                      </Button>
-                    )}
-                  </Stack>
-                </Stack>
-              </Stack>
-
-              {/* Footer */}
-              <Stack
-                direction="row"
-                justifyContent="flex-end"
-                spacing={1}
-                mt={1}>
-                <Button
-                  variant="plain"
-                  onClick={() => setOpen(false)}
-                  disabled={saving}>
-                  Cancelar
-                </Button>
-                <Button type="submit" loading={saving} disabled={saving}>
-                  Guardar
-                </Button>
-              </Stack>
-            </Sheet>
-          </Drawer>
+              ))}
+            </tbody>
+          </Table>
         )}
-      </Box>
-    </Sheet>
+      </Sheet>
+
+      {/* DRAWER DE CREACIÓN */}
+      <Drawer
+        open={open}
+        onClose={() => !saving && setOpen(false)}
+        anchor="right"
+        size="sm"
+        slotProps={{
+          content: {
+            sx: {
+              bgcolor: "background.surface",
+              p: 3,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              boxShadow: "xl",
+            },
+          },
+        }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between">
+          <Typography level="h4">{t("clients.create_title")}</Typography>
+          <ModalClose onClick={() => setOpen(false)} />
+        </Stack>
+        <Divider />
+
+        <Stack
+          component="form"
+          onSubmit={onSubmit}
+          spacing={2.5}
+          sx={{ flex: 1, overflowY: "auto", px: 1, pt: 1 }}>
+          <FormControl required>
+            <FormLabel>{t("clients.form.code")}</FormLabel>
+            <Input
+              value={form.codigo}
+              onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+              disabled={saving}
+            />
+          </FormControl>
+          <FormControl required>
+            <FormLabel>{t("clients.form.name")}</FormLabel>
+            <Input
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              disabled={saving}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t("clients.form.description")}</FormLabel>
+            <Input
+              value={form.descripcion}
+              onChange={(e) =>
+                setForm({ ...form, descripcion: e.target.value })
+              }
+              disabled={saving}
+            />
+          </FormControl>
+          <FormControl required>
+            <FormLabel>{t("clients.form.status")}</FormLabel>
+            <Select
+              value={form.estatus}
+              onChange={(_, v) => setForm({ ...form, estatus: v })}>
+              <Option value="Activo">{t("common.status.active")}</Option>
+              <Option value="Inactivo">{t("common.status.inactive")}</Option>
+            </Select>
+          </FormControl>
+
+          <Box
+            sx={{
+              p: 2,
+              border: "1px dashed",
+              borderColor: "neutral.outlinedBorder",
+              borderRadius: "md",
+            }}>
+            <FormLabel sx={{ mb: 1.5 }}>{t("clients.form.logo")}</FormLabel>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar src={logoPreview} size="lg" variant="rounded" />
+              <Stack>
+                <Button component="label" variant="soft" size="sm">
+                  {t("common.actions.upload")}
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    onChange={onLogoChange}
+                  />
+                </Button>
+                {logoPreview && (
+                  <Button
+                    variant="plain"
+                    color="danger"
+                    size="sm"
+                    onClick={() => {
+                      setLogoFile(null);
+                      setLogoPreview(null);
+                    }}
+                    sx={{ mt: 1 }}>
+                    {t("common.actions.remove")}
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" justifyContent="flex-end" spacing={1} pt={2}>
+          <Button
+            variant="plain"
+            color="neutral"
+            onClick={() => setOpen(false)}
+            disabled={saving}>
+            {t("common.actions.cancel")}
+          </Button>
+          <Button onClick={onSubmit} loading={saving}>
+            {t("common.actions.save")}
+          </Button>
+        </Stack>
+      </Drawer>
+    </Box>
   );
 }

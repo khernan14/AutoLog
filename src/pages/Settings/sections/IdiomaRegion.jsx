@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   Stack,
@@ -15,9 +16,15 @@ import {
   Snackbar,
   Alert,
   Chip,
+  Button,
+  CircularProgress,
 } from "@mui/joy";
-import { Globe, Clock, Calendar, Check, MapPin, Languages } from "lucide-react";
+import { Clock, Calendar, Check, MapPin, Languages } from "lucide-react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+
 import { SectionHeader } from "./_shared/SectionHeader.jsx";
 
 /* ----- Constantes ----- */
@@ -47,36 +54,97 @@ const DATE_FORMATS = [
   { value: "YYYY-MM-DD", label: "2025-12-31" },
 ];
 
-/* ----- Helper de Formato (Preview) ----- */
+/* ----- Helper: Intl Preview ----- */
 const formatPreview = (dateFormat, timeFormat, locale, timezone) => {
   const now = new Date();
 
-  // Opciones base para Intl.DateTimeFormat
-  const optsDate = { timeZone: timezone };
-  const optsTime = { timeZone: timezone, hour: "numeric", minute: "2-digit" };
+  const timeOptions = {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: timeFormat === "12h",
+  };
 
-  if (timeFormat === "12h") optsTime.hour12 = true;
-  if (timeFormat === "24h") optsTime.hour12 = false;
+  const datePartsOptions = {
+    timeZone: timezone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  };
 
-  // Formatear Fecha (Aproximación manual para coincidir con el string DD/MM/YYYY)
-  // Intl es bueno pero a veces restrictivo con el orden exacto, así que lo armamos:
-  const day = now.toLocaleString(locale, { ...optsDate, day: "2-digit" });
-  const month = now.toLocaleString(locale, { ...optsDate, month: "2-digit" });
-  const year = now.toLocaleString(locale, { ...optsDate, year: "numeric" });
+  try {
+    const timeStr = new Intl.DateTimeFormat(locale, timeOptions).format(now);
+    const parts = new Intl.DateTimeFormat(
+      locale,
+      datePartsOptions
+    ).formatToParts(now);
+    const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+    const day = map.day ?? "31";
+    const month = map.month ?? "12";
+    const year = map.year ?? "2025";
 
-  let dateStr = "";
-  if (dateFormat === "DD/MM/YYYY") dateStr = `${day}/${month}/${year}`;
-  else if (dateFormat === "MM/DD/YYYY") dateStr = `${month}/${day}/${year}`;
-  else if (dateFormat === "YYYY-MM-DD") dateStr = `${year}-${month}-${day}`;
+    let dateStr = "";
+    if (dateFormat === "DD/MM/YYYY") dateStr = `${day}/${month}/${year}`;
+    else if (dateFormat === "MM/DD/YYYY") dateStr = `${month}/${day}/${year}`;
+    else if (dateFormat === "YYYY-MM-DD") dateStr = `${year}-${month}-${day}`;
+    else dateStr = `${day}/${month}/${year}`;
 
-  // Formatear Hora
-  const timeStr = now.toLocaleString(locale, optsTime);
-
-  return { dateStr, timeStr };
+    return { dateStr, timeStr };
+  } catch (err) {
+    return { dateStr: "--/--/----", timeStr: "--:--" };
+  }
 };
 
+/* ----- TimeOption ----- */
+// Ahora acepta "label" como prop para recibir el texto traducido desde el padre
+function TimeOption({ value, checked, example, label, onSelect }) {
+  return (
+    <Sheet
+      component="button"
+      type="button"
+      onClick={() => onSelect(value)}
+      variant={checked ? "soft" : "outlined"}
+      sx={{
+        p: 1.5,
+        borderRadius: "md",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        border: checked ? "2px solid" : "1px solid",
+        borderColor: checked ? "primary.500" : "divider",
+        transition: "transform .12s, box-shadow .12s",
+        "&:hover": { transform: "translateY(-2px)", boxShadow: "sm" },
+        position: "relative",
+        textAlign: "left",
+      }}
+      aria-pressed={checked}>
+      <Radio
+        value={value}
+        checked={checked}
+        aria-hidden
+        sx={{
+          position: "absolute",
+          left: 8,
+          top: "50%",
+          transform: "translateY(-50%)",
+          opacity: 0,
+        }}
+      />
+      <Clock size={20} style={{ marginLeft: 8 }} />
+      <Box sx={{ ml: 1 }}>
+        <Typography level="title-sm">{label}</Typography>
+        <Typography level="body-xs">{example}</Typography>
+      </Box>
+      {checked && <Check size={16} style={{ marginLeft: "auto" }} />}
+    </Sheet>
+  );
+}
+
+/* ----- Componente Principal ----- */
 export default function IdiomaRegion({ initialData = {}, onSave }) {
-  // Estado local del formulario
+  const { t } = useTranslation(); // 👈 Hook
+
   const [form, setForm] = useState({
     language: "es-HN",
     timezone: "America/Tegucigalpa",
@@ -84,75 +152,145 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
     timeFormat: "12h",
   });
 
-  const [snack, setSnack] = useState({ open: false });
+  const [selectedLanguage, setSelectedLanguage] = useState("es-HN");
+  const [savingLanguage, setSavingLanguage] = useState(false);
 
-  // Sincronizar DB -> Estado Local
+  const [snack, setSnack] = useState({
+    open: false,
+    severity: "success",
+    message: "",
+  });
+
+  const saveTimersRef = useRef({});
+
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      setForm((prev) => ({
-        language: initialData.language || prev.language,
-        timezone: initialData.timezone || prev.timezone,
-        dateFormat: initialData.dateFormat || prev.dateFormat,
-        timeFormat: initialData.timeFormat || prev.timeFormat,
-      }));
+      const newData = {
+        language: initialData.language || "es-HN",
+        timezone: initialData.timezone || "America/Tegucigalpa",
+        dateFormat: initialData.dateFormat || "DD/MM/YYYY",
+        timeFormat: initialData.timeFormat || "12h",
+      };
+      setForm(newData);
+      setSelectedLanguage(newData.language);
     }
   }, [initialData]);
 
-  // Handler genérico de cambio y guardado
-  const handleChange = async (key, value) => {
-    if (!value) return;
+  const handleChange = (key, value) => {
+    if (value === undefined || value === null) return;
 
-    // 1. Actualizar visualmente
     setForm((prev) => ({ ...prev, [key]: value }));
 
-    // 2. Guardar en DB
+    if (saveTimersRef.current[key]) {
+      clearTimeout(saveTimersRef.current[key]);
+    }
+
+    saveTimersRef.current[key] = setTimeout(async () => {
+      try {
+        if (onSave) {
+          await onSave({ [key]: value });
+          // setSnack({
+          //   open: true,
+          //   severity: "success",
+          //   message: t("settings.region.success_save"),
+          // });
+        }
+      } catch (error) {
+        console.error(`Error guardando ${key}:`, error);
+        setSnack({
+          open: true,
+          severity: "error",
+          message: t("settings.region.error_save"),
+        });
+      } finally {
+        delete saveTimersRef.current[key];
+      }
+    }, 450);
+  };
+
+  const handleLanguageSelect = (_, newValue) => {
+    if (newValue) setSelectedLanguage(newValue);
+  };
+
+  const handleApplyLanguage = async () => {
+    setSavingLanguage(true);
     try {
-      await onSave({ [key]: value });
-      // setSnack({ open: true }); // Opcional: mostrar snackbar en cada cambio
+      if (onSave) await onSave({ language: selectedLanguage });
+
+      const i18n = (window && window.i18n) || null;
+      if (i18n && typeof i18n.changeLanguage === "function") {
+        await i18n.changeLanguage(selectedLanguage);
+        setForm((prev) => ({ ...prev, language: selectedLanguage }));
+        setSnack({
+          open: true,
+          severity: "success",
+          message: t("settings.region.language.success"),
+        });
+      } else {
+        setSnack({
+          open: true,
+          severity: "info",
+          message: t("settings.region.language.manual_reload"),
+        });
+      }
     } catch (error) {
-      console.error(`Error guardando ${key}:`, error);
+      console.error("Error guardando idioma:", error);
+      setSnack({
+        open: true,
+        severity: "error",
+        message: t("settings.region.language.error"),
+      });
+    } finally {
+      setSavingLanguage(false);
     }
   };
 
-  // Calcular preview en vivo
+  const hasPendingLangChange = selectedLanguage !== form.language;
+
   const preview = useMemo(
     () =>
       formatPreview(
         form.dateFormat,
         form.timeFormat,
-        form.language,
+        selectedLanguage,
         form.timezone
       ),
-    [form]
+    [form.dateFormat, form.timeFormat, form.timezone, selectedLanguage]
   );
+
+  const previewAria = `${preview.timeStr} — ${preview.dateStr}`;
 
   return (
     <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 16, boxShadow: "sm", p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 2, boxShadow: 1, p: 3 }}>
         <SectionHeader
-          title="Idioma y Región"
-          subtitle="Ajusta las preferencias de localización, formatos de fecha y zona horaria."
+          title={t("settings.region.title")}
+          subtitle={t("settings.region.subtitle")}
         />
         <Divider sx={{ my: 2 }} />
 
         <Stack spacing={4}>
-          {/* --- BLOQUE 1: IDIOMA Y ZONA --- */}
+          {/* BLOQUE 1: IDIOMA Y ZONA */}
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
               gap: 3,
+              alignItems: "start",
             }}>
             {/* Idioma */}
             <FormControl>
               <FormLabel sx={{ mb: 1 }}>
-                <Languages size={18} style={{ marginRight: 8 }} /> Idioma
+                <Languages size={18} style={{ marginRight: 8 }} />{" "}
+                {t("settings.region.language.label")}
               </FormLabel>
+
               <Select
-                value={form.language}
-                onChange={(_, val) => handleChange("language", val)}
+                value={selectedLanguage}
+                onChange={handleLanguageSelect}
                 size="lg"
-                variant="outlined">
+                variant="outlined"
+                aria-label={t("settings.region.language.label")}>
                 {LANGUAGES.map((lang) => (
                   <Option key={lang.code} value={lang.code}>
                     <Box component="span" sx={{ mr: 1.5, fontSize: "1.2em" }}>
@@ -162,18 +300,49 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
                   </Option>
                 ))}
               </Select>
+
+              {/* Alerta de Recarga / Aplicar */}
+              {hasPendingLangChange && (
+                <Alert
+                  variant="soft"
+                  color="warning"
+                  startDecorator={<InfoOutlinedIcon />}
+                  sx={{ alignItems: "flex-start", gap: 2, mt: 2 }}
+                  role="status">
+                  <Box>
+                    <Typography level="title-sm" color="warning">
+                      {t("settings.region.language.alert_title")}
+                    </Typography>
+                    <Typography level="body-sm" mb={1.5}>
+                      {t("settings.region.language.alert_desc")}
+                    </Typography>
+                    <Button
+                      size="sm"
+                      color="warning"
+                      variant="solid"
+                      startDecorator={<RestartAltRoundedIcon />}
+                      onClick={handleApplyLanguage}
+                      loading={savingLanguage}
+                      aria-label={t("settings.region.language.apply_btn")}>
+                      {t("settings.region.language.apply_btn")}
+                    </Button>
+                  </Box>
+                </Alert>
+              )}
             </FormControl>
 
             {/* Zona Horaria */}
             <FormControl>
               <FormLabel sx={{ mb: 1 }}>
-                <MapPin size={18} style={{ marginRight: 8 }} /> Zona Horaria
+                <MapPin size={18} style={{ marginRight: 8 }} />{" "}
+                {t("settings.region.timezone.label")}
               </FormLabel>
               <Select
                 value={form.timezone}
                 onChange={(_, val) => handleChange("timezone", val)}
                 size="lg"
-                variant="outlined">
+                variant="outlined"
+                aria-label={t("settings.region.timezone.label")}>
                 {TIMEZONES.map((tz) => (
                   <Option key={tz.value} value={tz.value}>
                     {tz.label}
@@ -185,13 +354,13 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
 
           <Divider />
 
-          {/* --- BLOQUE 2: FORMATOS DE FECHA Y HORA --- */}
+          {/* BLOQUE 2: FORMATOS DE FECHA Y HORA */}
           <Box>
             <Typography
               level="title-md"
               startDecorator={<Calendar size={20} />}
               mb={2}>
-              Formatos Regionales
+              {t("settings.region.formats.title")}
             </Typography>
 
             <Box
@@ -210,12 +379,13 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
                     }}>
-                    Fecha
+                    {t("settings.region.formats.date_label")}
                   </FormLabel>
                   <Select
                     value={form.dateFormat}
                     onChange={(_, val) => handleChange("dateFormat", val)}
-                    sx={{ width: "100%", maxWidth: 300 }}>
+                    sx={{ width: "100%", maxWidth: 360 }}
+                    aria-label={t("settings.region.formats.date_label")}>
                     {DATE_FORMATS.map((fmt) => (
                       <Option key={fmt.value} value={fmt.value}>
                         <Box
@@ -226,7 +396,7 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
                           }}>
                           <span>{fmt.value}</span>
                           <Typography level="body-xs" color="neutral">
-                            Ej: {fmt.label}
+                            {t("common.example_short")}: {fmt.label}
                           </Typography>
                         </Box>
                       </Option>
@@ -243,54 +413,30 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
                       letterSpacing: "0.5px",
                       mb: 1.5,
                     }}>
-                    Hora
+                    {t("settings.region.formats.time_label")}
                   </FormLabel>
+
                   <RadioGroup
                     orientation="horizontal"
                     value={form.timeFormat}
                     onChange={(e) => handleChange("timeFormat", e.target.value)}
-                    sx={{ gap: 2 }}>
+                    sx={{ gap: 2 }}
+                    aria-label={t("settings.region.formats.time_label")}>
                     {["12h", "24h"].map((fmt) => {
                       const checked = form.timeFormat === fmt;
                       return (
-                        <Sheet
+                        <TimeOption
                           key={fmt}
-                          variant={checked ? "soft" : "outlined"}
-                          color={checked ? "primary" : "neutral"}
-                          sx={{
-                            p: 1.5,
-                            borderRadius: "md",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                            border: checked ? "2px solid" : "1px solid",
-                            borderColor: checked ? "primary.500" : "divider",
-                            transition: "all 0.2s",
-                            "&:hover": { bgcolor: "background.level1" },
-                          }}>
-                          <Radio
-                            value={fmt}
-                            overlay
-                            disableIcon
-                            sx={{ position: "absolute", inset: 0 }}
-                          />
-                          <Clock size={20} />
-                          <Box>
-                            <Typography level="title-sm">
-                              {fmt === "12h" ? "12 Horas" : "24 Horas"}
-                            </Typography>
-                            <Typography level="body-xs">
-                              {fmt === "12h" ? "02:30 PM" : "14:30"}
-                            </Typography>
-                          </Box>
-                          {checked && (
-                            <Check
-                              size={16}
-                              className="ml-2 text-primary-600"
-                            />
-                          )}
-                        </Sheet>
+                          value={fmt}
+                          checked={checked}
+                          label={
+                            fmt === "12h"
+                              ? t("settings.region.formats.12h")
+                              : t("settings.region.formats.24h")
+                          }
+                          example={fmt === "12h" ? "02:30 PM" : "14:30"}
+                          onSelect={(v) => handleChange("timeFormat", v)}
+                        />
                       );
                     })}
                   </RadioGroup>
@@ -312,26 +458,35 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
                   textAlign: "center",
                   border: "1px dashed",
                   borderColor: "neutral.300",
-                }}>
+                }}
+                role="region"
+                aria-live="polite"
+                aria-label={t("settings.region.preview.title")}>
                 <Typography
                   level="body-xs"
                   fontWeight="bold"
                   textTransform="uppercase"
                   letterSpacing="1px">
-                  Vista Previa
+                  {t("settings.region.preview.title")}
                 </Typography>
 
                 <Typography level="h2" sx={{ fontFamily: "monospace", mt: 1 }}>
                   {preview.timeStr}
                 </Typography>
 
-                <Chip variant="outlined" color="neutral" size="lg">
+                <Chip variant="outlined" color="neutral" size="lg" aria-hidden>
                   {preview.dateStr}
                 </Chip>
 
-                <Typography level="body-xs" mt={2} sx={{ maxWidth: 200 }}>
-                  Así se mostrarán las fechas y horas en tus reportes y
-                  dashboard.
+                <Typography level="body-xs" mt={2} sx={{ maxWidth: 240 }}>
+                  {t("settings.region.preview.desc")}
+                </Typography>
+
+                <Typography
+                  component="span"
+                  sx={{ position: "absolute", left: -9999 }}
+                  aria-hidden={false}>
+                  {previewAria}
                 </Typography>
               </Sheet>
             </Box>
@@ -341,13 +496,22 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
 
       <Snackbar
         open={snack.open}
-        onClose={() => setSnack({ open: false })}
-        autoHideDuration={2000}
-        color="success"
-        variant="soft"
-        startDecorator={<CheckCircleRoundedIcon />}
+        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        autoHideDuration={3000}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        Configuración guardada
+        <Alert
+          startDecorator={<CheckCircleRoundedIcon />}
+          variant="soft"
+          color={
+            snack.severity === "error"
+              ? "danger"
+              : snack.severity === "info"
+              ? "neutral"
+              : "success"
+          }
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+          {snack.message}
+        </Alert>
       </Snackbar>
     </Stack>
   );

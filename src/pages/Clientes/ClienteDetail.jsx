@@ -8,157 +8,141 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+import { useTranslation } from "react-i18next"; // 👈 i18n
 
-import { Box, Card, Typography, Stack, Button, IconButton } from "@mui/joy";
-
+import { Box, Stack, Button } from "@mui/joy";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 // Hijos existentes
 import ClienteInfo from "./ClienteInfo.jsx";
 import ClienteSites from "./ClienteSites.jsx";
 import ClienteActivos from "./ClienteActivos.jsx";
-import ClienteContratos from "./ClienteContratos.jsx";
+// import ClienteContratos from "./ClienteContratos.jsx";
 
-// shadcn/ui
+// shadcn/ui components (Asumiendo que ya los tienes configurados)
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
 export default function ClienteDetail() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const location = useLocation();
 
-  // contadores para tabs (si luego los usas desde los children)
+  // Contadores para tabs (preparado para futuro uso)
   const [siteCount, setSiteCount] = useState(0);
   const [activosCount, setActivosCount] = useState(null);
 
+  // Definición de Tabs con traducción
   const tabs = useMemo(
     () => [
-      { key: "informacion", label: "Información" },
-      { key: "sites", label: "Sites" /*, count: siteCount || undefined*/ },
-      {
-        key: "activos",
-        label: "Activos" /*, count: activosCount || undefined*/,
-      },
-      // { key: "contratos", label: "Contratos" },
+      { key: "informacion", label: t("clients.tabs.info") },
+      { key: "sites", label: t("clients.tabs.sites"), count: siteCount },
+      { key: "activos", label: t("clients.tabs.assets"), count: activosCount },
+      // { key: "contratos", label: t("clients.tabs.contracts") },
     ],
-    [siteCount, activosCount]
+    [t, siteCount, activosCount]
   );
 
-  const active = useMemo(() => {
+  // Calcular tab activo basado en la URL
+  const activeTab = useMemo(() => {
     const found = tabs.find(
-      (t) =>
-        location.pathname.endsWith(`/${t.key}`) ||
-        location.pathname.includes(`/${t.key}/`)
+      (tab) =>
+        location.pathname.endsWith(`/${tab.key}`) ||
+        location.pathname.includes(`/${tab.key}/`)
     );
     return found?.key ?? "informacion";
   }, [location.pathname, tabs]);
 
   return (
     <Box
+      component="main"
       sx={{
         flex: 1,
         width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, md: 4 },
-        px: { xs: 2, md: 4 },
+        minHeight: "100dvh",
         bgcolor: "background.body",
         display: "flex",
-        justifyContent: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
+        flexDirection: "column",
+        alignItems: "center",
+        pt: { xs: "calc(12px + var(--Header-height))", md: 3 },
+        pb: 4,
+        px: { xs: 2, md: 4 },
       }}>
-      <Box sx={{ width: "100%", maxWidth: 1100 }}>
-        {/* Header con título + botón volver */}
+      <Box sx={{ width: "100%", maxWidth: 1200 }}>
+        {/* Header de Navegación Superior */}
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction="row"
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.5}
-          mb={2}>
-          {/* <Box>
-            <Typography
-              level="body-xs"
-              sx={{ textTransform: "uppercase", opacity: 0.7 }}>
-              Clientes
-            </Typography>
-            <Typography level="h4">Detalle del cliente</Typography>
-            <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.25 }}>
-              ID: {id}
-            </Typography>
-          </Box> */}
-
+          alignItems="center"
+          sx={{ mb: 2 }}>
+          {/* Botón Volver */}
           <Button
             component={Link}
             to="/admin/clientes"
             variant="plain"
+            color="neutral"
             size="sm"
             startDecorator={<ArrowBackRoundedIcon />}
-            sx={{
-              alignSelf: { xs: "stretch", sm: "auto" },
-              justifyContent: { xs: "flex-start", sm: "center" },
-            }}>
-            Volver
+            sx={{ fontWeight: "lg" }}>
+            {t("common.actions.back_to_list")}
           </Button>
         </Stack>
 
-        <Card
-          variant="plain"
-          sx={{
-            mt: 1,
-            p: 0,
-            bgcolor: "transparent",
-            boxShadow: "none",
-            "--Card-padding": 0,
-          }}>
-          {/* Tabs (navegación) */}
-          <Tabs value={active} className="w-full">
-            <TabsList className="w-full flex flex-nowrap overflow-x-auto rounded-lg bg-muted/40 p-1">
-              {tabs.map((t) => {
-                const to = `/admin/clientes/${id}/${t.key}`;
-                return (
-                  <TabsTrigger
-                    key={t.key}
-                    value={t.key}
-                    asChild
-                    className="text-xs sm:text-sm whitespace-nowrap">
-                    <Link className="inline-flex items-center gap-2" to={to}>
-                      <span>{t.label}</span>
-                      {typeof t.count === "number" && (
-                        <Badge variant="secondary">{t.count}</Badge>
-                      )}
-                    </Link>
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </Tabs>
+        {/* Sistema de Tabs (Navegación) */}
+        <Tabs value={activeTab} className="w-full">
+          <TabsList className="w-full sm:w-auto flex flex-nowrap overflow-x-auto justify-start bg-transparent p-0 gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-px mb-4">
+            {tabs.map((tab) => {
+              const to = `/admin/clientes/${id}/${tab.key}`;
+              return (
+                <TabsTrigger
+                  key={tab.key}
+                  value={tab.key}
+                  asChild
+                  className="
+                    relative h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-medium text-muted-foreground shadow-none transition-none 
+                    data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none
+                    hover:text-primary/80
+                  ">
+                  <Link
+                    to={to}
+                    className="flex items-center gap-2 no-underline">
+                    <span>{tab.label}</span>
+                    {typeof tab.count === "number" && tab.count > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-1 h-5 px-1.5 rounded-full text-[10px]">
+                        {tab.count}
+                      </Badge>
+                    )}
+                  </Link>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
 
-          {/* Contenido de cada tab */}
-          <Box mt={2}>
-            <Routes>
-              <Route index element={<Navigate to="informacion" replace />} />
-              <Route path="informacion" element={<ClienteInfo />} />
-              <Route
-                path="sites"
-                element={
-                  // si algún día quieres pasar el contador:
-                  // <ClienteSites onCountChange={setSiteCount} />
-                  <ClienteSites />
-                }
-              />
-              <Route
-                path="activos"
-                element={
-                  // igual aquí:
-                  // <ClienteActivos onCountChange={setActivosCount} />
-                  <ClienteActivos />
-                }
-              />
-              {/* <Route path="contratos" element={<ClienteContratos />} /> */}
-              <Route path="*" element={<Navigate to="informacion" replace />} />
-            </Routes>
-          </Box>
-        </Card>
+        {/* Área de Contenido (Rutas Hijas) */}
+        <Box sx={{ mt: 2 }}>
+          <Routes>
+            <Route index element={<Navigate to="informacion" replace />} />
+
+            <Route path="informacion" element={<ClienteInfo />} />
+
+            <Route
+              path="sites"
+              element={<ClienteSites onCountChange={setSiteCount} />}
+            />
+
+            <Route
+              path="activos"
+              element={<ClienteActivos onCountChange={setActivosCount} />}
+            />
+
+            {/* <Route path="contratos" element={<ClienteContratos />} /> */}
+
+            <Route path="*" element={<Navigate to="informacion" replace />} />
+          </Routes>
+        </Box>
       </Box>
     </Box>
   );

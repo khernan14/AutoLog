@@ -1,42 +1,62 @@
-// src/pages/Bodegas/BodegasList.jsx
-import { useEffect, useState, useCallback, useMemo } from "react";
+// src/pages/Bodegas/Bodegas.jsx
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next"; // 👈 i18n
+import { useFormik } from "formik";
+import * as yup from "yup";
 import { useNavigate, useSearchParams } from "react-router-dom";
+
 import {
   Box,
-  Card,
   Typography,
   Stack,
-  Table,
-  Sheet,
   Button,
-  IconButton,
+  Sheet,
+  Table,
   Input,
-  Tooltip,
+  IconButton,
+  Modal,
+  ModalDialog,
+  ModalClose,
+  FormControl,
+  FormLabel,
+  Divider,
   CircularProgress,
+  Select,
+  Option,
+  Tooltip,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
+  Chip,
+  Link,
 } from "@mui/joy";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
+
+// Iconos
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ClearIcon from "@mui/icons-material/Clear";
-import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
-import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
-import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import WarehouseRoundedIcon from "@mui/icons-material/WarehouseRounded"; // Icono empty
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 
-import { getBodegas } from "../../services/BodegasServices";
-import BodegaFormModal from "./BodegaFormModal";
-
+// Hooks & Context
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import StatusCard from "../../components/common/StatusCard";
-import useIsMobile from "../../hooks/useIsMobile";
-
-// ⭐ Hook highlight/scroll
 import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 
-// Normalizador para ignorar mayúsculas/tildes
+// Services
+import {
+  getBodegas,
+  createBodega,
+  updateBodega,
+} from "../../services/BodegasServices";
+import { getCities } from "../../services/LocationServices";
+
+// Normalizador
 const normalize = (val) =>
   (val || "")
     .toString()
@@ -44,35 +64,48 @@ const normalize = (val) =>
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 
-export default function BodegasList() {
-  // ---- state ----
-  const [rows, setRows] = useState([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const isMobile = useIsMobile(768);
+// Validación
+const validationSchema = yup.object({
+  nombre: yup
+    .string()
+    .trim()
+    .min(2, "Mínimo 2 caracteres")
+    .required("Requerido"),
+  descripcion: yup.string().nullable(),
+  id_ciudad: yup.string().required("Selecciona una ciudad"),
+});
 
-  const [openForm, setOpenForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-
-  // ---- deps ----
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+export default function Bodegas() {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // --- Permisos ---
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
-    (perm) => isAdmin || hasPermiso(perm),
+    (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
 
-  // Permisos
   const canView = can("ver_bodegas") || can("gestionar_bodegas");
   const canCreate = can("crear_bodegas") || can("gestionar_bodegas");
   const canEdit = can("editar_bodegas") || can("gestionar_bodegas");
 
-  // ---- load ----
-  const load = useCallback(async () => {
+  // --- Estado ---
+  const [rows, setRows] = useState([]);
+  const [citiesList, setCitiesList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+
+  // Modal
+  const [openModal, setOpenModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  // --- Carga Inicial ---
+  const loadData = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
       return;
@@ -86,50 +119,32 @@ export default function BodegasList() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getBodegas();
-      if (Array.isArray(data)) setRows(data);
-      else setError("No se pudieron cargar las bodegas.");
+      const [bodegasData, citiesData] = await Promise.all([
+        getBodegas(),
+        getCities(),
+      ]);
+      setRows(Array.isArray(bodegasData) ? bodegasData : []);
+      setCitiesList(Array.isArray(citiesData) ? citiesData : []);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : msg
+          ? t("common.network_error")
+          : t("warehouses.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canView]);
+  }, [checkingSession, canView, t]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadData();
+  }, [loadData]);
 
-  // ---- handlers ----
-  const onNew = () => {
-    if (!canCreate)
-      return showToast(
-        "No tienes permiso para crear bodegas. Solicítalo al administrador.",
-        "warning"
-      );
-    setEditing(null);
-    setOpenForm(true);
-  };
-
-  const onEdit = (row) => {
-    if (!canEdit)
-      return showToast("No tienes permiso para editar bodegas.", "warning");
-    setEditing(row);
-    setOpenForm(true);
-  };
-
-  const clearSearch = () => setSearch("");
-
-  // ---- filter ----
+  // --- Filtrado ---
   const filtered = useMemo(() => {
     const s = normalize(search);
-    const src = Array.isArray(rows) ? rows : [];
-    return src.filter(
+    return rows.filter(
       (r) =>
         normalize(r.nombre).includes(s) ||
         normalize(r.ciudad).includes(s) ||
@@ -137,376 +152,432 @@ export default function BodegasList() {
     );
   }, [rows, search]);
 
-  // ⭐ Highlight hook (sin paginación, usamos los rows filtrados)
+  // --- Highlight Logic ---
   const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
     rows: filtered,
-    matchRow: (r, token) => {
-      const t = normalize(token);
-      return String(r.id) === token || normalize(r.nombre) === t;
-    },
+    matchRow: (r, token) =>
+      String(r.id) === token || normalize(r.nombre) === normalize(token),
     getRowId: (r) => r.id,
     highlightMs: 4000,
   });
 
-  // Leer ?focus= de la URL, limpiar búsqueda y pedir foco
   useEffect(() => {
     const token = searchParams.get("focus");
     if (!token) return;
-
     const next = new URLSearchParams(searchParams);
     next.delete("focus");
     setSearchParams(next, { replace: true });
-
-    // limpiar filtros/búsqueda para asegurar que la bodega esté visible
     setSearch("");
-
     focusByToken(token);
   }, [searchParams, setSearchParams, focusByToken]);
 
-  // ---- view state ----
+  // --- Acciones ---
+  const handleNew = () => {
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
+    setEditing(null);
+    setOpenModal(true);
+  };
+
+  const handleEdit = (bodega) => {
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
+    setEditing(bodega);
+    setOpenModal(true);
+  };
+
+  const handleRowClick = (id) => {
+    navigate(`${id}`);
+  };
+
+  // --- Formulario (Formik) ---
+  const formik = useFormik({
+    initialValues: { nombre: "", descripcion: "", id_ciudad: "" },
+    validationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      const payload = {
+        nombre: values.nombre.trim(),
+        descripcion: values.descripcion?.trim() || null,
+        id_ciudad: values.id_ciudad,
+      };
+
+      try {
+        if (editing) {
+          await updateBodega(editing.id, payload);
+          showToast(t("warehouses.success.updated"), "success");
+        } else {
+          await createBodega(payload);
+          showToast(t("warehouses.success.created"), "success");
+        }
+        setOpenModal(false);
+        loadData();
+      } catch (e) {
+        showToast(e?.message || t("warehouses.errors.save_failed"), "danger");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (openModal) {
+      formik.setValues({
+        nombre: editing?.nombre || "",
+        descripcion: editing?.descripcion || "",
+        id_ciudad: editing?.id_ciudad ? String(editing.id_ciudad) : "",
+      });
+      formik.setTouched({});
+    }
+  }, [openModal, editing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Render Status ---
   const viewState = checkingSession
     ? "checking"
     : !canView
     ? "no-permission"
     : error
     ? "error"
-    : !loading && filtered.length === 0
-    ? "empty"
     : loading
     ? "loading"
+    : filtered.length === 0 && !search
+    ? "empty"
     : "data";
 
-  const renderStatus = () => {
-    if (viewState === "checking") {
-      return (
-        <StatusCard
-          icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
-        />
-      );
-    }
-    if (viewState === "no-permission") {
-      return (
-        <StatusCard
-          color="danger"
-          icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver bodegas"
-          description="Consulta con un administrador para obtener acceso."
-        />
-      );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
-      return (
-        <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
-          }
-          description={error}
-          actions={
-            <Button
-              startDecorator={<RestartAltRoundedIcon />}
-              onClick={load}
-              variant="soft">
-              Reintentar
-            </Button>
-          }
-        />
-      );
-    }
-    if (viewState === "empty") {
-      return (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="Sin bodegas"
-          description="Aún no hay bodegas registradas."
-        />
-      );
-    }
-    if (viewState === "loading") {
-      return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando…</Typography>
-          </Stack>
-        </Sheet>
-      );
-    }
-    return null;
-  };
-
-  // ---- UI ----
   return (
-    <Sheet
-      variant="plain"
+    <Box
+      component="main"
       sx={{
-        flex: 1,
-        width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, sm: 2, md: 4 },
         px: { xs: 2, md: 4 },
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
-        bgcolor: "background.body",
+        py: 3,
+        maxWidth: 1200,
+        mx: "auto",
+        minHeight: "100vh",
       }}>
-      <Box sx={{ width: "100%" }}>
-        {/* Header */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.5}
-          mb={2}>
-          <Typography level="h4">Bodegas</Typography>
+      {/* HEADER */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        mb={3}>
+        <Box>
+          <Typography level="h3" fontSize="xl2" fontWeight="lg">
+            {t("warehouses.title")}
+          </Typography>
+          <Typography level="body-sm" color="neutral">
+            {t("warehouses.subtitle")}
+          </Typography>
+        </Box>
+        {canCreate && (
+          <Button
+            startDecorator={<AddRoundedIcon />}
+            onClick={handleNew}
+            variant="solid"
+            color="primary">
+            {t("warehouses.actions.new")}
+          </Button>
+        )}
+      </Stack>
 
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Tooltip
-              title="Buscar por nombre, ciudad o descripción…"
-              variant="solid"
-              placement="top-end">
-              <Input
-                placeholder="Buscar por nombre, ciudad o descripción…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                startDecorator={<SearchRoundedIcon />}
-                endDecorator={
-                  search && (
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color="neutral"
-                      onClick={clearSearch}
-                      aria-label="Limpiar búsqueda">
-                      <ClearIcon />
-                    </IconButton>
-                  )
-                }
-                sx={{
-                  width: {
-                    xs: "100%",
-                    sm: 320,
-                    backgroundColor: "Background.level1",
-                  },
-                }}
-              />
-            </Tooltip>
+      {/* TOOLBAR */}
+      <Box sx={{ mb: 3 }}>
+        <Input
+          placeholder={t("warehouses.search_placeholder")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          startDecorator={<SearchRoundedIcon />}
+          endDecorator={
+            search && (
+              <IconButton
+                size="sm"
+                variant="plain"
+                onClick={() => setSearch("")}>
+                <ClearIcon />
+              </IconButton>
+            )
+          }
+          sx={{ maxWidth: 400 }}
+        />
+      </Box>
 
-            <Tooltip
-              title={
-                canCreate
-                  ? "Crear bodega"
-                  : "No tienes permiso para crear. Solicítalo al administrador."
-              }
-              variant="solid"
-              placement="bottom-end">
-              <span>
+      {/* CONTENT TABLE */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          overflow: "hidden",
+          bgcolor: "background.surface",
+          minHeight: "auto",
+        }}>
+        {viewState === "loading" && (
+          <Box display="flex" justifyContent="center" py={10}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {viewState === "error" && (
+          <Box p={4} display="flex" justifyContent="center">
+            <StatusCard
+              color="danger"
+              icon={<ErrorOutlineRoundedIcon />}
+              title={t("common.error_title")}
+              description={error}
+              actions={
                 <Button
-                  startDecorator={<AddRoundedIcon />}
-                  onClick={onNew}
-                  disabled={!canCreate}
-                  aria-disabled={!canCreate}
-                  variant={canCreate ? "solid" : "soft"}
-                  color={canCreate ? "primary" : "neutral"}>
-                  Nueva bodega
+                  startDecorator={<RestartAltRoundedIcon />}
+                  onClick={loadData}
+                  variant="soft">
+                  {t("common.retry")}
                 </Button>
-              </span>
-            </Tooltip>
-          </Stack>
-        </Stack>
+              }
+            />
+          </Box>
+        )}
 
-        {/* Contenido principal */}
-        <Card
-          variant="plain"
-          sx={{
-            overflowX: "auto",
-            width: "100%",
-            background: "background.surface",
-          }}>
-          {viewState !== "data" ? (
-            <Box p={2}>{renderStatus()}</Box>
-          ) : isMobile ? (
-            // ====== MÓVIL: tarjetas ======
-            <Stack spacing={2} p={2}>
-              {filtered.map((r) => (
-                <Sheet
-                  key={r.id}
-                  ref={r.id === highlightId ? focusedRef : null}
-                  variant={r.id === highlightId ? "soft" : "outlined"}
-                  color={r.id === highlightId ? "primary" : "neutral"}
-                  sx={{
-                    p: 2,
-                    borderRadius: "md",
-                    cursor: "pointer",
-                    boxShadow: r.id === highlightId ? "lg" : "sm",
-                    borderWidth: r.id === highlightId ? 2 : 1,
-                    borderColor:
-                      r.id === highlightId ? "primary.solidBg" : "divider",
-                    transition:
-                      "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
-                  }}
-                  onClick={() => navigate(`${r.id}`)}>
-                  <Stack spacing={1}>
-                    <Typography level="title-md">{r.nombre}</Typography>
-                    <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                      {r.ciudad || "—"}
-                    </Typography>
-                    {r.descripcion && (
-                      <Typography level="body-sm" sx={{ mt: 0.5 }}>
-                        {r.descripcion}
-                      </Typography>
-                    )}
+        {viewState === "empty" && (
+          <Box p={4} display="flex" justifyContent="center">
+            <StatusCard
+              color="neutral"
+              icon={<WarehouseRoundedIcon />}
+              title={t("warehouses.empty.title")}
+              description={t("warehouses.empty.desc")}
+            />
+          </Box>
+        )}
 
-                    <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`${r.id}`);
-                        }}>
-                        Ver detalle
-                      </Button>
-
-                      <Tooltip
-                        title={
-                          canEdit
-                            ? "Editar bodega"
-                            : "No tienes permiso para editar."
-                        }
-                        variant="soft"
-                        placement="top">
-                        <span>
-                          {/* Si quieres reactivar el botón de editar en móvil, descomenta */}
-                          {/* <IconButton
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEdit(r);
-                            }}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "soft" : "plain"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            <EditRoundedIcon />
-                          </IconButton> */}
-                        </span>
-                      </Tooltip>
-                    </Stack>
-                  </Stack>
-                </Sheet>
-              ))}
-            </Stack>
-          ) : (
-            // ====== ESCRITORIO: tabla ======
+        {viewState === "data" && (
+          <>
             <Table
-              hoverRow
-              size="sm"
               stickyHeader
+              hoverRow
               sx={{
-                minWidth: 800,
-                "--TableCell-headBackground":
-                  "var(--joy-palette-background-level5)",
-                "--TableCell-headColor": "var(--joy-palette-text-secondary)",
-                "--TableCell-headFontWeight": 600,
-                "--TableCell-headBorderBottom":
-                  "1px solid var(--joy-palette-divider)",
-                "--TableRow-hoverBackground":
-                  "var(--joy-palette-background-level1)",
+                "--TableCell-paddingX": "24px",
+                "--TableCell-paddingY": "12px",
+                "& thead th": {
+                  bgcolor: "background.level1",
+                  color: "text.tertiary",
+                  fontWeight: "md",
+                  textTransform: "uppercase",
+                  fontSize: "xs",
+                  letterSpacing: "0.05em",
+                },
               }}>
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Ciudad</th>
-                  <th>Descripción</th>
-                  <th style={{ width: 64 }} />
+                  <th style={{ width: "30%" }}>
+                    {t("warehouses.columns.name")}
+                  </th>
+                  <th style={{ width: "25%" }}>
+                    {t("warehouses.columns.city")}
+                  </th>
+                  <th style={{ width: "35%" }}>
+                    {t("warehouses.columns.description")}
+                  </th>
+                  <th style={{ width: "10%", textAlign: "right" }}></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
-                  <tr
-                    key={r.id}
-                    ref={r.id === highlightId ? focusedRef : null}
-                    style={{
-                      cursor: "pointer",
-                      ...(r.id === highlightId
-                        ? {
-                            backgroundColor: "rgba(59, 130, 246, 0.12)",
-                            boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
-                            transition:
-                              "background-color 0.25s ease, box-shadow 0.25s ease",
-                          }
-                        : null),
-                    }}
-                    onClick={() => navigate(`${r.id}`)}>
-                    <td>{r.nombre}</td>
-                    <td>{r.ciudad || "—"}</td>
-                    <td>{r.descripcion || "—"}</td>
-                    <td
-                      onClick={(e) => {
-                        e.stopPropagation();
+                {filtered.map((r) => {
+                  const isHighlighted = r.id === highlightId;
+                  return (
+                    <tr
+                      key={r.id}
+                      ref={isHighlighted ? focusedRef : null}
+                      onClick={() => handleRowClick(r.id)}
+                      style={{
+                        cursor: "pointer",
+                        backgroundColor: isHighlighted
+                          ? "var(--joy-palette-primary-50)"
+                          : undefined,
                       }}>
-                      <Tooltip
-                        title={
-                          canEdit
-                            ? "Editar bodega"
-                            : "No tienes permiso para editar."
-                        }
-                        variant="plain"
-                        placement="left">
-                        <span>
-                          <IconButton
-                            onClick={() => onEdit(r)}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "soft" : "plain"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            <EditRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </td>
-                  </tr>
-                ))}
+                      <td>
+                        <Typography
+                          fontWeight="lg"
+                          level="title-sm"
+                          component={Link}
+                          to={`/inventario/bodegas/${r.id}`}
+                          sx={{
+                            textDecoration: "none",
+                            color: "text.primary",
+                            "&:hover": {
+                              color: "primary.500",
+                              textDecoration: "none",
+                            },
+                          }}>
+                          {r.nombre}
+                        </Typography>
+                      </td>
+                      <td>
+                        {r.ciudad ? (
+                          <Chip size="sm" variant="soft" color="primary">
+                            {r.ciudad}
+                          </Chip>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        <Typography
+                          level="body-sm"
+                          noWrap
+                          sx={{ maxWidth: 300, color: "text.secondary" }}>
+                          {r.descripcion || "—"}
+                        </Typography>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <Dropdown>
+                          <MenuButton
+                            onClick={(e) => e.stopPropagation()} // Evitar navegación al abrir menú
+                            slots={{ root: IconButton }}
+                            slotProps={{
+                              root: {
+                                variant: "plain",
+                                color: "neutral",
+                                size: "sm",
+                              },
+                            }}>
+                            <MoreHorizRoundedIcon />
+                          </MenuButton>
+                          <Menu placement="bottom-end">
+                            {canEdit && (
+                              <MenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEdit(r);
+                                }}>
+                                <EditRoundedIcon /> {t("common.actions.edit")}
+                              </MenuItem>
+                            )}
+                          </Menu>
+                        </Dropdown>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
-          )}
-        </Card>
-
-        {/* Modal crear/editar */}
-        {openForm && (
-          <BodegaFormModal
-            open={openForm}
-            onClose={() => setOpenForm(false)}
-            editing={editing}
-            onSaved={() => {
-              setOpenForm(false);
-              setEditing(null);
-              load();
-            }}
-          />
+            {filtered.length === 0 && (
+              <Box sx={{ width: "100%", textAlign: "center", py: 8 }}>
+                <Typography level="h4" color="neutral">
+                  🔍 {t("common.no_data_title")}
+                </Typography>
+                <Typography level="body-md">
+                  {t("common.no_data_desc")}
+                </Typography>
+                <Button
+                  variant="soft"
+                  sx={{ mt: 2 }}
+                  onClick={() => {
+                    setSearch("");
+                  }}>
+                  {t("common.clear_filters")}
+                </Button>
+              </Box>
+            )}
+          </>
         )}
-      </Box>
-    </Sheet>
+      </Sheet>
+
+      {/* MODAL CREAR/EDITAR */}
+      <Modal
+        open={openModal}
+        onClose={() => !formik.isSubmitting && setOpenModal(false)}>
+        <ModalDialog sx={{ width: { xs: "100%", sm: 450 } }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            mb={1}>
+            <Typography level="h4">
+              {editing
+                ? t("warehouses.edit_title")
+                : t("warehouses.create_title")}
+            </Typography>
+            <ModalClose
+              disabled={formik.isSubmitting}
+              onClick={() => setOpenModal(false)}
+            />
+          </Stack>
+          <Divider />
+
+          <form onSubmit={formik.handleSubmit}>
+            <Stack spacing={2} mt={2}>
+              <FormControl
+                error={formik.touched.nombre && Boolean(formik.errors.nombre)}
+                required>
+                <FormLabel>{t("warehouses.form.name")}</FormLabel>
+                <Input
+                  autoFocus
+                  name="nombre"
+                  value={formik.values.nombre}
+                  onChange={formik.handleChange}
+                  onBlur={() => formik.setFieldTouched("nombre", true)}
+                  disabled={formik.isSubmitting}
+                />
+                {formik.touched.nombre && formik.errors.nombre && (
+                  <Typography level="body-xs" color="danger">
+                    {formik.errors.nombre}
+                  </Typography>
+                )}
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>{t("warehouses.form.description")}</FormLabel>
+                <Input
+                  name="descripcion"
+                  value={formik.values.descripcion}
+                  onChange={formik.handleChange}
+                  onBlur={() => formik.setFieldTouched("descripcion", true)}
+                  disabled={formik.isSubmitting}
+                />
+              </FormControl>
+
+              <FormControl
+                error={
+                  formik.touched.id_ciudad && Boolean(formik.errors.id_ciudad)
+                }
+                required>
+                <FormLabel>{t("warehouses.form.city")}</FormLabel>
+                <Select
+                  name="id_ciudad"
+                  value={formik.values.id_ciudad}
+                  onChange={(_, value) =>
+                    formik.setFieldValue("id_ciudad", value)
+                  }
+                  onBlur={() => formik.setFieldTouched("id_ciudad", true)}
+                  placeholder={t("warehouses.form.select_city")}
+                  disabled={formik.isSubmitting}>
+                  {citiesList.map((city) => (
+                    <Option key={city.id} value={String(city.id)}>
+                      {city.ciudad}
+                    </Option>
+                  ))}
+                </Select>
+                {formik.touched.id_ciudad && formik.errors.id_ciudad && (
+                  <Typography level="body-xs" color="danger">
+                    {formik.errors.id_ciudad}
+                  </Typography>
+                )}
+              </FormControl>
+
+              <Stack
+                direction="row"
+                justifyContent="flex-end"
+                spacing={1}
+                mt={1}>
+                <Button
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setOpenModal(false)}
+                  disabled={formik.isSubmitting}>
+                  {t("common.actions.cancel")}
+                </Button>
+                <Button type="submit" loading={formik.isSubmitting}>
+                  {t("common.actions.save")}
+                </Button>
+              </Stack>
+            </Stack>
+          </form>
+        </ModalDialog>
+      </Modal>
+    </Box>
   );
 }

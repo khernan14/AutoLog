@@ -10,21 +10,24 @@ import {
   Input,
   CircularProgress,
   Alert,
-  Dropdown,
-  Menu,
-  MenuButton,
-  MenuItem,
+  IconButton,
+  Chip,
+  Divider,
 } from "@mui/joy";
+import { useTranslation } from "react-i18next"; // 👈 Hook i18n
+import { useNavigate, useLocation } from "react-router-dom";
+
+// Iconos
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { useNavigate, useLocation } from "react-router-dom";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded"; // Icono para empty state
+import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 
+// Componentes
 import PaginationLite from "@/components/common/PaginationLite";
-import { getVehiculosMasUtilizadosReport } from "@/services/ReportServices";
-import { exportToCSV, exportToXLSX, exportToPDF } from "@/utils/exporters";
 import ExportDialog from "@/components/Exports/ExportDialog";
+import { getVehiculosMasUtilizadosReport } from "@/services/ReportServices";
 
 /** Utils */
 const debounced = (fn, ms = 250) => {
@@ -36,6 +39,7 @@ const debounced = (fn, ms = 250) => {
 };
 
 export default function VehiculosMasUtilizados() {
+  const { t } = useTranslation(); // 👈 Inicializamos traducciones
   const navigate = useNavigate();
   const { search } = useLocation();
 
@@ -49,12 +53,7 @@ export default function VehiculosMasUtilizados() {
   const [err, setErr] = useState(null);
   const [openExport, setOpenExport] = useState(false);
 
-  const fileBase = `vehiculos_mas_utilizados`;
-  const pageTitle = "Vehículos más utilizados";
-  const sheetName = "Vehículos";
-  const logoUrl = "/newLogoTecnasa.png";
-
-  // sincroniza q/p en URL (sin recargar)
+  // Sincroniza URL
   useEffect(() => {
     const params = new URLSearchParams(search);
     query ? params.set("q", query) : params.delete("q");
@@ -63,25 +62,24 @@ export default function VehiculosMasUtilizados() {
     window.history.replaceState(null, "", s ? `?${s}` : "");
   }, [query, page, search]);
 
-  // load
+  // Carga de datos
   useEffect(() => {
     (async () => {
       setLoading(true);
       setErr(null);
       try {
         const data = await getVehiculosMasUtilizadosReport();
-        // esperamos [{ marca, modelo, placa, total_usos }]
         setRaw(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error(e);
-        setErr("No se pudo cargar el reporte de vehículos más utilizados.");
+        setErr(t("reports.errors.load_failed"));
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [t]);
 
-  // filtro
+  // Filtro
   const onChangeQuery = useRef(
     debounced((v) => {
       setPage(1);
@@ -107,7 +105,7 @@ export default function VehiculosMasUtilizados() {
     });
   }, [raw, query]);
 
-  // paginación
+  // Paginación
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const pageSafe = Math.min(Math.max(page, 1), totalPages);
   const pageItems = useMemo(() => {
@@ -115,167 +113,205 @@ export default function VehiculosMasUtilizados() {
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, pageSafe, rowsPerPage]);
 
-  // columnas para export/pdf (usa formato de exporters.js)
+  // Definición de columnas para exportación (Dentro del componente para usar 't')
   const columnsExport = [
     {
       label: "#",
       key: "__rownum",
-      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1, // o solo i+1 si quieres reiniciar
+      get: (_row, i) => (pageSafe - 1) * rowsPerPage + i + 1,
     },
-    { label: "Marca", key: "marca" },
-    { label: "Modelo", key: "modelo" },
-    { label: "Placa", key: "placa" },
-    { label: "Total de usos", key: "total_usos" /* type sugerido: number */ },
+    { label: t("reports.columns.brand"), key: "marca" },
+    { label: t("reports.columns.model"), key: "modelo" },
+    { label: t("reports.columns.plate"), key: "placa" },
+    { label: t("reports.columns.total_uses"), key: "total_usos" },
   ];
 
-  const filenameBase = `vehiculos_mas_utilizados_${new Date()
-    .toISOString()
-    .slice(0, 10)}`;
+  const filenameBase = `vehiculos_top_${new Date().toISOString().slice(0, 10)}`;
 
+  // --- Renderizado de Estados de Carga/Error ---
   if (loading) {
     return (
       <Box
         sx={{
-          minHeight: "70vh",
-          display: "grid",
-          placeItems: "center",
-          gap: 1,
-          background:
-            "linear-gradient(180deg, var(--joy-palette-background-level1), transparent 40%)",
-          borderRadius: "xl",
+          py: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
         }}>
-        <CircularProgress size="lg" />
-        <Typography>Cargando reporte…</Typography>
+        <CircularProgress size="lg" thickness={3} />
+        <Typography level="body-md" color="neutral">
+          {t("common.loading")}
+        </Typography>
       </Box>
     );
   }
 
   if (err) {
     return (
-      <Alert color="danger" variant="soft">
-        <Typography>{err}</Typography>
-      </Alert>
+      <Box sx={{ maxWidth: 1200, mx: "auto", p: 2 }}>
+        <Alert color="danger" variant="soft">
+          {err}
+        </Alert>
+      </Box>
     );
   }
 
   return (
-    <Box
-      sx={{
-        // Fondo decorativo suave
-        background:
-          "radial-gradient(1200px 200px at 50% -20%, var(--joy-palette-primary-softBg), transparent), radial-gradient(1200px 200px at 50% 120%, var(--joy-palette-neutral-softBg), transparent)",
-        borderRadius: "xl",
-        p: { xs: 1.5, md: 2 },
-      }}>
+    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, md: 4 }, py: 3 }}>
+      {/* --- HEADER --- */}
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        alignItems={{ md: "center" }}
+        justifyContent="space-between"
+        mb={3}
+        spacing={2}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton
+            onClick={() => navigate("/admin/reports")}
+            variant="plain"
+            color="neutral">
+            <ArrowBackRoundedIcon />
+          </IconButton>
+          <Box>
+            <Typography level="h2" fontSize="lg" fontWeight="lg">
+              {t("reports.report_items.vehiculos_uso.title")}
+            </Typography>
+            <Typography level="body-sm" color="neutral">
+              {t("reports.total_records", { count: filtered.length })}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={2}>
+          {/* Buscador */}
+          <Input
+            startDecorator={<SearchRoundedIcon />}
+            placeholder={t("reports.search_placeholder")}
+            defaultValue={query}
+            onChange={(e) => onChangeQuery(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 260 } }}
+          />
+          <Button
+            variant="solid"
+            color="primary"
+            startDecorator={<DownloadRoundedIcon />}
+            onClick={() => setOpenExport(true)}
+            disabled={filtered.length === 0}>
+            {t("reports.actions.export")}
+          </Button>
+        </Stack>
+      </Stack>
+
+      {/* --- DATA TABLE --- */}
       <Sheet
         variant="outlined"
         sx={{
-          p: 2,
-          borderRadius: "xl",
-          borderColor: "neutral.outlinedBorder",
+          borderRadius: "lg",
           boxShadow: "sm",
-          backgroundColor: "background.body",
+          overflow: "hidden", // Para recortar las esquinas de la tabla
+          bgcolor: "background.surface",
         }}>
-        {/* Header con acciones */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1}
-          justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "center" }}
-          sx={{ mb: 1.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              startDecorator={<ArrowBackRoundedIcon />}
-              variant="soft"
-              onClick={() => navigate("/admin/reports")}
-              sx={{ borderRadius: "999px" }}>
-              Regresar
-            </Button>
-            <Typography level="h3" sx={{ fontWeight: 800, ml: 0.5 }}>
-              Vehículos más utilizados
-            </Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Input
-              startDecorator={<SearchRoundedIcon />}
-              placeholder="Buscar: marca, modelo o placa…"
-              onChange={(e) => onChangeQuery(e.target.value)}
-              defaultValue={query}
-              sx={{ minWidth: { xs: 220, sm: 280 } }}
-            />
-
-            <Button
-              variant="soft"
-              startDecorator={<DownloadRoundedIcon />}
-              onClick={() => setOpenExport(true)}
-              sx={{ borderRadius: "999px" }}>
-              Exportar
-            </Button>
-          </Stack>
-        </Stack>
-
-        {/* Tabla */}
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "neutral.outlinedBorder",
-            borderRadius: "lg",
-            overflow: "hidden",
-          }}>
+        <Box sx={{ overflowX: "auto" }}>
           <Table
-            aria-label="Tabla de vehículos más utilizados"
-            stickyHeader
+            aria-label={t("reports.report_items.vehiculos_uso.title")}
             hoverRow
+            stickyHeader
             sx={{
-              "--TableCell-paddingX": "12px",
-              "--TableCell-paddingY": "10px",
+              "--TableCell-paddingX": "16px",
+              "--TableCell-paddingY": "12px",
               "& thead th": {
                 bgcolor: "background.level1",
-                fontWeight: 700,
-                color: "text.primary",
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.05em",
                 borderBottom: "1px solid",
                 borderColor: "divider",
               },
-              "& tbody tr:nth-of-type(odd)": {
-                bgcolor: "background.level2",
-              },
-              "& tbody td": {
-                borderBottom: "1px solid",
-                borderColor: "divider",
+              "& tbody tr:last-child td": {
+                borderBottom: 0,
               },
             }}>
             <thead>
               <tr>
-                <th style={{ width: 64 }}>#</th>
-                <th>Marca</th>
-                <th>Modelo</th>
-                <th>Placa</th>
-                <th style={{ textAlign: "right", width: 140 }}>
-                  Total de usos
+                <th style={{ width: 60, textAlign: "center" }}>#</th>
+                <th>{t("reports.columns.brand")}</th>
+                <th>{t("reports.columns.model")}</th>
+                <th>{t("reports.columns.plate")}</th>
+                <th style={{ textAlign: "right", width: 180 }}>
+                  {t("reports.columns.total_uses")}
                 </th>
               </tr>
             </thead>
             <tbody>
-              {pageItems.map((r, i) => (
-                <tr key={`${r.placa}-${i}`}>
-                  <td>{(pageSafe - 1) * rowsPerPage + i + 1}</td>
-                  <td>{r.marca || "—"}</td>
-                  <td>{r.modelo || "—"}</td>
-                  <td>{r.placa || "—"}</td>
-                  <td style={{ textAlign: "right", fontWeight: 700 }}>
-                    {r.total_usos ?? 0}
-                  </td>
-                </tr>
-              ))}
-              {pageItems.length === 0 && (
+              {pageItems.length > 0 ? (
+                pageItems.map((r, i) => {
+                  const globalIndex = (pageSafe - 1) * rowsPerPage + i + 1;
+                  // Destacamos el top 3 con colores sutiles en el índice
+                  const isTop3 = globalIndex <= 3;
+
+                  return (
+                    <tr key={`${r.placa}-${i}`}>
+                      <td
+                        style={{
+                          textAlign: "center",
+                          color: "var(--joy-palette-text-tertiary)",
+                        }}>
+                        {isTop3 ? (
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={globalIndex === 1 ? "warning" : "neutral"}>
+                            {globalIndex}
+                          </Chip>
+                        ) : (
+                          globalIndex
+                        )}
+                      </td>
+                      <td>
+                        <Typography fontWeight="md">
+                          {r.marca || "—"}
+                        </Typography>
+                      </td>
+                      <td>{r.modelo || "—"}</td>
+                      <td>
+                        <Chip
+                          variant="outlined"
+                          size="sm"
+                          startDecorator={
+                            <DirectionsCarRoundedIcon fontSize="small" />
+                          }>
+                          {r.placa || "—"}
+                        </Chip>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <Typography fontWeight="lg" color="primary">
+                          {r.total_usos ?? 0}
+                        </Typography>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
                 <tr>
-                  <td colSpan={5}>
-                    <Alert variant="soft" color="neutral">
+                  <td
+                    colSpan={5}
+                    style={{ textAlign: "center", padding: "40px" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 1,
+                        color: "neutral.400",
+                      }}>
+                      <FilterListOffRoundedIcon sx={{ fontSize: 40 }} />
                       <Typography level="body-sm">
-                        No hay coincidencias para “{query}”.
+                        {t("reports.no_data_desc")}
                       </Typography>
-                    </Alert>
+                    </Box>
                   </td>
                 </tr>
               )}
@@ -283,41 +319,48 @@ export default function VehiculosMasUtilizados() {
           </Table>
         </Box>
 
-        {/* Footer: contador + paginación */}
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mt: 1.25, gap: 1 }}>
-          <Typography level="body-sm" color="neutral">
-            Mostrando{" "}
-            <b>
-              {pageItems.length} de {filtered.length}
-            </b>{" "}
-            registros
-          </Typography>
-
-          <PaginationLite
-            page={pageSafe}
-            count={totalPages}
-            onChange={setPage}
-            size="sm"
-            showFirstLast
-          />
-        </Stack>
-        <ExportDialog
-          open={openExport}
-          onClose={() => setOpenExport(false)}
-          rows={filtered} // todo el filtro
-          pageRows={pageItems} // página actual
-          columns={columnsExport}
-          defaultTitle="Vehículos más utilizados"
-          defaultSheetName="Vehículos"
-          defaultFilenameBase={filenameBase}
-          defaultOrientation="landscape"
-          logoUrl="/newLogoTecnasa.png"
-        />
+        {/* --- FOOTER PAGINATION --- */}
+        {pageItems.length > 0 && (
+          <Box
+            sx={{
+              p: 2,
+              borderTop: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.surface",
+            }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              alignItems="center"
+              spacing={2}>
+              <Typography level="body-sm" color="neutral">
+                {t("reports.showing_page", {
+                  page: pageSafe,
+                  total: totalPages,
+                })}
+              </Typography>
+              <PaginationLite
+                page={pageSafe}
+                count={totalPages}
+                onChange={setPage}
+                size="sm"
+              />
+            </Stack>
+          </Box>
+        )}
       </Sheet>
+
+      {/* --- EXPORT MODAL --- */}
+      <ExportDialog
+        open={openExport}
+        onClose={() => setOpenExport(false)}
+        rows={filtered}
+        columns={columnsExport}
+        defaultTitle={t("reports.report_items.vehiculos_uso.title")}
+        defaultSheetName="Vehículos"
+        defaultFilenameBase={filenameBase}
+        defaultOrientation="portrait" // Retrato queda mejor para pocas columnas
+      />
     </Box>
   );
 }

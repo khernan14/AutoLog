@@ -1,4 +1,6 @@
+// src/components/Users/Permissions/UserPermissionsDrawer.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next"; // 👈 i18n
 import {
   Drawer,
   Box,
@@ -14,32 +16,36 @@ import {
   Stack,
   Card,
   Input,
+  ModalClose,
 } from "@mui/joy";
 
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import SaveIcon from "@mui/icons-material/Save";
+// Iconos
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
 
+// Services & Context
 import { useToast } from "../../../context/ToastContext";
 import {
   getUserPermissions,
   updateUserPermissions,
 } from "../../../services/PermissionsServices";
 
-// ⚙️ CONFIGURACIÓN DE GRUPOS "EN CASCADA"
+// Configuración de Grupos en Cascada
 const CASCADING_CONFIG = {
   Vehiculos: {
-    isCascade: false,
+    isCascade: false, // Cambiar a true si quieres activar la lógica de cascada visual
     masterPermission: "gestion_vehiculos",
-    title: "Gestión de Flota y Vehículos",
-    description: "Habilita el acceso al módulo de vehículos.",
+    titleKey: "permissions.groups.vehicles.title",
+    descKey: "permissions.groups.vehicles.desc",
   },
   Usuarios: {
     isCascade: false,
     masterPermission: "gestion_usuarios",
-    title: "Administración de Usuarios",
-    description: "Permite gestionar el personal y accesos.",
+    titleKey: "permissions.groups.users.title",
+    descKey: "permissions.groups.users.desc",
   },
 };
 
@@ -49,21 +55,20 @@ export default function UserPermissionsDrawer({
   onClose,
   onUpdateSuccess,
 }) {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [permissionsData, setPermissionsData] = useState({});
   const [assignedList, setAssignedList] = useState([]);
-
-  // 🔍 Estado para el buscador
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { showToast } = useToast();
-
-  // --- Cargar Permisos ---
+  // --- Carga ---
   const fetchPermissions = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    setSearchTerm(""); // Limpiar búsqueda al abrir
+    setSearchTerm("");
     try {
       const res = await getUserPermissions(user.id_usuario);
       const rawGroups = res?.permisos || {};
@@ -77,55 +82,47 @@ export default function UserPermissionsDrawer({
       setAssignedList(currentAssigned);
     } catch (error) {
       console.error(error);
-      showToast("Error al cargar permisos", "danger");
+      showToast(t("permissions.errors.load_failed"), "danger");
     } finally {
       setLoading(false);
     }
-  }, [user, showToast]);
+  }, [user, showToast, t]);
 
   useEffect(() => {
     if (open) fetchPermissions();
   }, [open, fetchPermissions]);
 
-  // --- Lógica de Filtrado (Buscador) ---
+  // --- Filtrado ---
   const filteredPermissions = useMemo(() => {
     if (!searchTerm.trim()) return permissionsData;
-
     const term = searchTerm.toLowerCase();
     const result = {};
 
     Object.entries(permissionsData).forEach(([group, perms]) => {
-      // Filtramos los permisos dentro del grupo
       const matchingPerms = perms.filter(
         (p) =>
           p.nombre.toLowerCase().includes(term) ||
           (p.descripcion && p.descripcion.toLowerCase().includes(term))
       );
 
-      // Si el grupo tiene coincidencias (o el nombre del grupo coincide), lo mostramos
       if (matchingPerms.length > 0 || group.toLowerCase().includes(term)) {
-        // Si coincide por nombre de grupo, mostramos todos sus permisos
-        // Si coincide por permisos, mostramos solo los que coinciden
         result[group] = group.toLowerCase().includes(term)
           ? perms
           : matchingPerms;
       }
     });
-
     return result;
   }, [permissionsData, searchTerm]);
 
-  // --- Manejar Toggle Individual ---
+  // --- Toggles ---
   const handleToggle = (permisoNombre) => {
-    setAssignedList((prev) => {
-      const exists = prev.includes(permisoNombre);
-      return exists
+    setAssignedList((prev) =>
+      prev.includes(permisoNombre)
         ? prev.filter((p) => p !== permisoNombre)
-        : [...prev, permisoNombre];
-    });
+        : [...prev, permisoNombre]
+    );
   };
 
-  // --- Manejar Toggle Maestro ---
   const handleMasterToggle = (masterPerm, childrenPerms) => {
     const isMasterActive = assignedList.includes(masterPerm);
     if (isMasterActive) {
@@ -143,35 +140,30 @@ export default function UserPermissionsDrawer({
     setSaving(true);
     try {
       await updateUserPermissions(user.id_usuario, assignedList);
-      showToast("Permisos actualizados correctamente", "success");
+      showToast(t("permissions.success.updated"), "success");
       if (onUpdateSuccess) onUpdateSuccess();
       onClose();
     } catch (error) {
-      showToast("Error al guardar cambios", "danger");
+      showToast(t("permissions.errors.save_failed"), "danger");
     } finally {
       setSaving(false);
     }
   };
 
-  // --- Renderizado de Grupo ---
+  // --- Render Grupo ---
   const renderGroup = (groupName, permissions) => {
     const config = CASCADING_CONFIG[groupName];
 
-    // 1. Caso Especial: Grupo en Cascada (Vehículos, Usuarios)
+    // 1. Grupo Especial (Cascada)
     if (config && config.isCascade) {
       const masterPerm = permissionsData[groupName]?.find(
         (p) => p.nombre === config.masterPermission
       );
-
-      // Si estamos filtrando y el permiso maestro se filtró (no aparece), buscamos en la data original
-      // para asegurar que el switch principal siempre exista si hay hijos visibles.
       const safeMasterPerm = masterPerm || { nombre: config.masterPermission };
-
       const subPermissions = permissions.filter(
         (p) => p.nombre !== config.masterPermission
       );
 
-      // Si por culpa del filtro no quedó nada en este grupo, no renderizamos
       if (!masterPerm && subPermissions.length === 0) return null;
 
       const isMasterOn = assignedList.includes(safeMasterPerm.nombre);
@@ -200,9 +192,9 @@ export default function UserPermissionsDrawer({
                 <Typography
                   level="title-md"
                   color={isMasterOn ? "primary" : "neutral"}>
-                  {config.title || groupName}
+                  {t(config.titleKey) || groupName}
                 </Typography>
-                <Typography level="body-xs">{config.description}</Typography>
+                <Typography level="body-xs">{t(config.descKey)}</Typography>
               </Box>
               <Switch
                 checked={isMasterOn}
@@ -221,44 +213,32 @@ export default function UserPermissionsDrawer({
             </Stack>
           </Box>
 
-          {/* Sub-permisos: Visibles si Master ON */}
           {isMasterOn && (
             <Box sx={{ p: 2, pt: 1, bgcolor: "background.surface" }}>
               <Divider sx={{ mb: 1.5, opacity: 0.5 }} />
-
               {subPermissions.length > 0 ? (
-                <>
-                  <Typography
-                    level="body-xs"
-                    fontWeight="bold"
-                    mb={1}
-                    textTransform="uppercase"
-                    letterSpacing="1px">
-                    Capacidades habilitadas:
-                  </Typography>
-                  <List size="sm">
-                    {subPermissions.map((perm) => (
-                      <ListItem key={perm.id}>
-                        <ListItemContent>
-                          <Typography level="body-sm">
-                            {perm.nombre.replace(/_/g, " ")}
-                          </Typography>
-                          <Typography level="body-xs" textColor="neutral.500">
-                            {perm.descripcion}
-                          </Typography>
-                        </ListItemContent>
-                        <Switch
-                          size="sm"
-                          checked={assignedList.includes(perm.nombre)}
-                          onChange={() => handleToggle(perm.nombre)}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </>
+                <List size="sm">
+                  {subPermissions.map((perm) => (
+                    <ListItem key={perm.id}>
+                      <ListItemContent>
+                        <Typography level="body-sm">
+                          {perm.nombre.replace(/_/g, " ")}
+                        </Typography>
+                        <Typography level="body-xs" textColor="neutral.500">
+                          {perm.descripcion}
+                        </Typography>
+                      </ListItemContent>
+                      <Switch
+                        size="sm"
+                        checked={assignedList.includes(perm.nombre)}
+                        onChange={() => handleToggle(perm.nombre)}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
               ) : (
                 <Typography level="body-xs" color="neutral" fontStyle="italic">
-                  No hay sub-permisos que coincidan con la búsqueda.
+                  {t("permissions.empty_sub_search")}
                 </Typography>
               )}
             </Box>
@@ -267,7 +247,7 @@ export default function UserPermissionsDrawer({
       );
     }
 
-    // 2. Caso Normal: Lista Simple
+    // 2. Grupo Normal
     return (
       <Box key={groupName} sx={{ mb: 3 }}>
         <Typography
@@ -281,8 +261,8 @@ export default function UserPermissionsDrawer({
           }}>
           {groupName}
         </Typography>
-        <Card variant="soft" sx={{ bgcolor: "background.level1" }}>
-          <List>
+        <Card variant="soft" sx={{ bgcolor: "background.level1", p: 0 }}>
+          <List sx={{ "--ListItem-paddingY": "12px" }}>
             {permissions.map((perm, idx) => (
               <React.Fragment key={perm.id}>
                 {idx > 0 && <Divider />}
@@ -292,7 +272,7 @@ export default function UserPermissionsDrawer({
                       {perm.nombre.replace(/_/g, " ")}
                     </Typography>
                     <Typography level="body-xs">
-                      {perm.descripcion || "Sin descripción"}
+                      {perm.descripcion || t("permissions.no_desc")}
                     </Typography>
                   </ListItemContent>
                   <Switch
@@ -300,6 +280,9 @@ export default function UserPermissionsDrawer({
                     onChange={() => handleToggle(perm.nombre)}
                     color={
                       assignedList.includes(perm.nombre) ? "success" : "neutral"
+                    }
+                    variant={
+                      assignedList.includes(perm.nombre) ? "solid" : "outlined"
                     }
                   />
                 </ListItem>
@@ -327,7 +310,7 @@ export default function UserPermissionsDrawer({
           },
         },
       }}>
-      {/* Header Fijo */}
+      {/* Header */}
       <Box
         sx={{
           p: 2,
@@ -338,62 +321,62 @@ export default function UserPermissionsDrawer({
           gap: 2,
           bgcolor: "background.surface",
         }}>
-        <IconButton
-          variant="plain"
-          color="neutral"
-          onClick={onClose}
-          disabled={saving}>
-          <CloseRoundedIcon />
-        </IconButton>
         <Box flex={1}>
           <Typography
             level="h4"
             startDecorator={
-              <ManageAccountsIcon sx={{ color: "primary.500" }} />
+              <ManageAccountsRoundedIcon sx={{ color: "primary.500" }} />
             }>
-            Permisos
+            {t("permissions.title")}
           </Typography>
           <Typography level="body-sm" color="neutral" noWrap>
-            Configurando a: <b>{user?.nombre}</b>
+            {t("permissions.subtitle", { name: user?.nombre })}
           </Typography>
         </Box>
-        {loading && <CircularProgress size="sm" />}
+        <ModalClose disabled={saving} onClick={onClose} />
       </Box>
 
       {/* Buscador Sticky */}
-      <Box
-        sx={{
-          p: 2,
-          pb: 1,
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          bgcolor: "background.body",
-        }}>
-        <Input
-          placeholder="Buscar permiso..."
-          startDecorator={<SearchRoundedIcon />}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="sm"
-          variant="outlined"
-          fullWidth
-        />
-      </Box>
+      {Object.keys(permissionsData).length > 0 && (
+        <Box
+          sx={{
+            p: 2,
+            pb: 1,
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            bgcolor: "background.body",
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}>
+          <Input
+            placeholder={t("permissions.search_placeholder")}
+            startDecorator={<SearchRoundedIcon />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="sm"
+            fullWidth
+          />
+        </Box>
+      )}
 
-      {/* Contenido Scrollable */}
+      {/* Contenido */}
       <Box
         sx={{
           flex: 1,
           overflowY: "auto",
           p: 3,
-          pt: 1,
+          pt: 2,
           bgcolor: "background.body",
         }}>
-        {Object.keys(filteredPermissions).length === 0 && !loading ? (
-          <Box textAlign="center" mt={4} opacity={0.6}>
-            <SearchRoundedIcon sx={{ fontSize: 40, mb: 1 }} />
-            <Typography>No se encontraron permisos.</Typography>
+        {loading ? (
+          <Box display="flex" justifyContent="center" py={10}>
+            <CircularProgress />
+          </Box>
+        ) : Object.keys(filteredPermissions).length === 0 ? (
+          <Box textAlign="center" mt={4} color="neutral.400">
+            <FilterListOffRoundedIcon sx={{ fontSize: 48, mb: 1 }} />
+            <Typography>{t("permissions.empty_search")}</Typography>
           </Box>
         ) : (
           Object.entries(filteredPermissions).map(([groupName, perms]) =>
@@ -402,7 +385,7 @@ export default function UserPermissionsDrawer({
         )}
       </Box>
 
-      {/* Footer Fijo */}
+      {/* Footer */}
       <Box
         sx={{
           p: 2,
@@ -413,11 +396,11 @@ export default function UserPermissionsDrawer({
         <Button
           fullWidth
           size="lg"
-          startDecorator={<SaveIcon />}
+          startDecorator={<SaveRoundedIcon />}
           onClick={handleSave}
           loading={saving}
           disabled={loading}>
-          Guardar Permisos
+          {t("common.actions.save_changes")}
         </Button>
       </Box>
     </Drawer>

@@ -1,6 +1,12 @@
 // src/pages/Register.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Typography, CircularProgress, Alert as JoyAlert } from "@mui/joy";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Alert as JoyAlert,
+  Link,
+} from "@mui/joy";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -8,30 +14,29 @@ import { toast } from "react-toastify";
 import SearchBar from "../../components/RegisterForm/SearchBar";
 import VehicleTable from "../../components/RegisterForm/VehicleTable";
 
-import {
-  obtenerVehiculos,
-  ListarVehiculosEmpleado,
-} from "../../services/VehiculosService";
+import { obtenerVehiculos } from "../../services/VehiculosService";
 import { getReservasPorUsuario } from "../../services/ReservaServices";
 import { obtenerRegistroActivo } from "../../services/RegistrosService";
 import { STORAGE_KEYS } from "../../config/variables";
 import { useAuth } from "../../context/AuthContext";
+import { useTranslation } from "react-i18next";
 
 export default function Register() {
+  const { t } = useTranslation();
   const [vehicles, setVehicles] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [registroActivo, setRegistroActivo] = useState(null); // <-- nuevo
-  const navigate = useNavigate();
+  const [registroActivo, setRegistroActivo] = useState(null);
 
+  const navigate = useNavigate();
   const { userData, hasPermiso } = useAuth();
+
   const esAdmin = (userData?.rol || "").toLowerCase() === "admin";
   const puedeRegistrar =
     esAdmin ||
     (typeof hasPermiso === "function" && hasPermiso("registrar_uso"));
 
-  // helper robusto para obtener id empleado (igual que en otras páginas)
   const getUserIdForApi = () =>
     userData?.id_empleado ??
     userData?.id ??
@@ -49,6 +54,7 @@ export default function Register() {
       }
     })();
 
+  // Cargar vehículos
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -58,16 +64,17 @@ export default function Register() {
         setVehicles(response);
       } else {
         setVehicles([]);
-        setError("No se pudo obtener la lista de vehículos.");
+        setError(t("register.errors.no_list"));
       }
     } catch (error) {
       console.error("Error al obtener vehículos:", error);
-      setError("No se pudo conectar con el servidor.");
+      setError(t("register.errors.server"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
+  // Verificar reservas
   const verificarReservas = useCallback(async () => {
     try {
       const userLS = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER));
@@ -77,45 +84,39 @@ export default function Register() {
       const reservas = await getReservasPorUsuario(idEmpleado);
       if (reservas && reservas.length > 0 && reservas[0].total > 0) {
         Swal.fire({
-          title: "Reservas Pendientes",
-          text: "Tienes una o más reservas activas pendientes. Por favor realiza el registro correspondiente.",
+          title: t("register.reservas.title"),
+          text: t("register.reservas.msg"),
           icon: "warning",
-          confirmButtonText: "Entendido",
+          confirmButtonText: t("register.reservas.ok"),
         });
       }
     } catch (error) {
       console.error("Error al verificar reservas activas:", error);
-      toast.error("No se pudo verificar tus reservas activas.");
+      toast.error(t("register.errors.check_reservas"));
     }
-  }, []);
+  }, [t]);
 
-  // ---- NUEVO: verificar registro activo al cargar la página (mostrar alerta desde la tabla) ----
+  // Verificar registro activo
   const checkRegistroActivo = useCallback(async () => {
     const userId = getUserIdForApi();
-    if (!userId) {
-      console.warn("[Register] No hay userId para checkRegistroActivo");
-      return;
-    }
+    if (!userId) return;
+
     try {
       const reg = await obtenerRegistroActivo(userId);
+
       if (reg) {
-        // guardamos para mostrar banner/usar en UI si quieres
         setRegistroActivo(reg);
 
-        // mostramos Swal inmediatamente (igual que en el formulario)
         Swal.fire({
-          title: "Tienes un registro pendiente",
-          text: "Debes registrar el regreso del vehículo antes de hacer otra salida.",
+          title: t("register.registro_activo.title"),
+          text: t("register.registro_activo.msg"),
           icon: "info",
-          confirmButtonText: "Ir al registro",
+          confirmButtonText: t("register.registro_activo.go"),
           showCancelButton: true,
-          cancelButtonText: "Cerrar",
+          cancelButtonText: t("register.registro_activo.cancel"),
         }).then((res) => {
           if (res.isConfirmed) {
-            // llevar al formulario de regreso (si tu ruta es esa)
             navigate("/admin/panel-vehiculos/register?mode=regreso");
-            // o si usas otra ruta:
-            // navigate("/admin/panel-vehiculos/register-regreso");
           }
         });
       } else {
@@ -123,32 +124,14 @@ export default function Register() {
       }
     } catch (err) {
       console.error("[Register] Error checkRegistroActivo:", err);
-      // no bloqueamos la página por esto
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData]);
+  }, [navigate, t]);
 
   useEffect(() => {
     fetchVehicles();
     verificarReservas();
     checkRegistroActivo();
   }, [fetchVehicles, verificarReservas, checkRegistroActivo]);
-
-  const handleSearchChange = (value) => setSearch(value);
-
-  const handleRegisterClick = () => {
-    if (!puedeRegistrar) {
-      toast.warning("No tienes permiso para registrar uso de vehículos.");
-      return;
-    }
-    if (vehicles.length === 0 && !esAdmin) {
-      toast.error(
-        "No puedes registrar vehículos porque no tienes permiso para ver los vehículos."
-      );
-      return;
-    }
-    navigate("/admin/panel-vehiculos/register");
-  };
 
   const filteredVehicles = useMemo(() => {
     const searchLower = search.toLowerCase();
@@ -160,47 +143,45 @@ export default function Register() {
     );
   }, [vehicles, search]);
 
+  const handleRegisterClick = () => {
+    if (!puedeRegistrar) {
+      toast.warning(t("register.no_permiso"));
+      return;
+    }
+    navigate("/admin/panel-vehiculos/register");
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography level="h4" mb={2}>
-        Registro de uso de vehículos
+        {t("register.title")}
       </Typography>
 
-      {/* Si hay un registro activo mostramos un banner claro arriba */}
+      {/* Banner superior si tiene registro activo */}
       {registroActivo && (
-        <JoyAlert
-          color="warning"
-          variant="soft"
-          sx={{ mb: 2 }}
-          startDecorator={null}>
-          <strong>Tienes un registro pendiente:</strong>{" "}
-          {registroActivo.placa ? `${registroActivo.placa}` : ""}
-          {" • "}
+        <JoyAlert color="warning" variant="soft" sx={{ mb: 2 }}>
+          <b>{t("register.registro_activo.banner_title")}</b>{" "}
+          {registroActivo.placa} —{" "}
           {registroActivo.fecha_salida
-            ? `Salida: ${new Date(
+            ? `${t("register.registro_activo.fecha")}: ${new Date(
                 registroActivo.fecha_salida
               ).toLocaleString()}`
             : ""}
-          {" — "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              // navegar directo al formulario de regreso (ajusta la ruta si hace falta)
-              navigate("/admin/panel-vehiculos/register?mode=regreso");
-            }}
-            style={{
-              color: "inherit",
-              textDecoration: "underline",
-              marginLeft: 8,
-            }}>
-            Ir al registro
-          </a>
+          {" • "}
+          <Link
+            component="button"
+            onClick={() =>
+              navigate("/admin/panel-vehiculos/register?mode=regreso")
+            }
+            underline="always"
+            sx={{ ml: 1 }}>
+            {t("register.registro_activo.go")}
+          </Link>
         </JoyAlert>
       )}
 
       <SearchBar
-        onSearch={handleSearchChange}
+        onSearch={setSearch}
         onAdd={handleRegisterClick}
         canAdd={!!puedeRegistrar}
         inputMaxWidth={320}
@@ -217,7 +198,7 @@ export default function Register() {
           </Typography>
         ) : filteredVehicles.length === 0 ? (
           <Typography textAlign="center" color="neutral">
-            No se encontraron vehículos que coincidan con la búsqueda.
+            {t("register.no_results")}
           </Typography>
         ) : (
           <VehicleTable vehicles={filteredVehicles} />

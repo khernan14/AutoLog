@@ -1,110 +1,123 @@
+// src/components/Users/MyAccount/MyAccountForm.jsx
+import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
-  List,
-  ListItem,
-  ListItemDecorator,
+  Grid,
+  FormControl,
+  FormLabel,
+  Input,
   Typography,
-  Divider,
+  Stack,
 } from "@mui/joy";
-import PersonIcon from "@mui/icons-material/Person";
-import EmailIcon from "@mui/icons-material/Email";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import PublicIcon from "@mui/icons-material/Public";
-import LocationCityIcon from "@mui/icons-material/LocationCity";
+
+// Iconos
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import AlternateEmailRoundedIcon from "@mui/icons-material/AlternateEmailRounded"; // Para usuario
+import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
+import LocationCityRoundedIcon from "@mui/icons-material/LocationCityRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded"; // Para apellido
 
 export default function MyAccountForm({ user }) {
-  if (!user) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}>
-        <Typography level="h4">Cargando...</Typography>
-      </Box>
-    );
-  }
+  const { t } = useTranslation();
+
+  // Si no hay usuario, el padre maneja el Skeleton, así que retornamos null o un fallback simple
+  if (!user) return null;
 
   return (
-    <Box sx={{ width: "100%", px: { xs: 2, md: 4 }, py: 2 }}>
-      <Typography level="h4" fontWeight="lg" mb={2}>
-        Información de la cuenta
-      </Typography>
+    <Box sx={{ width: "100%" }}>
+      <Grid container spacing={2}>
+        {/* Nombre */}
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.name")}</FormLabel>
+            <Input
+              startDecorator={<PersonRoundedIcon />}
+              value={user.nombre || ""}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
 
-      <List
-        size="sm"
-        variant="plain"
-        sx={{
-          "--ListItem-paddingY": "12px",
-          "--ListItemDecorator-size": "32px",
-          borderRadius: "md",
-        }}>
-        <ListItem>
-          <ListItemDecorator>
-            <PersonIcon />
-          </ListItemDecorator>
-          <Box>
-            <Typography level="body-sm" color="neutral">
-              Nombre completo
-            </Typography>
-            <Typography level="body-md">{user.nombre}</Typography>
-          </Box>
-        </ListItem>
-        <Divider />
+        {/* Apellido (si existe en tu modelo, o repetimos nombre si es campo único) */}
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.lastname")}</FormLabel>
+            <Input
+              startDecorator={<BadgeRoundedIcon />}
+              value={user.apellido || ""}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
 
-        <ListItem>
-          <ListItemDecorator>
-            <EmailIcon />
-          </ListItemDecorator>
-          <Box>
-            <Typography level="body-sm" color="neutral">
-              Correo electrónico
-            </Typography>
-            <Typography level="body-md">{user.email}</Typography>
-          </Box>
-        </ListItem>
-        <Divider />
+        {/* Email - Ocupa todo el ancho en móviles, mitad en escritorio */}
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.email")}</FormLabel>
+            <Input
+              startDecorator={<EmailRoundedIcon />}
+              value={user.email || ""}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
 
-        <ListItem>
-          <ListItemDecorator>
-            <AccountCircleIcon />
-          </ListItemDecorator>
-          <Box>
-            <Typography level="body-sm" color="neutral">
-              Usuario
-            </Typography>
-            <Typography level="body-md">{user.username}</Typography>
-          </Box>
-        </ListItem>
-        <Divider />
+        {/* Username */}
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.username")}</FormLabel>
+            <Input
+              startDecorator={<AlternateEmailRoundedIcon />}
+              value={user.username || ""}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
 
-        <ListItem>
-          <ListItemDecorator>
-            <PublicIcon />
-          </ListItemDecorator>
-          <Box>
-            <Typography level="body-sm" color="neutral">
-              País
-            </Typography>
-            <Typography level="body-md">{user.pais}</Typography>
-          </Box>
-        </ListItem>
-        <Divider />
+        {/* Ubicación: País y Ciudad */}
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.country")}</FormLabel>
+            <Input
+              startDecorator={<PublicRoundedIcon />}
+              value={user.pais || "—"}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
 
-        <ListItem>
-          <ListItemDecorator>
-            <LocationCityIcon />
-          </ListItemDecorator>
-          <Box>
-            <Typography level="body-sm" color="neutral">
-              Ciudad
-            </Typography>
-            <Typography level="body-md">{user.ciudad}</Typography>
-          </Box>
-        </ListItem>
-      </List>
+        <Grid xs={12} md={6}>
+          <FormControl>
+            <FormLabel>{t("account.fields.city")}</FormLabel>
+            <Input
+              startDecorator={<LocationCityRoundedIcon />}
+              value={user.ciudad || "—"}
+              readOnly
+              variant="outlined"
+              color="neutral"
+            />
+          </FormControl>
+        </Grid>
+      </Grid>
+
+      {/* Nota sutil al pie */}
+      <Stack sx={{ mt: 3 }}>
+        <Typography level="body-xs" textColor="neutral.500">
+          * {t("account.info_readonly")}
+        </Typography>
+      </Stack>
     </Box>
   );
 }

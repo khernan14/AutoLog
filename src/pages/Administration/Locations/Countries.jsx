@@ -1,24 +1,50 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next"; // 👈 i18n
+import { useFormik } from "formik";
+import * as yup from "yup";
+import Swal from "sweetalert2";
+
 import {
   Box,
-  Card,
   Typography,
   Stack,
   Button,
   Sheet,
+  Table,
+  Input,
+  IconButton,
+  Modal,
+  ModalDialog,
+  ModalClose,
+  FormControl,
+  FormLabel,
+  Divider,
   CircularProgress,
+  Tooltip,
+  Dropdown,
+  Menu,
+  MenuButton,
+  MenuItem,
 } from "@mui/joy";
-import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
-import LockPersonRoundedIcon from "@mui/icons-material/LockPersonRounded";
-import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
+// Iconos
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ClearIcon from "@mui/icons-material/Clear";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import PublicRoundedIcon from "@mui/icons-material/PublicRounded"; // Icono para empty state
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import Swal from "sweetalert2";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 
-import { useAuth } from "../../../context/AuthContext";
-import { useToast } from "../../../context/ToastContext";
+// Hooks & Context
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
+import useIsMobile from "@/hooks/useIsMobile";
+import StatusCard from "@/components/common/StatusCard";
 
+// Services
 import {
   getCountries,
   addCountry,
@@ -26,50 +52,52 @@ import {
   deleteCountry,
 } from "../../../services/LocationServices";
 
-// Ajusta la ruta si tu StatusCard vive en otro lugar
-import StatusCard from "../../../components/common/StatusCard";
-
-import CountriesTable from "../../../components/Administration/Locations/Countries/CountriesTable";
-import CountriesModal from "../../../components/Administration/Locations/Countries/CountriesModal";
-import CountriesToolBar from "../../../components/Administration/Locations/Countries/CountriesToolBar";
+// --- Validaciones ---
+const validationSchema = yup.object({
+  nombre: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? v.trim() : v))
+    .min(2, "Mínimo 2 caracteres")
+    .max(60, "Máximo 60 caracteres")
+    .required("Requerido"),
+});
 
 export default function Countries() {
-  // ---- state ----
-  const [countries, setCountries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const [openModal, setOpenModal] = useState(false);
-  const [editCountry, setEditCountry] = useState(null);
-
-  const [search, setSearch] = useState("");
-
-  // ---- auth/perm ----
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
+  const isMobile = useIsMobile(); // Hook para detectar móvil
+
+  // --- Permisos ---
   const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
-    (perm) => isAdmin || hasPermiso(perm),
+    (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
 
-  // Fallbacks por ausencia de eliminar_paises en tu DB
   const canView = can("ver_paises");
   const canCreate = can("crear_paises");
   const canEdit = can("editar_paises");
-  const canDelete = can("eliminar_paises") || canEdit;
+  const canDelete = can("eliminar_paises") || canEdit; // Fallback
 
-  // ---- toast ----
-  const { showToast } = useToast();
+  // --- Estado ---
+  const [countries, setCountries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
 
-  // ---- load ----
+  // Modal
+  const [openModal, setOpenModal] = useState(false);
+  const [editingCountry, setEditingCountry] = useState(null);
+
+  // --- Carga ---
   const loadCountries = useCallback(async () => {
     if (checkingSession) {
       setLoading(true);
       return;
     }
-
     if (!canView) {
-      setError(null); // dejemos a la tarjeta de "sin permisos" encargarse del mensaje
+      setError(null);
       setLoading(false);
       return;
     }
@@ -78,276 +106,369 @@ export default function Countries() {
     setError(null);
     try {
       const data = await getCountries();
-      if (Array.isArray(data)) {
-        setCountries(data);
-      } else {
-        setError("No se pudieron cargar los países.");
-      }
+      setCountries(Array.isArray(data) ? data : []);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : msg
+          ? t("common.network_error")
+          : t("locations.countries.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [checkingSession, canView]);
+  }, [checkingSession, canView, t]);
 
   useEffect(() => {
     loadCountries();
   }, [loadCountries]);
 
-  // ---- actions ----
-  const onNew = () => {
-    if (!canCreate) {
-      showToast(
-        "No tienes permiso para crear países. Solicítalo al administrador.",
-        "warning"
-      );
-      return;
-    }
-    setEditCountry(null);
+  // --- Filtrado ---
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase();
+    return countries.filter((c) => (c.nombre || "").toLowerCase().includes(s));
+  }, [countries, search]);
+
+  // --- Acciones ---
+  const handleNew = () => {
+    if (!canCreate) return showToast(t("common.no_permission"), "warning");
+    setEditingCountry(null);
     setOpenModal(true);
   };
 
-  const onEdit = (country) => {
-    if (!canEdit) {
-      showToast("No tienes permiso para editar países.", "warning");
-      return;
-    }
-    setEditCountry(country);
+  const handleEdit = (country) => {
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
+    setEditingCountry(country);
     setOpenModal(true);
   };
 
-  const onDelete = async (id) => {
-    if (!canDelete) {
-      showToast("No tienes permiso para eliminar países.", "warning");
-      return;
-    }
+  const handleDelete = async (country) => {
+    if (!canDelete) return showToast(t("common.no_permission"), "warning");
+
     const res = await Swal.fire({
-      title: "¿Eliminar país?",
-      text: "Esta acción no se puede deshacer.",
+      title: t("common.confirm_delete"),
+      text: t("locations.countries.delete_confirm", { name: country.nombre }),
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Sí, eliminar",
-      cancelButtonText: "Cancelar",
+      confirmButtonText: t("common.actions.delete"),
+      cancelButtonText: t("common.actions.cancel"),
     });
+
     if (!res.isConfirmed) return;
 
     try {
-      const r = await deleteCountry(id);
+      const r = await deleteCountry(country.id);
       if (r && !r.error) {
-        setCountries((prev) => prev.filter((c) => c.id !== id));
-        showToast("País eliminado correctamente", "success");
+        showToast(t("locations.countries.success.deleted"), "success");
+        setCountries((prev) => prev.filter((c) => c.id !== country.id));
       } else {
-        showToast("Error al eliminar el país.", "danger");
+        showToast(t("locations.countries.errors.delete_failed"), "danger");
       }
     } catch {
-      showToast("Error de conexión al intentar eliminar el país.", "danger");
+      showToast(t("locations.countries.errors.delete_failed"), "danger");
     }
   };
 
-  const onSubmitCountry = async (payload) => {
-    const nombre = payload?.nombre?.trim();
-    if (!nombre)
-      return showToast("El nombre del país es obligatorio", "warning");
+  // --- Formulario (Formik) ---
+  const formik = useFormik({
+    initialValues: { nombre: "" },
+    validationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      const payload = { ...values, nombre: values.nombre.trim() };
 
-    // crear
-    if (!payload?.id) {
-      if (!canCreate)
-        return showToast("No tienes permiso para crear países.", "warning");
       try {
-        const r = await addCountry({ nombre });
-        if (r && !r.error) {
-          showToast("País agregado correctamente", "success");
-          setOpenModal(false);
-          setEditCountry(null);
-          loadCountries();
+        if (editingCountry) {
+          // Update
+          const r = await updateCountry(editingCountry.id, {
+            id: editingCountry.id,
+            ...payload,
+          });
+          if (r && !r.error) {
+            showToast(t("locations.countries.success.updated"), "success");
+            setOpenModal(false);
+            loadCountries();
+          } else {
+            showToast(t("locations.countries.errors.update_failed"), "danger");
+          }
         } else {
-          showToast("Error al agregar el país.", "danger");
+          // Create
+          const r = await addCountry(payload);
+          if (r && !r.error) {
+            showToast(t("locations.countries.success.created"), "success");
+            setOpenModal(false);
+            loadCountries();
+          } else {
+            showToast(t("locations.countries.errors.create_failed"), "danger");
+          }
         }
-      } catch {
-        showToast("Error de conexión al guardar el país.", "danger");
+      } catch (e) {
+        showToast(t("common.unknown_error"), "danger");
+      } finally {
+        setSubmitting(false);
       }
-      return;
+    },
+  });
+
+  // Reset form al abrir/cerrar
+  useEffect(() => {
+    if (openModal) {
+      formik.setValues({ nombre: editingCountry?.nombre || "" });
+      formik.setTouched({});
     }
+  }, [openModal, editingCountry]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // actualizar
-    if (!canEdit)
-      return showToast("No tienes permiso para editar países.", "warning");
-    try {
-      const r = await updateCountry(payload.id, { id: payload.id, nombre });
-      if (r && !r.error) {
-        showToast("País actualizado correctamente", "success");
-        setOpenModal(false);
-        setEditCountry(null);
-        loadCountries();
-      } else {
-        showToast("Error al actualizar el país.", "danger");
-      }
-    } catch {
-      showToast("Error de conexión al actualizar el país.", "danger");
-    }
-  };
-
-  // ---- filtered ----
-  const filtered = useMemo(() => {
-    const s = (search || "").toLowerCase();
-    return (Array.isArray(countries) ? countries : []).filter((c) =>
-      (c?.nombre || "").toLowerCase().includes(s)
-    );
-  }, [countries, search]);
-
-  // ---- view state ----
+  // --- Render ---
   const viewState = checkingSession
     ? "checking"
     : !canView
     ? "no-permission"
     : error
     ? "error"
-    : !loading && filtered.length === 0
-    ? "empty"
     : loading
     ? "loading"
+    : filtered.length === 0 && !search
+    ? "empty"
     : "data";
 
-  const renderStatus = () => {
-    if (viewState === "checking") {
-      return (
-        <StatusCard
-          icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
-        />
-      );
-    }
-    if (viewState === "no-permission") {
-      return (
-        <StatusCard
-          color="danger"
-          icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver países"
-          description="Consulta con un administrador para obtener acceso."
-        />
-      );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
-      return (
-        <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
-          }
-          description={error}
-          actions={
-            <Button
-              startDecorator={<RestartAltRoundedIcon />}
-              onClick={loadCountries}
-              variant="soft">
-              Reintentar
-            </Button>
-          }
-        />
-      );
-    }
-    if (viewState === "empty") {
-      return (
-        <StatusCard
-          color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="Sin países"
-          description="Aún no hay países registrados."
-        />
-      );
-    }
-    if (viewState === "loading") {
-      return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando…</Typography>
-          </Stack>
-        </Sheet>
-      );
-    }
-    return null;
-  };
-
-  // ---- UI ----
   return (
-    <Sheet
-      variant="plain"
+    <Box
+      component="main"
       sx={{
-        flex: 1,
-        width: "100%",
-        pt: { xs: "calc(12px + var(--Header-height))", md: 4 },
-        pb: { xs: 2, sm: 2, md: 4 },
         px: { xs: 2, md: 4 },
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        overflow: "auto",
-        minHeight: "100dvh",
-        bgcolor: "background.body",
-        borderRadius: 16,
+        py: 3,
+        maxWidth: 1000,
+        mx: "auto",
+        minHeight: "100vh",
       }}>
-      <Box sx={{ width: "100%" }}>
-        {/* Header */}
-        <CountriesToolBar
-          onSearch={(text) => setSearch(text)}
-          onAdd={onNew}
-          canAdd={canCreate}
-        />
-
-        {/* Contenedor principal */}
-        <Card
-          variant="plain"
-          sx={{
-            overflowX: "auto",
-            width: "100%",
-            background: "background.surface",
-          }}>
-          {viewState !== "data" ? (
-            <Box p={2}>{renderStatus()}</Box>
-          ) : (
-            <CountriesTable
-              countries={filtered}
-              onEdit={canEdit ? onEdit : undefined}
-              onDelete={canDelete ? onDelete : undefined}
-              canEdit={canEdit}
-              canDelete={canDelete}
-            />
-          )}
-        </Card>
-
-        {/* Modal crear/editar */}
-        {openModal && (
-          <CountriesModal
-            open={openModal}
-            onClose={() => {
-              setOpenModal(false);
-              setEditCountry(null);
-            }}
-            initialValues={editCountry || undefined}
-            onSubmit={onSubmitCountry}
-          />
+      {/* HEADER */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        mb={3}>
+        <Box>
+          <Typography level="h3" fontSize="xl2" fontWeight="lg">
+            {t("locations.countries.title")}
+          </Typography>
+          <Typography level="body-sm" color="neutral">
+            {t("locations.countries.subtitle")}
+          </Typography>
+        </Box>
+        {canCreate && (
+          <Button
+            startDecorator={<AddRoundedIcon />}
+            onClick={handleNew}
+            variant="solid"
+            color="primary">
+            {t("locations.countries.actions.new")}
+          </Button>
         )}
+      </Stack>
+
+      {/* TOOLBAR */}
+      <Box sx={{ mb: 3 }}>
+        <Input
+          placeholder={t("locations.countries.search_placeholder")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          startDecorator={<SearchRoundedIcon />}
+          endDecorator={
+            search && (
+              <IconButton
+                size="sm"
+                variant="plain"
+                onClick={() => setSearch("")}>
+                <ClearIcon />
+              </IconButton>
+            )
+          }
+          sx={{ maxWidth: 400 }}
+        />
       </Box>
-    </Sheet>
+
+      {/* CONTENT */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          overflow: "hidden",
+          bgcolor: "background.surface",
+        }}>
+        {viewState === "loading" && (
+          <Box display="flex" justifyContent="center" py={10}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {viewState === "error" && (
+          <Box p={4} display="flex" justifyContent="center">
+            <StatusCard
+              color="danger"
+              icon={<ErrorOutlineRoundedIcon />}
+              title={t("common.error_title")}
+              description={error}
+              actions={
+                <Button
+                  startDecorator={<RestartAltRoundedIcon />}
+                  onClick={loadCountries}
+                  variant="soft">
+                  {t("common.retry")}
+                </Button>
+              }
+            />
+          </Box>
+        )}
+
+        {viewState === "empty" && (
+          <Box p={4} display="flex" justifyContent="center">
+            <StatusCard
+              color="neutral"
+              icon={<PublicRoundedIcon />}
+              title={t("locations.countries.empty.title")}
+              description={t("locations.countries.empty.desc")}
+            />
+          </Box>
+        )}
+
+        {viewState === "data" && (
+          <Table
+            stickyHeader
+            hoverRow
+            sx={{
+              "--TableCell-paddingX": "24px",
+              "--TableCell-paddingY": "12px",
+              "& thead th": {
+                bgcolor: "background.level1",
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.05em",
+              },
+            }}>
+            <thead>
+              <tr>
+                <th>{t("locations.countries.columns.name")}</th>
+                <th style={{ width: 100, textAlign: "right" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((country) => (
+                <tr key={country.id}>
+                  <td>
+                    <Typography fontWeight="md">{country.nombre}</Typography>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <Dropdown>
+                      <MenuButton
+                        slots={{ root: IconButton }}
+                        slotProps={{
+                          root: {
+                            variant: "plain",
+                            color: "neutral",
+                            size: "sm",
+                          },
+                        }}>
+                        <MoreHorizRoundedIcon />
+                      </MenuButton>
+                      <Menu placement="bottom-end">
+                        {canEdit && (
+                          <MenuItem onClick={() => handleEdit(country)}>
+                            <EditRoundedIcon /> {t("common.actions.edit")}
+                          </MenuItem>
+                        )}
+                        {/* {canDelete && (
+                          <MenuItem
+                            onClick={() => handleDelete(country)}
+                            color="danger">
+                            <DeleteOutlineRoundedIcon />{" "}
+                            {t("common.actions.delete")}
+                          </MenuItem>
+                        )} */}
+                      </Menu>
+                    </Dropdown>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={2}
+                    style={{ textAlign: "center", padding: "40px" }}>
+                    <Typography color="neutral">
+                      {t("locations.countries.empty.no_matches")}
+                    </Typography>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </Table>
+        )}
+      </Sheet>
+
+      {/* MODAL CREAR/EDITAR */}
+      <Modal
+        open={openModal}
+        onClose={() => !formik.isSubmitting && setOpenModal(false)}>
+        <ModalDialog sx={{ width: { xs: "100%", sm: 400 } }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            mb={1}>
+            <Typography level="h4">
+              {editingCountry
+                ? t("locations.countries.edit_title")
+                : t("locations.countries.create_title")}
+            </Typography>
+            <ModalClose
+              disabled={formik.isSubmitting}
+              onClick={() => setOpenModal(false)}
+            />
+          </Stack>
+          <Divider />
+          <form onSubmit={formik.handleSubmit}>
+            <Stack spacing={2} mt={2}>
+              <FormControl
+                error={formik.touched.nombre && Boolean(formik.errors.nombre)}>
+                <FormLabel>{t("locations.countries.form.name")}</FormLabel>
+                <Input
+                  autoFocus
+                  name="nombre"
+                  value={formik.values.nombre}
+                  onChange={formik.handleChange}
+                  onBlur={() => formik.setFieldTouched("nombre", true)}
+                  disabled={formik.isSubmitting}
+                />
+                {formik.touched.nombre && formik.errors.nombre && (
+                  <Typography level="body-xs" color="danger">
+                    {formik.errors.nombre}
+                  </Typography>
+                )}
+              </FormControl>
+
+              <Stack
+                direction="row"
+                justifyContent="flex-end"
+                spacing={1}
+                mt={1}>
+                <Button
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setOpenModal(false)}
+                  disabled={formik.isSubmitting}>
+                  {t("common.actions.cancel")}
+                </Button>
+                <Button type="submit" loading={formik.isSubmitting}>
+                  {t("common.actions.save")}
+                </Button>
+              </Stack>
+            </Stack>
+          </form>
+        </ModalDialog>
+      </Modal>
+    </Box>
   );
 }

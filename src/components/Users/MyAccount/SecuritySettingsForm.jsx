@@ -1,3 +1,6 @@
+// src/components/Users/MyAccount/SecuritySettingsForm.jsx
+import React, { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Stack,
@@ -7,138 +10,214 @@ import {
   FormControl,
   LinearProgress,
   Button,
+  IconButton,
+  List,
+  ListItem,
+  ListItemDecorator,
+  FormHelperText,
 } from "@mui/joy";
-import { Key } from "@mui/icons-material";
+
+// Iconos
+import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import Swal from "sweetalert2";
 import { updateUser } from "../../../services/AuthServices";
 
-const validationSchema = Yup.object({
-  password: Yup.string()
-    .required("La contraseña es obligatoria")
-    .min(8, "Mínimo 8 caracteres"),
-});
+export default function SecuritySettingsForm({ user, showSnackbar }) {
+  const { t } = useTranslation();
+  const [showPassword, setShowPassword] = useState(false);
 
-export default function SecuritySettingsForm({ user }) {
+  // Esquema de validación con reglas estrictas
+  const validationSchema = useMemo(() => {
+    return Yup.object({
+      password: Yup.string()
+        .required(t("account.security.validation.required"))
+        .min(8, t("account.security.validation.min_length"))
+        .matches(/[a-z]/, t("account.security.validation.lowercase"))
+        .matches(/[A-Z]/, t("account.security.validation.uppercase"))
+        .matches(/\d/, t("account.security.validation.number"))
+        .matches(/[@$!%*?&._-]/, t("account.security.validation.special")),
+    });
+  }, [t]);
+
   const formik = useFormik({
     initialValues: {
       password: "",
     },
     validationSchema,
-    onSubmit: async ({ password }) => {
+    onSubmit: async ({ password }, { resetForm }) => {
       const confirm = await Swal.fire({
-        title: "¿Deseas cambiar la contraseña?",
-        text: "Se cambiará la contraseña actual",
+        title: t("account.security.confirm_title"),
+        text: t("account.security.confirm_text"),
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#03624C",
+        confirmButtonColor: "#0B6BCB",
         cancelButtonColor: "#d33",
-        confirmButtonText: "Sí, cambiar contraseña",
+        confirmButtonText: t("common.actions.confirm"),
+        cancelButtonText: t("common.actions.cancel"),
       });
 
       if (confirm.isConfirmed) {
-        const data = await updateUser({
-          id_usuario: user.id_usuario,
-          password,
-        });
-        if (data && data.error) {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: data.error,
-            confirmButtonColor: "#d33",
+        try {
+          const data = await updateUser({
+            id_usuario: user.id_usuario || user.id, // Asegurar ID
+            password,
           });
-        } else {
-          Swal.fire({
-            icon: "success",
-            title: "Éxito",
-            text: "La contraseña fue actualizada.",
-            confirmButtonColor: "#03624C",
-          });
-          formik.resetForm();
+
+          if (data && data.error) {
+            showSnackbar(data.error, "danger");
+          } else {
+            // Éxito visual con SweetAlert o Snackbar (usamos Snackbar por consistencia con el padre)
+            showSnackbar(t("account.security.success_update"), "success");
+            resetForm();
+          }
+        } catch (error) {
+          showSnackbar(t("common.network_error"), "danger");
         }
       }
     },
   });
 
+  // --- Lógica de cálculo de fuerza visual ---
+  const getStrength = (pass) => {
+    let score = 0;
+    if (!pass) return 0;
+    if (pass.length >= 8) score += 20;
+    if (/[a-z]/.test(pass)) score += 20;
+    if (/[A-Z]/.test(pass)) score += 20;
+    if (/\d/.test(pass)) score += 20;
+    if (/[@$!%*?&._-]/.test(pass)) score += 20;
+    return score;
+  };
+
+  const strength = getStrength(formik.values.password);
+
+  const getColor = (s) => {
+    if (s < 40) return "danger";
+    if (s < 80) return "warning";
+    return "success";
+  };
+
+  const getStrengthLabel = (s) => {
+    if (s === 0) return "";
+    if (s < 40) return t("account.security.strength.weak");
+    if (s < 80) return t("account.security.strength.medium");
+    return t("account.security.strength.strong");
+  };
+
+  // Helper para renderizar items de requisitos
+  const RequirementItem = ({ fulfilled, label }) => (
+    <ListItem sx={{ minHeight: 24, p: 0 }}>
+      <ListItemDecorator sx={{ minWidth: 24 }}>
+        {fulfilled ? (
+          <CheckCircleRoundedIcon sx={{ fontSize: 16, color: "success.500" }} />
+        ) : (
+          <CancelRoundedIcon sx={{ fontSize: 16, color: "neutral.300" }} />
+        )}
+      </ListItemDecorator>
+      <Typography
+        level="body-xs"
+        textColor={fulfilled ? "text.primary" : "neutral.400"}
+        sx={{ textDecoration: fulfilled ? "none" : "none" }}>
+        {label}
+      </Typography>
+    </ListItem>
+  );
+
   return (
     <form onSubmit={formik.handleSubmit}>
-      <Stack spacing={2}>
+      <Stack spacing={3} sx={{ maxWidth: 400 }}>
         <FormControl
-          error={formik.touched.password && !!formik.errors.password}>
-          <FormLabel>Nueva Contraseña</FormLabel>
+          error={formik.touched.password && Boolean(formik.errors.password)}>
+          <FormLabel>{t("account.security.new_password_label")}</FormLabel>
           <Input
-            type="password"
+            type={showPassword ? "text" : "password"}
             name="password"
-            placeholder="Nueva contraseña"
-            size="sm"
-            startDecorator={<Key />}
+            placeholder={t("account.security.placeholder")}
+            startDecorator={<KeyRoundedIcon />}
+            endDecorator={
+              <IconButton
+                onClick={() => setShowPassword(!showPassword)}
+                variant="plain"
+                color="neutral"
+                size="sm">
+                {showPassword ? (
+                  <VisibilityOffRoundedIcon />
+                ) : (
+                  <VisibilityRoundedIcon />
+                )}
+              </IconButton>
+            }
             value={formik.values.password}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
-            fullWidth
+            size="lg"
           />
+          {/* Solo mostramos el error de Formik si es un error "general" o si queremos ser redundantes. 
+              En este diseño, la lista de abajo ya actúa como validador visual. */}
         </FormControl>
 
-        {formik.values.password && (
-          <>
-            <LinearProgress
-              determinate
-              size="sm"
-              value={Math.min((formik.values.password.length * 100) / 12, 100)}
-              color={
-                formik.values.password.length < 3
-                  ? "danger"
-                  : formik.values.password.length < 6
-                  ? "warning"
-                  : formik.values.password.length < 10
-                  ? "primary"
-                  : "success"
-              }
-              sx={{
-                bgcolor: "background.level3",
-              }}
-            />
+        {/* Indicador de Fuerza */}
+        <Box>
+          <Stack direction="row" justifyContent="space-between" mb={1}>
+            <Typography level="body-xs" fontWeight="lg">
+              {t("account.security.password_strength")}
+            </Typography>
             <Typography
               level="body-xs"
-              sx={{
-                color:
-                  formik.values.password.length < 3
-                    ? "danger.plainColor"
-                    : formik.values.password.length < 6
-                    ? "warning.plainColor"
-                    : formik.values.password.length < 10
-                    ? "primary.plainColor"
-                    : "success.plainColor",
-                textAlign: "right",
-              }}>
-              {formik.values.password.length < 3 && "Muy débil"}
-              {formik.values.password.length >= 3 &&
-                formik.values.password.length < 6 &&
-                "Débil"}
-              {formik.values.password.length >= 6 &&
-                formik.values.password.length < 10 &&
-                "Fuerte"}
-              {formik.values.password.length >= 10 && "Muy fuerte"}
+              color={getColor(strength)}
+              fontWeight="lg">
+              {getStrengthLabel(strength)}
             </Typography>
-          </>
-        )}
+          </Stack>
+          <LinearProgress
+            determinate
+            value={strength}
+            color={getColor(strength)}
+            thickness={6}
+            sx={{ bgcolor: "background.level3", borderRadius: "sm" }}
+          />
+        </Box>
 
-        {formik.touched.password && formik.errors.password && (
-          <Typography color="danger" level="body-xs">
-            {formik.errors.password}
-          </Typography>
-        )}
+        {/* Lista de Requisitos Visuales */}
+        <List size="sm" sx={{ "--ListItem-paddingY": "0px", gap: 0.5 }}>
+          <RequirementItem
+            fulfilled={formik.values.password.length >= 8}
+            label={t("account.security.req.min_chars")}
+          />
+          <RequirementItem
+            fulfilled={/[A-Z]/.test(formik.values.password)}
+            label={t("account.security.req.uppercase")}
+          />
+          <RequirementItem
+            fulfilled={/[a-z]/.test(formik.values.password)}
+            label={t("account.security.req.lowercase")}
+          />
+          <RequirementItem
+            fulfilled={/\d/.test(formik.values.password)}
+            label={t("account.security.req.number")}
+          />
+          <RequirementItem
+            fulfilled={/[@$!%*?&._-]/.test(formik.values.password)}
+            label={t("account.security.req.special")}
+          />
+        </List>
 
         <Button
           type="submit"
-          size="sm"
+          size="lg"
           variant="solid"
-          disabled={
-            !formik.values.password || formik.values.password.length < 8
-          }>
-          Guardar Contraseña
+          startDecorator={<SaveRoundedIcon />}
+          disabled={!formik.isValid || !formik.dirty} // Deshabilitado si no cumple requisitos o está vacío
+        >
+          {t("account.security.btn_save")}
         </Button>
       </Stack>
     </form>

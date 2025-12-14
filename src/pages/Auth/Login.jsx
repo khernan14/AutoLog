@@ -15,7 +15,6 @@ export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  // Estado para el 2FA
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [verifying2FA, setVerifying2FA] = useState(false);
 
@@ -23,10 +22,8 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirect");
 
-  // Esta función maneja el éxito del login (ya sea directo o post-2FA)
   const handleLoginSuccess = async (roleData) => {
     try {
-      // Espera que /auth/me confirme la sesión y actualice el contexto
       const serverUser = await refreshUser();
       if (!serverUser) throw new Error("No se pudo restaurar la sesión.");
 
@@ -49,21 +46,17 @@ export default function Login() {
     }
   };
 
-  // Login inicial (paso 1)
   const handleLogin = async () => {
     setLoading(true);
     try {
-      // Enviamos solo usuario y contraseña
       const data = await login(credentials.username, credentials.password);
 
-      // CASO A: El backend pide 2FA
       if (data.require_2fa) {
         setLoading(false);
-        setShow2FAModal(true); // Abrimos el modal
+        setShow2FAModal(true);
         return;
       }
 
-      // CASO B: Login directo exitoso
       if (!data || !data.rol) {
         throw new Error("Credenciales inválidas o datos incompletos.");
       }
@@ -76,15 +69,13 @@ export default function Login() {
         "error"
       );
     } finally {
-      if (!show2FAModal) setLoading(false); // Solo quitamos loading si no abrimos modal
+      if (!show2FAModal) setLoading(false);
     }
   };
 
-  // Verificación del código 2FA (paso 2)
   const handleVerify2FA = async (code) => {
     setVerifying2FA(true);
     try {
-      // Llamamos al mismo endpoint de login pero AHORA con el código
       const data = await login(
         credentials.username,
         credentials.password,
@@ -95,17 +86,16 @@ export default function Login() {
         throw new Error("Código incorrecto o expirado.");
       }
 
-      // Si pasa, cerramos modal y procedemos al éxito
       setShow2FAModal(false);
       await handleLoginSuccess(data.rol);
     } catch (error) {
-      // Si falla el código, mostramos error pero mantenemos el modal abierto para reintentar
+      setShow2FAModal(false);
       Swal.fire({
         title: "Error",
         text: error?.message || "Código incorrecto",
         icon: "error",
         toast: true,
-        position: "top-end",
+        position: "top-center",
         showConfirmButton: false,
         timer: 3000,
       });

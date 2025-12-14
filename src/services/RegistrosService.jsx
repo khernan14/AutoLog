@@ -18,6 +18,29 @@ export async function obtenerRegistroActivo(id_empleado) {
   }
 }
 
+export async function obtenerRegistroPendientePorVehiculo(id_vehiculo) {
+  try {
+    const res = await fetchConToken(
+      // Ajusta esta ruta si registraste otra en el backend router:
+      endpoints.getRegistros + `vehiculos/${id_vehiculo}/registro-pendiente`,
+      { method: "GET" }
+    );
+
+    if (!res.ok) {
+      // devuelvo null cuando 404 (no hay registro), y lanzo para otros códigos
+      if (res.status === 404) return null;
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || "Error obteniendo registro pendiente");
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("Error al obtener registro pendiente por vehículo:", err);
+    // importante: devolvemos null para que el frontend lo trate como "no hay registro"
+    return null;
+  }
+}
+
 export async function obtenerKmActual(id_vehiculo) {
   try {
     const res = await fetchConToken(

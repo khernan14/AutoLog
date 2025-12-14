@@ -1,10 +1,7 @@
-// src/pages/Inventario/ClienteActivos.jsx
+// src/pages/Clientes/ClienteActivos.jsx
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { getActivosByCliente } from "../../services/ActivosServices";
-import { getPublicLinkForActivo } from "../../services/PublicLinksService";
-import { getBodegas } from "../../services/BodegasServices";
-import { moverABodega } from "../../services/UbicacionesServices";
+import { useTranslation } from "react-i18next";
 
 import {
   Box,
@@ -31,6 +28,7 @@ import {
   DialogTitle,
 } from "@mui/joy";
 
+// Iconos
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
@@ -43,25 +41,28 @@ import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import DevicesOtherRoundedIcon from "@mui/icons-material/DevicesOtherRounded";
 
+// Componentes y Hooks
 import HistorialActivoModal from "../Inventario/HistorialActivoModal";
 import MoverActivoModal from "../Inventario/MoverActivoModal";
+import ActivoFormModal from "@pages/Inventario/ActivoFormModal";
 import StyledQR from "../../components/QRCode/StyledQR";
 import StatusCard from "../../components/common/StatusCard";
+import CatalogSelect from "../../components/forms/CatalogSelect";
+import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
 import useIsMobile from "../../hooks/useIsMobile";
 
+// Context & Services
 import { useToast } from "../../context/ToastContext";
 import { useAuth } from "../../context/AuthContext";
+import { getActivosByCliente } from "../../services/ActivosServices";
+import { getPublicLinkForActivo } from "../../services/PublicLinksService";
+import { getBodegas } from "../../services/BodegasServices";
+import { moverABodega } from "../../services/UbicacionesServices";
+import { ESTATUS_COLOR } from "../../constants/inventario";
 import logoTecnasa from "../../assets/newLogoTecnasaBlack.png";
 
-import { ESTATUS_COLOR } from "../../constants/inventario";
-import CatalogSelect from "../../components/forms/CatalogSelect";
-import ActivoFormModal from "@pages/Inventario/ActivoFormModal";
-
-// ⭐ hook de highlight/scroll
-import useRowFocusHighlight from "../../hooks/useRowFocusHighlight";
-
-// Normalizador para ignorar mayúsculas/tildes
 const normalize = (val) =>
   (val || "")
     .toString()
@@ -70,19 +71,19 @@ const normalize = (val) =>
     .replace(/\p{Diacritic}/gu, "");
 
 export default function ClienteActivos() {
-  const { id } = useParams(); // id del cliente actual
+  const { t } = useTranslation();
+  const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-
   const isMobile = useIsMobile(768);
   const { showToast } = useToast();
   const { userData, checkingSession, hasPermiso } = useAuth();
-  const isAdmin = userData?.rol?.toLowerCase() === "admin";
 
-  // permisos
+  const isAdmin = userData?.rol?.toLowerCase() === "admin";
   const can = useCallback(
     (p) => isAdmin || hasPermiso(p),
     [isAdmin, hasPermiso]
   );
+
   const canView = can("ver_activos");
   const canEdit = can("editar_activos");
   const canMove = can("mover_activos");
@@ -91,37 +92,29 @@ export default function ClienteActivos() {
 
   const qrRef = useRef();
 
-  // data
   const [rows, setRows] = useState([]);
-
-  // ui state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // filtros
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
 
-  // selección múltiple
   const [selectedIds, setSelectedIds] = useState([]);
   const hasSelection = selectedIds.length > 0;
 
-  // modals
   const [openEdit, setOpenEdit] = useState(false);
   const [openMover, setOpenMover] = useState(false);
   const [openHistorial, setOpenHistorial] = useState(false);
   const [openQR, setOpenQR] = useState(false);
-
-  // modal de movimiento masivo a bodega
   const [openBulkMover, setOpenBulkMover] = useState(false);
+
   const [bodegas, setBodegas] = useState([]);
   const [loadingBodegas, setLoadingBodegas] = useState(false);
   const [bulkBodega, setBulkBodega] = useState("");
   const [bulkMotivo, setBulkMotivo] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  // selecciones individuales
   const [editing, setEditing] = useState(null);
   const [activoSeleccionado, setActivoSeleccionado] = useState(null);
   const [activoQR, setActivoQR] = useState(null);
@@ -137,32 +130,31 @@ export default function ClienteActivos() {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
       const activos = await getActivosByCliente(id);
       setRows(Array.isArray(activos) ? activos : []);
-      setSelectedIds([]); // limpiar selección al recargar
+      setSelectedIds([]);
     } catch (err) {
-      const msg = err?.message || "Error desconocido.";
+      const msg = err?.message || t("common.unknown_error");
       setError(
         /failed to fetch|network/i.test(msg)
-          ? "No hay conexión con el servidor."
-          : "No se pudieron cargar los activos."
+          ? t("common.network_error")
+          : t("clients.assets.errors.load_failed")
       );
     } finally {
       setLoading(false);
     }
-  }, [id, checkingSession, canView]);
+  }, [id, checkingSession, canView, t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // nombre del cliente (si viene en la consulta)
   const clienteNombre = useMemo(() => rows[0]?.cliente_nombre || "", [rows]);
 
-  // filtrado (con normalize para ignorar tildes/mayúsculas)
   const filtered = useMemo(() => {
     const s = normalize(search);
     return (rows || []).filter((r) => {
@@ -172,14 +164,12 @@ export default function ClienteActivos() {
         normalize(r.modelo).includes(s) ||
         normalize(r.serial_number).includes(s) ||
         normalize(r.site_nombre).includes(s);
-
       const matchStatus = !statusFilter || r.estatus === statusFilter;
       const matchType = !typeFilter || r.tipo === typeFilter;
       return matchSearch && matchStatus && matchType;
     });
   }, [rows, search, statusFilter, typeFilter]);
 
-  // ⭐ Hook de focus/highlight, basado en token (id/código/serie)
   const { highlightId, focusedRef, focusByToken } = useRowFocusHighlight({
     rows: filtered,
     matchRow: (r, token) => {
@@ -194,29 +184,22 @@ export default function ClienteActivos() {
     highlightMs: 4000,
   });
 
-  // Leer ?focus= de la URL, limpiar filtros y pedir foco
   useEffect(() => {
     const token = searchParams.get("focus");
     if (!token) return;
-
     const next = new URLSearchParams(searchParams);
     next.delete("focus");
     setSearchParams(next, { replace: true });
-
-    // Limpiar filtros/búsqueda para asegurar que el activo se vea
     setSearch("");
     setStatusFilter("");
     setTypeFilter("");
-
     focusByToken(token);
   }, [searchParams, setSearchParams, focusByToken]);
 
-  // selección múltiple (ids visibles)
   const allVisibleIds = useMemo(
     () => (filtered || []).map((r) => r.id),
     [filtered]
   );
-
   const allSelectedInPage =
     allVisibleIds.length > 0 &&
     allVisibleIds.every((idSite) => selectedIds.includes(idSite));
@@ -231,56 +214,41 @@ export default function ClienteActivos() {
 
   const toggleSelectAllVisible = () => {
     setSelectedIds((prev) => {
-      if (allSelectedInPage) {
-        // quitar todos los visibles
+      if (allSelectedInPage)
         return prev.filter((idActivo) => !allVisibleIds.includes(idActivo));
-      }
-      // agregar todos los visibles
       const set = new Set(prev);
       allVisibleIds.forEach((idActivo) => set.add(idActivo));
       return Array.from(set);
     });
   };
 
-  // acciones individuales
   function editActivo(row) {
-    if (!canEdit)
-      return showToast("No tienes permisos para editar activos.", "warning");
+    if (!canEdit) return showToast(t("common.no_permission"), "warning");
     setEditing(row);
     setOpenEdit(true);
   }
 
   function abrirMover(row) {
-    if (!canMove)
-      return showToast("No tienes permisos para mover activos.", "warning");
+    if (!canMove) return showToast(t("common.no_permission"), "warning");
     setActivoSeleccionado(row);
     setOpenMover(true);
   }
 
   function abrirHistorial(row) {
-    if (!canViewHistory) {
-      showToast("No tienes permisos para ver el historial.", "warning");
-      return;
-    }
+    if (!canViewHistory) return showToast(t("common.no_permission"), "warning");
     setActivoSeleccionado(row);
     setOpenHistorial(true);
   }
 
   async function abrirQR(row) {
-    if (!canQR) {
-      showToast("No tienes permisos para ver el QR.", "warning");
-      return;
-    }
+    if (!canQR) return showToast(t("common.no_permission"), "warning");
     setActivoQR(row);
     setPublicLink("");
     try {
       const { url } = await getPublicLinkForActivo(row.id);
       setPublicLink(url);
     } catch (e) {
-      showToast(
-        e?.message || "No se pudo generar el enlace público firmado",
-        "danger"
-      );
+      showToast(e?.message || t("clients.assets.errors.qr_failed"), "danger");
       setPublicLink(
         `${window.location.origin}/public/activos/${encodeURIComponent(
           row.codigo
@@ -296,7 +264,6 @@ export default function ClienteActivos() {
     qrRef.current.download("png", `QR_${activoQR.codigo}`);
   }
 
-  // cargar bodegas cuando abrimos el modal masivo
   useEffect(() => {
     if (!openBulkMover) return;
     setLoadingBodegas(true);
@@ -304,60 +271,44 @@ export default function ClienteActivos() {
       .then((rows) => setBodegas(Array.isArray(rows) ? rows : []))
       .catch(() => {
         setBodegas([]);
-        showToast("Error al cargar bodegas", "danger");
+        showToast(t("clients.assets.errors.load_warehouses"), "danger");
       })
       .finally(() => setLoadingBodegas(false));
-  }, [openBulkMover, showToast]);
+  }, [openBulkMover, showToast, t]);
 
   async function bulkMoveToBodega() {
-    if (!bulkBodega) {
-      showToast("Selecciona una bodega destino.", "warning");
-      return;
-    }
-    if (!selectedIds.length) {
-      showToast("No hay activos seleccionados.", "warning");
-      return;
-    }
-    if (!canMove) {
-      showToast("No tienes permisos para mover activos.", "warning");
-      return;
-    }
+    if (!bulkBodega)
+      return showToast(t("clients.assets.errors.select_warehouse"), "warning");
+    if (!selectedIds.length)
+      return showToast(t("clients.assets.errors.no_selection"), "warning");
+    if (!canMove) return showToast(t("common.no_permission"), "warning");
 
     setBulkSaving(true);
     try {
       const usuario = userData?.id_usuario ?? userData?.id ?? null;
-
-      const okIds = [];
-      const failed = [];
-
-      // opcional, ordenar para tener orden estable
       const idsOrdenados = [...selectedIds].sort((a, b) => a - b);
+      const failed = [];
 
       for (const id_activo of idsOrdenados) {
         try {
           await moverABodega({
             id_activo,
             id_bodega: bulkBodega,
-            motivo:
-              bulkMotivo ||
-              "Movimiento masivo desde cliente hacia bodega (salida)",
+            motivo: bulkMotivo || t("clients.assets.bulk_move_reason"),
             usuario_responsable: usuario,
           });
-          okIds.push(id_activo);
         } catch (e) {
-          failed.push({ id_activo, error: e?.message || "Error desconocido" });
+          failed.push({ id_activo, error: e?.message });
         }
       }
 
-      if (failed.length === 0) {
-        showToast("Activos movidos a bodega correctamente.", "success");
-      } else {
+      if (failed.length === 0)
+        showToast(t("clients.assets.success.bulk_moved"), "success");
+      else
         showToast(
-          `Algunos activos no se pudieron mover (${failed.length} fallos).`,
+          t("clients.assets.errors.bulk_partial", { count: failed.length }),
           "warning"
         );
-        console.warn("Fallos en movimiento masivo:", failed);
-      }
 
       setOpenBulkMover(false);
       setBulkBodega("");
@@ -366,7 +317,7 @@ export default function ClienteActivos() {
       load();
     } catch (err) {
       showToast(
-        err?.message || "Error al mover los activos seleccionados",
+        err?.message || t("clients.assets.errors.bulk_failed"),
         "danger"
       );
     } finally {
@@ -374,118 +325,101 @@ export default function ClienteActivos() {
     }
   }
 
-  // view state
   const viewState = checkingSession
     ? "checking"
     : !canView
     ? "no-permission"
     : error
     ? "error"
-    : !loading && filtered.length === 0
-    ? "empty"
     : loading
     ? "loading"
+    : filtered.length === 0
+    ? "empty"
     : "data";
 
   const renderStatus = () => {
-    if (viewState === "checking") {
+    if (viewState === "checking")
       return (
         <StatusCard
           icon={<HourglassEmptyRoundedIcon />}
-          title="Verificando sesión…"
-          description={
-            <Stack alignItems="center" spacing={1}>
-              <CircularProgress size="sm" />
-              <Typography level="body-xs" sx={{ opacity: 0.8 }}>
-                Por favor, espera un momento.
-              </Typography>
-            </Stack>
-          }
+          title={t("common.verifying_session")}
+          description={<CircularProgress size="sm" />}
         />
       );
-    }
-    if (viewState === "no-permission") {
+    if (viewState === "no-permission")
       return (
         <StatusCard
           color="danger"
           icon={<LockPersonRoundedIcon />}
-          title="Sin permisos para ver activos"
-          description="Consulta con un administrador para obtener acceso."
+          title={t("common.no_permission")}
+          description={t("common.contact_admin")}
         />
       );
-    }
-    if (viewState === "error") {
-      const isNetwork = /conexión|failed to fetch/i.test(error || "");
+    if (viewState === "error")
       return (
         <StatusCard
-          color={isNetwork ? "warning" : "danger"}
-          icon={
-            isNetwork ? <WifiOffRoundedIcon /> : <ErrorOutlineRoundedIcon />
-          }
-          title={
-            isNetwork ? "Problema de conexión" : "No se pudo cargar la lista"
-          }
+          color="danger"
+          icon={<ErrorOutlineRoundedIcon />}
+          title={t("common.error_title")}
           description={error}
           actions={
             <Button
               startDecorator={<RestartAltRoundedIcon />}
               onClick={load}
               variant="soft">
-              Reintentar
+              {t("common.retry")}
             </Button>
           }
         />
       );
-    }
-    if (viewState === "empty") {
+    if (viewState === "empty")
       return (
         <StatusCard
           color="neutral"
-          icon={<InfoOutlinedIcon />}
-          title="No se encontraron activos"
-          description="Ajusta los filtros para encontrar resultados."
+          icon={<DevicesOtherRoundedIcon />}
+          title={t("clients.assets.empty.title")}
+          description={
+            rows.length === 0
+              ? t("clients.assets.empty.no_data")
+              : t("clients.assets.empty.no_matches")
+          }
         />
       );
-    }
-    if (viewState === "loading") {
+    if (viewState === "loading")
       return (
-        <Sheet p={3} sx={{ textAlign: "center" }}>
-          <Stack spacing={1} alignItems="center">
-            <CircularProgress />
-            <Typography level="body-sm">Cargando…</Typography>
-          </Stack>
-        </Sheet>
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress />
+        </Box>
       );
-    }
     return null;
   };
 
   return (
     <Box>
-      {/* HEADER NUEVO: título + totales arriba, filtros abajo */}
-      <Stack spacing={1.5} mb={2}>
+      <Stack spacing={2} mb={3}>
         <Box>
-          <Typography level="h4">
-            {clienteNombre || "Activos del Cliente"}
+          <Typography level="h3" fontWeight="lg">
+            {clienteNombre || t("clients.assets.title")}
           </Typography>
           {clienteNombre && (
             <Typography level="body-sm" color="neutral">
-              Inventario de activos asignados al cliente
+              {t("clients.assets.subtitle")}
             </Typography>
           )}
           <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
-            Total activos: {rows.length}
-            {rows.length !== filtered.length &&
-              ` · Con filtros: ${filtered.length}`}
+            {t("clients.assets.stats", {
+              total: rows.length,
+              filtered:
+                filtered.length !== rows.length ? filtered.length : null,
+            })}
           </Typography>
         </Box>
 
-        {/* Filtros / acciones */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
-          spacing={1.25}>
+          spacing={1.5}>
           <Stack
             direction="row"
             spacing={1}
@@ -493,7 +427,7 @@ export default function ClienteActivos() {
             flexWrap="wrap"
             sx={{ width: { xs: "100%", sm: "auto" } }}>
             <Input
-              placeholder="Buscar por código, nombre, modelo, serie o site…"
+              placeholder={t("clients.assets.search_placeholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startDecorator={<SearchRoundedIcon />}
@@ -502,44 +436,37 @@ export default function ClienteActivos() {
                   <IconButton
                     size="sm"
                     variant="plain"
-                    color="neutral"
-                    onClick={() => setSearch("")}
-                    aria-label="Limpiar búsqueda">
+                    onClick={() => setSearch("")}>
                     <ClearIcon />
                   </IconButton>
                 )
               }
               sx={{ width: { xs: "100%", sm: 280 } }}
             />
-
-            {/* Filtro de estatus desde catálogo */}
             <CatalogSelect
               catalog="estatusActivo"
               value={statusFilter}
               onChange={(v) => setStatusFilter(v || "")}
-              placeholder="Estatus"
+              placeholder={t("clients.assets.columns.status")}
               allowEmpty
-              sx={{ width: 200 }}
+              sx={{ width: 160 }}
             />
-
-            {/* Filtro de tipo desde catálogo */}
             <CatalogSelect
               catalog="tiposActivo"
               value={typeFilter}
               onChange={(v) => setTypeFilter(v || "")}
-              placeholder="Tipo"
+              placeholder={t("clients.assets.columns.type")}
               allowEmpty
-              sx={{ width: 200 }}
+              sx={{ width: 160 }}
             />
           </Stack>
 
-          {/* Mover a bodega (masivo) */}
           {canMove && (
             <Tooltip
               title={
                 hasSelection
-                  ? "Mover activos seleccionados a bodega"
-                  : "Selecciona uno o más activos"
+                  ? t("clients.assets.actions.move_selected")
+                  : t("clients.assets.actions.select_to_move")
               }
               variant="soft">
               <span>
@@ -550,7 +477,7 @@ export default function ClienteActivos() {
                   disabled={!hasSelection}
                   onClick={() => setOpenBulkMover(true)}
                   sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}>
-                  Mover a Bodega
+                  {t("clients.assets.actions.move_to_warehouse")}
                 </Button>
               </span>
             </Tooltip>
@@ -558,144 +485,45 @@ export default function ClienteActivos() {
         </Stack>
       </Stack>
 
-      {/* Contenido principal */}
-      <Card variant="outlined" sx={{ overflowX: "auto" }}>
+      {/* DATA TABLE */}
+      <Sheet
+        variant="outlined"
+        sx={{
+          borderRadius: "lg",
+          overflow: "hidden",
+          bgcolor: "background.surface",
+        }}>
         {viewState !== "data" ? (
-          <Box p={2}>{renderStatus()}</Box>
-        ) : isMobile ? (
-          // ====== Móvil: tarjetas ======
-          <Stack spacing={2} p={2}>
-            {filtered.map((r) => (
-              <Sheet
-                key={r.id}
-                ref={r.id === highlightId ? focusedRef : null}
-                variant={r.id === highlightId ? "soft" : "outlined"}
-                color={r.id === highlightId ? "primary" : "neutral"}
-                sx={{
-                  p: 2,
-                  borderRadius: "md",
-                  boxShadow: r.id === highlightId ? "lg" : "sm",
-                  borderWidth: r.id === highlightId ? 2 : 1,
-                  borderColor:
-                    r.id === highlightId ? "primary.solidBg" : "divider",
-                  transition:
-                    "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
-                }}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center">
-                  <Typography level="title-md">{r.nombre}</Typography>
-                  {canMove && (
-                    <Checkbox
-                      size="sm"
-                      checked={selectedIds.includes(r.id)}
-                      onChange={() => toggleSelectOne(r.id)}
-                    />
-                  )}
-                </Stack>
-
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                  {r.codigo}
-                </Typography>
-
-                <Stack direction="row" spacing={2}>
-                  <Typography level="body-sm">
-                    <strong>Tipo:</strong> {r.tipo}
-                  </Typography>
-                  <Typography level="body-sm">
-                    <strong>Modelo:</strong> {r.modelo || "—"}
-                  </Typography>
-                </Stack>
-                <Typography level="body-sm">
-                  <strong>Serie:</strong> {r.serial_number || "—"}
-                </Typography>
-
-                {/* Site del activo */}
-                <Typography level="body-xs" sx={{ mt: 0.5 }}>
-                  <strong>Site:</strong> {r.site_nombre || "—"}
-                </Typography>
-
-                <Chip
-                  size="sm"
-                  variant="soft"
-                  color={ESTATUS_COLOR[r.estatus] || "neutral"}
-                  sx={{ alignSelf: "flex-start", mt: 0.5 }}>
-                  {r.estatus}
-                </Chip>
-
-                <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                  <Tooltip
-                    title={canEdit ? "Editar" : "Sin permiso"}
-                    variant="soft">
-                    <span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => editActivo(r)}
-                        disabled={!canEdit}
-                        aria-disabled={!canEdit}
-                        variant={canEdit ? "soft" : "plain"}
-                        color={canEdit ? "primary" : "neutral"}>
-                        <EditRoundedIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-
-                  <Tooltip
-                    title={canMove ? "Mover" : "Sin permiso"}
-                    variant="soft">
-                    <span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => abrirMover(r)}
-                        disabled={!canMove}
-                        aria-disabled={!canMove}
-                        variant={canMove ? "soft" : "plain"}
-                        color={canMove ? "primary" : "neutral"}>
-                        <SwapHorizRoundedIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-
-                  <Tooltip title="Historial" variant="soft">
-                    <span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => abrirHistorial(r)}
-                        disabled={!canViewHistory}
-                        aria-disabled={!canViewHistory}
-                        variant={canViewHistory ? "soft" : "plain"}
-                        color={canViewHistory ? "primary" : "neutral"}>
-                        <HistoryRoundedIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-
-                  <Tooltip
-                    title={canQR ? "Ver QR" : "Sin permiso"}
-                    variant="soft">
-                    <span>
-                      <IconButton
-                        size="sm"
-                        onClick={() => abrirQR(r)}
-                        disabled={!canQR}
-                        aria-disabled={!canQR}
-                        variant={canQR ? "soft" : "plain"}
-                        color={canQR ? "primary" : "neutral"}>
-                        <QrCodeRoundedIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Stack>
-              </Sheet>
-            ))}
-          </Stack>
+          <Box p={4} display="flex" justifyContent="center">
+            {renderStatus()}
+          </Box>
         ) : (
-          // ====== Escritorio: tabla ======
-          <Table size="sm" stickyHeader hoverRow sx={{ minWidth: 980 }}>
+          <Table
+            stickyHeader
+            hoverRow
+            sx={{
+              "--TableCell-paddingX": "12px",
+              "--TableCell-paddingY": "8px",
+              "& thead th": {
+                bgcolor: "background.level1",
+                color: "text.tertiary",
+                fontWeight: "md",
+                textTransform: "uppercase",
+                fontSize: "xs",
+                letterSpacing: "0.05em",
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                whiteSpace: "nowrap",
+              },
+              "& tbody td": {
+                borderBottom: "1px solid",
+                borderColor: "neutral.outlinedBorder",
+                fontSize: "sm",
+              },
+            }}>
             <thead>
               <tr>
-                <th style={{ width: 40 }}>
+                <th style={{ width: 40, textAlign: "center" }}>
                   {canMove && (
                     <Checkbox
                       checked={allSelectedInPage && filtered.length > 0}
@@ -708,130 +536,214 @@ export default function ClienteActivos() {
                     />
                   )}
                 </th>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Modelo</th>
-                <th>Serie</th>
-                <th>Site</th>
-                <th>Estatus</th>
-                <th style={{ width: 200 }}></th>
+                <th style={{ width: 100 }}>
+                  {t("clients.assets.columns.code")}
+                </th>
+                <th style={{ width: 180 }}>
+                  {t("clients.assets.columns.name")}
+                </th>
+                <th style={{ width: 100 }}>
+                  {t("clients.assets.columns.type")}
+                </th>
+                <th style={{ width: 120 }}>
+                  {t("clients.assets.columns.model")}
+                </th>
+                <th style={{ width: 120 }}>
+                  {t("clients.assets.columns.serial")}
+                </th>
+                <th style={{ width: 160 }}>
+                  {t("clients.assets.columns.site")}
+                </th>
+                <th style={{ width: 100 }}>
+                  {t("clients.assets.columns.status")}
+                </th>
+                <th style={{ width: 140, textAlign: "right" }}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr
-                  key={r.id}
-                  ref={r.id === highlightId ? focusedRef : null}
-                  style={
-                    r.id === highlightId
-                      ? {
-                          backgroundColor: "rgba(59, 130, 246, 0.12)",
-                          boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.6) inset",
-                          transition:
-                            "background-color 0.25s ease, box-shadow 0.25s ease",
-                        }
-                      : undefined
-                  }>
-                  <td>
-                    {canMove && (
-                      <Checkbox
-                        checked={selectedIds.includes(r.id)}
-                        onChange={() => toggleSelectOne(r.id)}
-                      />
-                    )}
-                  </td>
-                  <td>{r.codigo}</td>
-                  <td>{r.nombre}</td>
-                  <td>{r.tipo}</td>
-                  <td>{r.modelo || "—"}</td>
-                  <td>{r.serial_number || "—"}</td>
-                  <td>
-                    {r.site_nombre ? (
-                      <Chip size="sm" variant="soft" color="primary">
-                        {r.site_nombre}
-                      </Chip>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    <Chip
-                      size="sm"
-                      variant="soft"
-                      color={ESTATUS_COLOR[r.estatus] || "neutral"}>
-                      {r.estatus}
-                    </Chip>
-                  </td>
-                  <td>
-                    <Stack direction="row" spacing={1}>
-                      <Tooltip
-                        title={canEdit ? "Editar" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            onClick={() => editActivo(r)}
-                            disabled={!canEdit}
-                            aria-disabled={!canEdit}
-                            variant={canEdit ? "soft" : "plain"}
-                            color={canEdit ? "primary" : "neutral"}>
-                            <EditRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+              {filtered.map((r) => {
+                const isHighlighted = r.id === highlightId;
+                return (
+                  <tr
+                    key={r.id}
+                    ref={isHighlighted ? focusedRef : null}
+                    style={
+                      isHighlighted
+                        ? { backgroundColor: "var(--joy-palette-primary-50)" }
+                        : undefined
+                    }>
+                    <td style={{ textAlign: "center" }}>
+                      {canMove && (
+                        <Checkbox
+                          checked={selectedIds.includes(r.id)}
+                          onChange={() => toggleSelectOne(r.id)}
+                        />
+                      )}
+                    </td>
 
-                      <Tooltip
-                        title={canMove ? "Mover" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            onClick={() => abrirMover(r)}
-                            disabled={!canMove}
-                            aria-disabled={!canMove}
-                            variant={canMove ? "soft" : "plain"}
-                            color={canMove ? "primary" : "neutral"}>
-                            <SwapHorizRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                    {/* Código: Monospace para lectura técnica */}
+                    <td>
+                      <Typography fontFamily="monospace" fontSize="xs">
+                        {r.codigo}
+                      </Typography>
+                    </td>
 
-                      <Tooltip title="Historial" variant="soft">
-                        <span>
-                          <IconButton
-                            onClick={() => abrirHistorial(r)}
-                            disabled={!canViewHistory}
-                            aria-disabled={!canViewHistory}
-                            variant={canViewHistory ? "soft" : "plain"}
-                            color={canViewHistory ? "primary" : "neutral"}>
-                            <HistoryRoundedIcon />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-
+                    {/* Nombre: Truncado con Tooltip */}
+                    <td>
                       <Tooltip
-                        title={canQR ? "Ver QR" : "Sin permiso"}
-                        variant="soft">
-                        <span>
-                          <IconButton
-                            onClick={() => abrirQR(r)}
-                            disabled={!canQR}
-                            aria-disabled={!canQR}
-                            variant={canQR ? "soft" : "plain"}
-                            color={canQR ? "primary" : "neutral"}>
-                            <QrCodeRoundedIcon />
-                          </IconButton>
-                        </span>
+                        title={r.nombre}
+                        variant="soft"
+                        placement="top-start">
+                        <Typography
+                          fontWeight="md"
+                          noWrap
+                          sx={{ maxWidth: 180 }}>
+                          {r.nombre}
+                        </Typography>
                       </Tooltip>
-                    </Stack>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+
+                    <td>
+                      <Typography level="body-xs" noWrap sx={{ maxWidth: 100 }}>
+                        {r.tipo}
+                      </Typography>
+                    </td>
+
+                    <td>
+                      <Tooltip title={r.modelo || ""} variant="soft">
+                        <Typography
+                          level="body-sm"
+                          noWrap
+                          sx={{ maxWidth: 120 }}>
+                          {r.modelo || "—"}
+                        </Typography>
+                      </Tooltip>
+                    </td>
+
+                    <td>
+                      <Tooltip title={r.serial_number || ""} variant="soft">
+                        <Typography
+                          level="body-sm"
+                          noWrap
+                          sx={{ maxWidth: 120 }}>
+                          {r.serial_number || "—"}
+                        </Typography>
+                      </Tooltip>
+                    </td>
+
+                    {/* Site: Chip Truncado */}
+                    <td>
+                      {r.site_nombre ? (
+                        <Tooltip
+                          title={r.site_nombre}
+                          variant="soft"
+                          color="neutral">
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color="primary"
+                            sx={{
+                              maxWidth: 150, // Forzar ancho máximo
+                              justifyContent: "flex-start",
+                            }}>
+                            <Typography
+                              noWrap // Puntos suspensivos automático
+                              fontSize="xs"
+                              color="primary"
+                              sx={{ display: "block" }}>
+                              {r.site_nombre}
+                            </Typography>
+                          </Chip>
+                        </Tooltip>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Estatus */}
+                    <td>
+                      {r.estatus ? (
+                        <Tooltip
+                          title={r.estatus}
+                          variant="soft"
+                          color="neutral">
+                          <Chip
+                            size="sm"
+                            variant="soft"
+                            color={ESTATUS_COLOR[r.estatus] || "neutral"}
+                            sx={{
+                              maxWidth: 100, // Forzar ancho máximo
+                              justifyContent: "flex-start",
+                            }}>
+                            <Typography
+                              noWrap // Puntos suspensivos automático
+                              fontSize="xs"
+                              color={ESTATUS_COLOR[r.estatus] || "neutral"}
+                              sx={{ display: "block" }}>
+                              {r.estatus}
+                            </Typography>
+                          </Chip>
+                        </Tooltip>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* Acciones */}
+                    <td>
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        justifyContent="flex-end">
+                        {canEdit && (
+                          <Tooltip
+                            title={t("common.actions.edit")}
+                            variant="soft">
+                            <IconButton size="sm" onClick={() => editActivo(r)}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canMove && (
+                          <Tooltip
+                            title={t("common.actions.move")}
+                            variant="soft">
+                            <IconButton size="sm" onClick={() => abrirMover(r)}>
+                              <SwapHorizRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canViewHistory && (
+                          <Tooltip
+                            title={t("common.actions.history")}
+                            variant="soft">
+                            <IconButton
+                              size="sm"
+                              onClick={() => abrirHistorial(r)}>
+                              <HistoryRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canQR && (
+                          <Tooltip
+                            title={t("common.actions.qr")}
+                            variant="soft">
+                            <IconButton size="sm" onClick={() => abrirQR(r)}>
+                              <QrCodeRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}
-      </Card>
+      </Sheet>
 
-      {/* Modal Editar (reutilizable) */}
+      {/* MODALES */}
       <ActivoFormModal
         open={openEdit}
         onClose={() => setOpenEdit(false)}
@@ -839,7 +751,6 @@ export default function ClienteActivos() {
         onSaved={load}
       />
 
-      {/* Modal QR */}
       <Modal
         open={openQR}
         onClose={() => {
@@ -848,7 +759,9 @@ export default function ClienteActivos() {
         }}>
         <ModalDialog
           sx={{ width: { xs: "100%", sm: 420 }, textAlign: "center" }}>
-          <Typography level="title-lg">QR del Activo</Typography>
+          <Typography level="title-lg">
+            {t("clients.assets.qr_title")}
+          </Typography>
           <Divider sx={{ my: 1 }} />
           {activoQR && (
             <Stack alignItems="center" spacing={1}>
@@ -869,7 +782,7 @@ export default function ClienteActivos() {
               {publicLink && (
                 <Typography level="body-sm" sx={{ mt: 1 }}>
                   <a href={publicLink} target="_blank" rel="noreferrer">
-                    Ver página del activo
+                    {t("clients.assets.view_public_page")}
                   </a>
                 </Typography>
               )}
@@ -877,21 +790,21 @@ export default function ClienteActivos() {
           )}
           <Stack direction="row" justifyContent="center" spacing={2} mt={2}>
             <Button variant="plain" onClick={() => setOpenQR(false)}>
-              Cerrar
+              {t("common.actions.close")}
             </Button>
-            <Button onClick={descargarQR}>Descargar PNG</Button>
+            <Button onClick={descargarQR}>
+              {t("common.actions.download_png")}
+            </Button>
           </Stack>
         </ModalDialog>
       </Modal>
 
-      {/* Modal Historial */}
       <HistorialActivoModal
         open={openHistorial}
         onClose={() => setOpenHistorial(false)}
         activo={activoSeleccionado}
       />
 
-      {/* Modal Mover (individual) */}
       <MoverActivoModal
         open={openMover}
         onClose={() => setOpenMover(false)}
@@ -904,86 +817,68 @@ export default function ClienteActivos() {
         defaultClienteId={Number(id)}
       />
 
-      {/* Modal mover MASIVO a Bodega */}
       <Drawer
         anchor="right"
         size="md"
-        variant="plain"
         open={openBulkMover}
-        onClose={() => {
-          if (!bulkSaving) setOpenBulkMover(false);
-        }}
-        slotProps={{
-          content: {
-            sx: {
-              bgcolor: "transparent",
-              p: { md: 3, sm: 0 },
-              boxShadow: "none",
-            },
-          },
-        }}>
+        onClose={() => !bulkSaving && setOpenBulkMover(false)}>
         <Sheet
           sx={{
             borderRadius: "md",
-            p: 2,
+            p: 3,
             display: "flex",
             flexDirection: "column",
             gap: 2,
             height: "100%",
-            overflow: "auto",
           }}>
-          <DialogTitle id="bulk-mover-title" level="title-lg">
-            Mover activos seleccionados a Bodega
+          <DialogTitle level="title-lg">
+            {t("clients.assets.bulk_move_title")}
           </DialogTitle>
-          <ModalClose />
-          <Divider sx={{ my: 1 }} />
-          <Stack spacing={1.5} mt={1}>
+          <ModalClose onClick={() => setOpenBulkMover(false)} />
+          <Divider />
+          <Stack spacing={2} mt={1}>
             <Typography level="body-sm">
-              Activos seleccionados: {selectedIds.length}
+              {t("clients.assets.selected_count", {
+                count: selectedIds.length,
+              })}
             </Typography>
-
             <FormControl required>
-              <FormLabel>Bodega destino</FormLabel>
+              <FormLabel>
+                {t("clients.assets.form.destination_warehouse")}
+              </FormLabel>
               <Autocomplete
-                placeholder="Escribe para buscar bodega…"
+                placeholder={t("clients.assets.form.search_warehouse")}
                 options={bodegas}
                 loading={loadingBodegas}
                 value={bodegas.find((b) => b.id === bulkBodega) || null}
                 onChange={(_, v) => setBulkBodega(v?.id || "")}
                 getOptionLabel={(o) => o?.nombre || ""}
                 isOptionEqualToValue={(o, v) => o.id === v.id}
-                disablePortal
-                clearOnBlur={false}
-                autoHighlight
-                renderInput={(params) => <Input {...params} />}
-                slotProps={{ listbox: { sx: { maxHeight: 280 } } }}
                 disabled={bulkSaving}
               />
             </FormControl>
-
             <FormControl required>
-              <FormLabel>Motivo</FormLabel>
+              <FormLabel>{t("clients.assets.form.reason")}</FormLabel>
               <Input
                 value={bulkMotivo}
                 onChange={(e) => setBulkMotivo(e.target.value)}
                 disabled={bulkSaving}
-                placeholder="(Ej: Cambio de equipo / salida del cliente)"
+                placeholder={t("clients.assets.form.reason_placeholder")}
               />
             </FormControl>
           </Stack>
-
           <Stack direction="row" justifyContent="flex-end" spacing={1} mt={2}>
             <Button
               variant="plain"
               onClick={() => setOpenBulkMover(false)}
               disabled={bulkSaving}>
-              Cancelar
+              {t("common.actions.cancel")}
             </Button>
             <Button
               onClick={bulkMoveToBodega}
               loading={bulkSaving}
               disabled={bulkSaving || !selectedIds.length || !bulkBodega}>
-              Mover a Bodega
+              {t("clients.assets.actions.move_to_warehouse")}
             </Button>
           </Stack>
         </Sheet>

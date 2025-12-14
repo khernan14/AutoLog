@@ -1,3 +1,4 @@
+// src/components/RegisterForm/SalidaForm.jsx
 import { useState, useEffect, useMemo } from "react";
 import { ListarVehiculosEmpleado } from "../../services/VehiculosService";
 import {
@@ -25,20 +26,23 @@ import {
 import Autocomplete from "@mui/joy/Autocomplete";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { useTranslation } from "react-i18next";
 
 /**
- * SalidaForm robusto:
- * - resuelve id_empleado desde props.usuario o desde localStorage (fallback)
- * - maneja preselección vía vehiculoPreseleccionado (QR)
- * - logs para depuración
+ * SalidaForm mejorado:
+ * - i18n
+ * - validación en tiempo real
+ * - prevención doble submit
+ * - respeta tus servicios/rutas existentes
  */
-
 export default function SalidaForm({
   vehicles = [],
   usuario = null,
   emailSupervisor = null,
   vehiculoPreseleccionado = null,
 }) {
+  const { t } = useTranslation();
+
   const [vehicleSelected, setVehicleSelected] = useState("");
   const [listVehicles, setListVehicles] = useState([]);
   const [kmActual, setKmActual] = useState("");
@@ -75,36 +79,41 @@ export default function SalidaForm({
 
   // Cargar la lista de vehículos asignados al empleado
   useEffect(() => {
+    let mounted = true;
     const load = async () => {
       const idEmpleado = resolveIdEmpleado();
-      console.log(
+      console.debug(
         "[SalidaForm] resolveIdEmpleado:",
         idEmpleado,
         "usuario:",
         usuario
       );
       if (!idEmpleado) {
-        // no hacemos nada — el componente padre debe controlar la autenticación
+        // componente padre debe controlar auth
         return;
       }
 
       try {
         const data = await ListarVehiculosEmpleado(idEmpleado);
+        if (!mounted) return;
         setListVehicles(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Error al listar vehículos del empleado:", err);
-        setListVehicles([]);
+        if (mounted) setListVehicles([]);
       }
     };
 
     load();
+    return () => {
+      mounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario]);
 
   // Manejar cambio/selección de vehículo (id)
   const handleVehicleChange = async (_, value) => {
-    // value puede ser id (number) o null
-    const id = value ?? null;
+    // value puede ser objeto de vehiculo o id primitivo (según Autocomplete)
+    const id = (value && (value.id ?? value)) ?? null;
     setVehicleSelected(id);
     setErrorMessage("");
 
@@ -120,11 +129,12 @@ export default function SalidaForm({
       const kilometraje = await obtenerKmActual(id);
       const combustible = await obtenerCombustibleActual(id);
 
+      // intentamos extraer campos flexibles
       const km = kilometraje?.km_regreso ?? kilometraje?.km ?? 0;
       const combustibleActual =
         combustible?.combustible_regreso ?? combustible?.combustible ?? 0;
 
-      if (km > 0 || combustibleActual > 0) {
+      if ((km && km > 0) || (combustibleActual && combustibleActual > 0)) {
         setKmActual(km ? String(km) : "");
         setKmManual(!km);
         setFuelActual(combustibleActual ? String(combustibleActual) : "");
@@ -173,36 +183,74 @@ export default function SalidaForm({
     return listVehicles.find((v) => v.id === idNum) || null;
   }, [vehicleSelected, listVehicles]);
 
+  // Validación simple en tiempo real
+  const validationErrors = useMemo(() => {
+    const errs = {};
+    if (!vehicleSelected)
+      errs.vehicle = t(
+        "register.salidas.err_vehicle",
+        "Selecciona un vehículo."
+      );
+    const kmNum = Number(kmActual);
+    if (!kmActual)
+      errs.km = t(
+        "register.salidas.err_km_required",
+        "El kilometraje es obligatorio."
+      );
+    else if (Number.isNaN(kmNum) || kmNum < 0)
+      errs.km = t("register.salidas.err_km_invalid", "Kilometraje inválido.");
+    const fuelNum = fuelActual === "" ? null : Number(fuelActual);
+    if (
+      fuelActual !== "" &&
+      (Number.isNaN(fuelNum) || fuelNum < 0 || fuelNum > 100)
+    )
+      errs.fuel = t(
+        "register.salidas.err_fuel_invalid",
+        "Porcentaje de combustible inválido (0-100)."
+      );
+    if (!observations)
+      errs.obs = t(
+        "register.salidas.err_observations",
+        "Agrega una observación."
+      );
+    if (!images || images.length === 0)
+      errs.images = t(
+        "register.salidas.err_images",
+        "Agrega al menos una imagen."
+      );
+    return errs;
+  }, [vehicleSelected, kmActual, fuelActual, observations, images, t]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
-    setIsSubmitting(true);
 
-    // Validaciones básicas
-    if (
-      !kmActual ||
-      !vehicleSelected ||
-      !fuelActual ||
-      !observations ||
-      !images.length
-    ) {
-      setErrorMessage("Por favor, rellena todos los campos obligatorios.");
-      setIsSubmitting(false);
+    // validar
+    if (Object.keys(validationErrors).length > 0) {
+      setErrorMessage(
+        t(
+          "register.salidas.err_fix_fields",
+          "Corrige los campos marcados antes de continuar."
+        )
+      );
       return;
     }
+
+    setIsSubmitting(true);
 
     const kmParsed = parseInt(kmActual, 10);
     const fuelParsed = parseInt(fuelActual, 10);
 
     if (
       isNaN(kmParsed) ||
-      isNaN(fuelParsed) ||
-      kmParsed < 0 ||
-      fuelParsed < 0 ||
-      fuelParsed > 100
+      (fuelActual !== "" &&
+        (isNaN(fuelParsed) || fuelParsed < 0 || fuelParsed > 100))
     ) {
       setErrorMessage(
-        "Verifica que el kilometraje sea válido y el combustible esté entre 0 y 100."
+        t(
+          "register.salidas.err_values_invalid",
+          "Verifica que el kilometraje y combustible sean válidos."
+        )
       );
       setIsSubmitting(false);
       return;
@@ -212,7 +260,10 @@ export default function SalidaForm({
     let idEmpleado = resolveIdEmpleado();
     if (!idEmpleado) {
       setErrorMessage(
-        "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+        t(
+          "register.salidas.err_user_invalid",
+          "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+        )
       );
       setIsSubmitting(false);
       return;
@@ -246,7 +297,12 @@ export default function SalidaForm({
     }
 
     if (!foundVehicle) {
-      setErrorMessage("Vehículo no válido. Selecciona un vehículo existente.");
+      setErrorMessage(
+        t(
+          "register.salidas.err_vehicle_invalid",
+          "Vehículo no válido. Selecciona un vehículo existente."
+        )
+      );
       setIsSubmitting(false);
       return;
     }
@@ -255,21 +311,20 @@ export default function SalidaForm({
     const formData = new FormData();
     formData.append("id_empleado", idEmpleado);
     formData.append("id_vehiculo", foundVehicle.id);
-    // LocationID puede llamarse distinto; si no existe dejamos null
     formData.append(
       "id_ubicacion_salida",
       foundVehicle?.LocationID ?? foundVehicle?.locationId ?? ""
     );
     formData.append("km_salida", kmParsed);
     formData.append("combustible_salida", fuelParsed);
-    formData.append("comentario_salida", observations);
+    formData.append("comentario_salida", observations ?? "");
 
     images.forEach((file) => {
       formData.append("files", file);
     });
 
     try {
-      console.log("[SalidaForm] enviando registro:", {
+      console.debug("[SalidaForm] enviando registro:", {
         id_empleado: idEmpleado,
         id_vehiculo: foundVehicle.id,
         km_salida: kmParsed,
@@ -279,42 +334,64 @@ export default function SalidaForm({
       const register = await registrarSalida(formData);
 
       if (register) {
-        Swal.fire({
-          title: "¡Salida registrada con éxito!",
-          text: "Salida registrada con éxito 🚗",
+        await Swal.fire({
+          title: t(
+            "register.salidas.success_title",
+            "¡Salida registrada con éxito!"
+          ),
+          text: t(
+            "register.salidas.success_text",
+            "Salida registrada con éxito 🚗"
+          ),
           icon: "success",
           confirmButtonColor: "#03624C",
-        }).then(() => {
-          navigate("/admin/panel-vehiculos", {
-            state: { mensaje: "Salida registrada con éxito 🚗✅" },
-          });
-
-          try {
-            if (emailSupervisor?.supervisor_email) {
-              sendNotificacionSalida({
-                to: [usuario?.email, emailSupervisor.supervisor_email].filter(
-                  Boolean
-                ),
-                employeeName: usuario?.nombre,
-                vehicleName: foundVehicle.placa,
-                supervisorName: emailSupervisor.supervisor_nombre,
-              });
-            }
-          } catch (err) {
-            console.warn("No se pudo enviar notificación de salida:", err);
-          }
         });
+
+        // notificación no bloqueante
+        try {
+          if (emailSupervisor?.supervisor_email) {
+            sendNotificacionSalida({
+              to: [usuario?.email, emailSupervisor.supervisor_email].filter(
+                Boolean
+              ),
+              employeeName: usuario?.nombre,
+              vehicleName: foundVehicle.placa,
+              supervisorName: emailSupervisor.supervisor_nombre,
+            }).catch((err) =>
+              console.warn("sendNotificacionSalida failed:", err)
+            );
+          }
+        } catch (err) {
+          console.warn("No se pudo enviar notificación de salida:", err);
+        }
+
+        navigate("/admin/panel-vehiculos", {
+          state: {
+            mensaje: t(
+              "register.salidas.success_toast",
+              "Salida registrada con éxito 🚗✅"
+            ),
+          },
+        });
+      } else {
+        throw new Error(
+          t(
+            "register.salidas.err_server",
+            "Ocurrió un error al registrar la salida. Intenta de nuevo."
+          )
+        );
       }
     } catch (error) {
       console.error("Error al registrar la salida:", error);
-
       const errMsg =
         error?.response?.data?.error ||
         error?.message ||
-        "Ocurrió un error al registrar la salida. Intenta de nuevo.";
-
-      Swal.fire({
-        title: "Error",
+        t(
+          "register.salidas.err_server",
+          "Ocurrió un error al registrar la salida. Intenta de nuevo."
+        );
+      await Swal.fire({
+        title: t("register.salidas.error_title", "Error"),
         text: errMsg,
         icon: "error",
       });
@@ -352,20 +429,28 @@ export default function SalidaForm({
         sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
         <Box sx={{ mb: 2 }}>
           <Typography level="title-md">
-            Realiza el Registro de Salida
+            {t("register.salidas.title", "Realiza el Registro de Salida")}
           </Typography>
           <Typography level="body-sm">
-            Realiza el registro de salida de tu vehículo en el sistema de
-            registro de vehículos.
+            {t(
+              "register.salidas.subtitle",
+              "Realiza el registro de salida de tu vehículo en el sistema de registro de vehículos."
+            )}
           </Typography>
         </Box>
+
         <Divider sx={{ mb: 2 }} />
 
         <Stack spacing={2}>
           <FormControl fullWidth>
-            <FormLabel>Vehículo</FormLabel>
+            <FormLabel>
+              {t("register.salidas.field_vehicle", "Vehículo")}
+            </FormLabel>
             <Autocomplete
-              placeholder="Selecciona un vehículo..."
+              placeholder={t(
+                "register.salidas.ph_select_vehicle",
+                "Selecciona un vehículo..."
+              )}
               options={listVehicles || []}
               getOptionLabel={(option) =>
                 option
@@ -389,41 +474,68 @@ export default function SalidaForm({
               disabled={!!vehiculoPreseleccionado}
               sx={{ width: "100%" }}
             />
+            {validationErrors.vehicle && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.vehicle}
+              </Typography>
+            )}
           </FormControl>
 
           <FormControl fullWidth>
-            <FormLabel>Kilometraje Actual</FormLabel>
+            <FormLabel>
+              {t("register.salidas.field_km", "Kilometraje Actual")}
+            </FormLabel>
             <Input
               fullWidth
               size="sm"
               type="text"
-              placeholder="Ingrese el Kilometraje"
+              placeholder={t(
+                "register.salidas.ph_km",
+                "Ingrese el Kilometraje"
+              )}
               value={kmActual}
               onChange={(e) => setKmActual(e.target.value)}
               readOnly={!kmManual}
             />
+            {validationErrors.km && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.km}
+              </Typography>
+            )}
           </FormControl>
 
           <FormControl fullWidth>
-            <FormLabel>Porcentaje de Combustible</FormLabel>
+            <FormLabel>
+              {t("register.salidas.field_fuel", "Porcentaje de Combustible")}
+            </FormLabel>
             <Input
               fullWidth
               size="sm"
               type="number"
-              placeholder="Porcentaje (%)"
+              placeholder={t("register.salidas.ph_fuel", "Porcentaje (%)")}
               value={fuelActual}
               onChange={(e) => setFuelActual(e.target.value)}
               readOnly={!fuelManual}
             />
+            {validationErrors.fuel && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.fuel}
+              </Typography>
+            )}
           </FormControl>
 
           <FormControl fullWidth>
-            <FormLabel>Observaciones</FormLabel>
+            <FormLabel>
+              {t("register.salidas.field_observations", "Observaciones")}
+            </FormLabel>
             <Textarea
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               maxRows={3}
-              placeholder="Observaciones"
+              placeholder={t(
+                "register.salidas.ph_observations",
+                "Observaciones"
+              )}
               minRows={2}
               sx={{
                 "--Textarea-focusedInset": "var(--any, )",
@@ -431,9 +543,19 @@ export default function SalidaForm({
                 "--Textarea-focusedHighlight": "rgba(13,110,253,.25)",
               }}
             />
+            {validationErrors.obs && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.obs}
+              </Typography>
+            )}
           </FormControl>
 
           <UploadImages value={images} onChange={setImages} />
+          {validationErrors.images && (
+            <Typography level="body-xs" color="danger">
+              {validationErrors.images}
+            </Typography>
+          )}
         </Stack>
 
         <CardOverflow
@@ -445,7 +567,7 @@ export default function SalidaForm({
               color="neutral"
               onClick={handleCancel}
               disabled={isSubmitting}>
-              Cancelar
+              {t("register.salidas.cancel", "Cancelar")}
             </Button>
             <Button
               size="sm"
@@ -453,7 +575,9 @@ export default function SalidaForm({
               type="submit"
               loading={isSubmitting}
               disabled={isSubmitting}>
-              {isSubmitting ? "Guardando..." : "Guardar"}
+              {isSubmitting
+                ? t("register.salidas.saving", "Guardando...")
+                : t("register.salidas.save", "Guardar")}
             </Button>
           </CardActions>
         </CardOverflow>

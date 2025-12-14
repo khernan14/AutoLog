@@ -1,4 +1,3 @@
-// src/components/VehiculosForm/VehiculosTable.jsx
 import React, { useMemo, useState, useCallback } from "react";
 import {
   Box,
@@ -25,6 +24,7 @@ import QrCodeRoundedIcon from "@mui/icons-material/QrCodeRounded";
 import useIsMobile from "@/hooks/useIsMobile";
 
 export default function VehiculosTable({
+  t,
   vehiculos = [],
   onEdit,
   onDelete,
@@ -78,10 +78,41 @@ export default function VehiculosTable({
   const getHighlightStyle = (id) =>
     typeof highlightStyle === "function" ? highlightStyle(id) : {};
 
+  // Map estado -> color token (joy color names) and fallback styles
+  const stateToColor = (estado) => {
+    if (!estado) return "neutral";
+    const key = estado.toString().toLowerCase();
+    switch (key) {
+      case "disponible":
+        return "success";
+      case "en uso":
+      case "en_uso":
+      case "en-uso":
+        return "warning";
+      case "en mantenimiento":
+      case "en_mantenimiento":
+      case "en-mantenimiento":
+        return "danger";
+      case "reservado":
+        return "info";
+      case "inactivo":
+        return "neutral";
+      default:
+        return "neutral";
+    }
+  };
+
+  // compact chip styles shared
+  const chipSx = {
+    fontSize: 12,
+    px: 1,
+    py: "2px",
+  };
+
   // ====== MÓVIL: Tarjetas ======
   if (isMobile) {
     return (
-      <Stack spacing={2} p={2}>
+      <Stack spacing={2} p={1}>
         {sortedVehiculos.map((v) => {
           const showMenu =
             (canEdit && onEdit) ||
@@ -97,7 +128,7 @@ export default function VehiculosTable({
               ref={isHighlighted ? focusedRef : null}
               variant="outlined"
               sx={{
-                p: 2,
+                p: 1,
                 borderRadius: "md",
                 ...getHighlightStyle(v.id),
               }}>
@@ -107,8 +138,10 @@ export default function VehiculosTable({
                   justifyContent="space-between"
                   alignItems="center">
                   <Box>
-                    <Typography level="title-md">{v.placa}</Typography>
-                    <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                    <Typography level="title-md" sx={{ fontSize: 15 }}>
+                      {v.placa}
+                    </Typography>
+                    <Typography level="body-xs" sx={{ opacity: 0.75 }}>
                       {v.marca} · {v.modelo}
                     </Typography>
                   </Box>
@@ -120,35 +153,31 @@ export default function VehiculosTable({
                         slotProps={{
                           root: { variant: "plain", color: "neutral" },
                         }}
-                        aria-label="Acciones">
+                        aria-label={t?.("vehiculos.actions", "Acciones")}>
                         <MoreHorizRoundedIcon />
                       </MenuButton>
                       <Menu>
                         {canEdit && onEdit && (
                           <MenuItem onClick={() => onEdit(v)}>
-                            <EditRoundedIcon fontSize="small" />
-                            Editar
+                            {t?.("vehiculos.edit", "Editar")}
                           </MenuItem>
                         )}
                         {isInactive(v)
                           ? canRestore &&
                             onRestore && (
                               <MenuItem onClick={() => onRestore(v.id)}>
-                                <RestoreRoundedIcon fontSize="small" />
-                                Restaurar
+                                {t?.("vehiculos.restore", "Restaurar")}
                               </MenuItem>
                             )
                           : canDelete &&
                             onDelete && (
                               <MenuItem onClick={() => onDelete(v.id)}>
-                                <DeleteRoundedIcon fontSize="small" />
-                                Inactivar
+                                {t?.("vehiculos.disable", "Inactivar")}
                               </MenuItem>
                             )}
                         {canQR && onShowQR && (
                           <MenuItem onClick={() => onShowQR(v)}>
-                            <QrCodeRoundedIcon fontSize="small" />
-                            Ver QR registro
+                            {t?.("vehiculos.view_qr", "Ver QR registro")}
                           </MenuItem>
                         )}
                       </Menu>
@@ -160,11 +189,20 @@ export default function VehiculosTable({
                   <Chip
                     size="sm"
                     variant="soft"
-                    color={v.estado === "Disponible" ? "success" : "warning"}>
-                    {v.estado || "—"}
+                    color={stateToColor(v.estado)}
+                    sx={chipSx}>
+                    {t?.(
+                      `vehiculos.states.${(v.estado || "unknown")
+                        .toLowerCase()
+                        .replace(/\s+/g, "_")}`,
+                      v.estado
+                    ) ||
+                      v.estado ||
+                      "—"}
                   </Chip>
-                  <Chip size="sm" variant="soft">
-                    {v.nombre_ubicacion || "Sin ubicación"}
+                  <Chip size="sm" variant="soft" sx={chipSx}>
+                    {v.nombre_ubicacion ||
+                      t?.("vehiculos.no_location", "Sin ubicación")}
                   </Chip>
                 </Stack>
               </Stack>
@@ -175,29 +213,35 @@ export default function VehiculosTable({
     );
   }
 
-  // ====== ESCRITORIO: Tabla ======
+  // ====== ESCRITORIO: Tabla (compacta) ======
   return (
     <Table
       hoverRow
-      aria-label="Tabla de vehículos"
+      aria-label={t?.("vehiculos.table_aria", "Tabla de vehículos")}
       size="sm"
       stickyHeader
       sx={{
-        minWidth: 800,
+        minWidth: 700,
         "--TableCell-headBackground": "var(--joy-palette-background-level5)",
         "--TableCell-headColor": "var(--joy-palette-text-secondary)",
-        "--TableCell-headFontWeight": 600,
+        "--TableCell-headFontWeight": "600",
         "--TableCell-headBorderBottom": "1px solid var(--joy-palette-divider)",
         "--TableRow-hoverBackground": "var(--joy-palette-background-level1)",
+        // compact adjustments:
+        "--TableCell-padding": "8px 10px",
+        "--TableCell-gap": "6px",
       }}>
       <thead>
         <tr>
           {[
-            { label: "Vehículo", key: "placa" },
-            { label: "Marca", key: "marca" },
-            { label: "Modelo", key: "modelo" },
-            { label: "Estado", key: "estado" },
-            { label: "Ubicación", key: "nombre_ubicacion" },
+            { label: t?.("vehiculos.col_vehicle", "Vehículo"), key: "placa" },
+            { label: t?.("vehiculos.col_brand", "Marca"), key: "marca" },
+            { label: t?.("vehiculos.col_model", "Modelo"), key: "modelo" },
+            { label: t?.("vehiculos.col_status", "Estado"), key: "estado" },
+            {
+              label: t?.("vehiculos.col_location", "Ubicación"),
+              key: "nombre_ubicacion",
+            },
           ].map((col) => (
             <th key={col.key}>
               <Button
@@ -216,12 +260,14 @@ export default function VehiculosTable({
                     }}
                   />
                 }>
-                {col.label}
+                <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                  {col.label}
+                </Typography>
               </Button>
             </th>
           ))}
 
-          {hasActions && <th>Acciones</th>}
+          {hasActions && <th>{t?.("vehiculos.col_actions", "Acciones")}</th>}
         </tr>
       </thead>
       <tbody>
@@ -232,24 +278,40 @@ export default function VehiculosTable({
               key={v.id}
               ref={isHighlighted ? focusedRef : null}
               style={getHighlightStyle(v.id)}>
-              <td>{v.placa}</td>
-              <td>{v.marca}</td>
-              <td>{v.modelo}</td>
+              <td>
+                <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                  {v.placa}
+                </Typography>
+              </td>
+              <td>
+                <Typography level="body-sm">{v.marca}</Typography>
+              </td>
+              <td>
+                <Typography level="body-sm">{v.modelo}</Typography>
+              </td>
               <td>
                 <Chip
                   size="sm"
                   variant="soft"
-                  color={v.estado === "Disponible" ? "success" : "warning"}>
-                  {v.estado || "—"}
+                  color={stateToColor(v.estado)}
+                  sx={chipSx}>
+                  {t?.(
+                    `vehiculos.states.${(v.estado || "unknown")
+                      .toLowerCase()
+                      .replace(/\s+/g, "_")}`,
+                    v.estado
+                  ) ||
+                    v.estado ||
+                    "—"}
                 </Chip>
               </td>
               <td>
                 {v.nombre_ubicacion ? (
-                  <Chip size="sm" variant="soft">
+                  <Chip size="sm" variant="soft" sx={chipSx}>
                     {v.nombre_ubicacion}
                   </Chip>
                 ) : (
-                  "—"
+                  t?.("vehiculos.no_location", "—")
                 )}
               </td>
 
@@ -261,14 +323,14 @@ export default function VehiculosTable({
                       slotProps={{
                         root: { variant: "plain", color: "neutral" },
                       }}
-                      aria-label="Acciones">
+                      aria-label={t?.("vehiculos.actions", "Acciones")}>
                       <MoreHorizRoundedIcon />
                     </MenuButton>
                     <Menu>
                       {canEdit && onEdit && (
                         <MenuItem onClick={() => onEdit(v)}>
                           <EditRoundedIcon fontSize="small" />
-                          Editar
+                          {t?.("vehiculos.edit", "Editar")}
                         </MenuItem>
                       )}
                       {isInactive(v)
@@ -276,20 +338,20 @@ export default function VehiculosTable({
                           onRestore && (
                             <MenuItem onClick={() => onRestore(v.id)}>
                               <RestoreRoundedIcon fontSize="small" />
-                              Restaurar
+                              {t?.("vehiculos.restore", "Restaurar")}
                             </MenuItem>
                           )
                         : canDelete &&
                           onDelete && (
                             <MenuItem onClick={() => onDelete(v.id)}>
                               <DeleteRoundedIcon fontSize="small" />
-                              Inhabilitar
+                              {t?.("vehiculos.disable", "Inactivar")}
                             </MenuItem>
                           )}
                       {canQR && onShowQR && (
                         <MenuItem onClick={() => onShowQR(v)}>
                           <QrCodeRoundedIcon fontSize="small" />
-                          Ver QR registro
+                          {t?.("vehiculos.view_qr", "Ver QR registro")}
                         </MenuItem>
                       )}
                     </Menu>

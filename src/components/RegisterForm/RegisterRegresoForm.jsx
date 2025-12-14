@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+// src/components/RegisterForm/RegisterRegresoForm.jsx
+import { useState, useEffect, useMemo } from "react";
 import {
   Alert,
   Box,
@@ -26,164 +27,93 @@ import {
 } from "../../services/RegistrosService";
 import { getParkings } from "../../services/ParkingServices";
 import { sendNotificacionRegreso } from "../../services/MailServices";
+import { useTranslation } from "react-i18next";
 
+/**
+ * RegisterRegresoForm (mejorado)
+ *
+ * Props:
+ *  - registro: objeto con info del registro (id_registro, id_vehiculo, placa, estado, etc.)
+ *  - usuario: objeto usuario (id_empleado, nombre, email, ...)
+ *  - emailSupervisor: { supervisor_email, supervisor_nombre } (opcional)
+ */
 export default function RegisterRegresoForm({
   registro,
   usuario,
   emailSupervisor,
 }) {
+  const { t } = useTranslation();
+
   const [kmAnterior, setKmAnterior] = useState("");
-  const [km_regreso, setkm_regreso] = useState("");
+  const [km_regreso, setKmRegreso] = useState("");
   const [id_ubicacion_regreso, setIdUbicacionRegreso] = useState("");
   const [fuel, setFuel] = useState("");
   const [observations, setObservations] = useState("");
   const [images, setImages] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false); // nuevo estado
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [estacionamientos, setEstacionamientos] = useState([]);
 
   const navigate = useNavigate();
 
-  const estacionamientoNombre =
-    estacionamientos.find((e) => e.id === id_ubicacion_regreso)
-      ?.nombre_ubicacion || "Desconocido";
+  // Nombre del estacionamiento seleccionado (memo)
+  const estacionamientoNombre = useMemo(() => {
+    const e = estacionamientos.find((x) => x.id === id_ubicacion_regreso);
+    return (
+      e?.nombre_ubicacion ??
+      t("register.regreso.unknown_parking", "Desconocido")
+    );
+  }, [estacionamientos, id_ubicacion_regreso, t]);
 
+  // Cargar estacionamientos
   useEffect(() => {
-    const fetchParkings = async () => {
+    let mounted = true;
+    (async () => {
       try {
         const data = await getParkings();
-        setEstacionamientos(data);
-      } catch (error) {
-        console.error("Error al obtener estacionamientos:", error);
+        if (!mounted) return;
+        setEstacionamientos(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("[Regreso] getParkings error:", err);
+        if (mounted) setEstacionamientos([]);
       }
-    };
-
-    fetchParkings();
+    })();
+    return () => (mounted = false);
   }, []);
 
+  // Obtener último km registrado para el vehículo (si registro/vehículo están presentes)
   useEffect(() => {
-    // resuelve idEmpleado e idVehiculo de forma robusta
-    const idEmpleado =
-      usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
+    let mounted = true;
     const idVehiculo =
       registro?.id_vehiculo ?? registro?.id ?? registro?.idVehiculo ?? null;
+    if (!idVehiculo) return;
 
-    if (!idEmpleado || !idVehiculo) return;
-
-    const loadKmActual = async () => {
+    (async () => {
       try {
         const data = await obtenerKmActual(idVehiculo);
+        if (!mounted) return;
+        const kmValue =
+          data?.km_regreso ??
+          data?.km ??
+          data?.km_salida ??
+          data?.km_actual ??
+          0;
         setKmAnterior(
-          data?.km_regreso !== undefined ? String(data.km_regreso) : "0"
+          kmValue !== undefined && kmValue !== null ? String(kmValue) : ""
         );
-      } catch (error) {
-        console.error("Error al obtener km actual:", error);
+      } catch (err) {
+        console.error("[Regreso] obtenerKmActual error:", err);
+        if (mounted) setKmAnterior("");
       }
-    };
+    })();
 
-    loadKmActual();
-  }, [usuario, registro]);
-  //   setIsSubmitting(true); // nuevo cambio
+    return () => (mounted = false);
+  }, [registro]);
 
-  //   if (
-  //     !km_regreso ||
-  //     !fuel ||
-  //     !observations ||
-  //     !images.length ||
-  //     !id_ubicacion_regreso
-  //   ) {
-  //     setErrorMessage("Por favor, rellena todos los campos obligatorios.");
-  //     setIsSubmitting(false);
-  //     return;
-  //   }
-
-  //   if (parseInt(km_regreso) < parseInt(kmAnterior)) {
-  //     setErrorMessage(
-  //       "El kilometraje de regreso no puede ser menor al de salida."
-  //     );
-  //     setIsSubmitting(false);
-  //     return;
-  //   }
-
-  //   const datosEntrada = {
-  //     id_registro: registro.id_registro,
-  //     id_empleado: usuario.id_empleado,
-  //     id_ubicacion_regreso,
-  //     km_regreso: parseInt(km_regreso),
-  //     combustible_regreso: parseInt(fuel),
-  //     comentario_regreso: observations,
-  //   };
-
-  //   try {
-  //     const registerReturn = await registrarEntrada(datosEntrada);
-  //     const onlyFiles = images.map((f) => f.file);
-
-  //     if (registerReturn) {
-  //       // 🔔 Enviar correo de regreso
-  //       const emailData = {
-  //         to: [usuario.email, emailSupervisor?.supervisor_email].filter(
-  //           Boolean
-  //         ),
-  //         employeeName: usuario.nombre,
-  //         vehicleName: registro.placa,
-  //         supervisorName: emailSupervisor?.supervisor_nombre,
-  //         estacionamiento: estacionamientoNombre,
-  //       };
-
-  //       try {
-  //         await sendNotificacionRegreso(emailData);
-  //       } catch (err) {
-  //         console.warn("No se pudo enviar el correo de regreso:", err);
-  //       }
-
-  //       // 📷 Subir imágenes
-  //       const imageData = await SubirImagenesRegistro(
-  //         registro.id_registro,
-  //         onlyFiles
-  //       );
-
-  //       if (imageData) {
-  //         Swal.fire(
-  //           "Proceso completo",
-  //           "Regreso registrado y fotos subidas exitosamente",
-  //           "success"
-  //         ).then(() => {
-  //           navigate("/admin/panel-vehiculos", {
-  //             state: { mensaje: "Regreso registrado con éxito 🚗✅" },
-  //           });
-  //         });
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error(error);
-  //     Swal.fire("Error", "Ocurrió un error durante el registro", "error");
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMessage("");
-    setIsSubmitting(true);
-
-    if (
-      !km_regreso ||
-      !fuel ||
-      !observations ||
-      !images.length ||
-      !id_ubicacion_regreso
-    ) {
-      setErrorMessage("Por favor, rellena todos los campos obligatorios.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const idEmpleado =
-      usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
-
-    // fallback: intenta leer del localStorage (por si el RegisterForm no pasó userData por props)
-    if (!idEmpleado) {
+  // Helper robusto para resolver idEmpleado (props o localStorage)
+  const resolveIdEmpleado = () => {
+    let id = usuario?.id_empleado ?? usuario?.id ?? usuario?.id_usuario ?? null;
+    if (!id) {
       try {
         const stored =
           localStorage.getItem("user") ||
@@ -191,93 +121,217 @@ export default function RegisterRegresoForm({
           localStorage.getItem("usuario");
         if (stored) {
           const parsed = JSON.parse(stored);
-          idEmpleado =
-            parsed?.id_empleado ??
-            parsed?.id ??
-            parsed?.id_usuario ??
-            idEmpleado;
+          id = parsed?.id_empleado ?? parsed?.id ?? parsed?.id_usuario ?? id;
         }
       } catch (err) {
-        console.warn("No se pudo parsear user de localStorage:", err);
+        console.warn("[Regreso] parse user from localStorage failed:", err);
       }
     }
+    return id;
+  };
 
-    if (!idEmpleado) {
-      setErrorMessage(
-        "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+  // Validación en tiempo real
+  const validationErrors = useMemo(() => {
+    const errs = {};
+    if (!id_ubicacion_regreso)
+      errs.id_ubicacion_regreso = t(
+        "register.regreso.err_parking",
+        "Selecciona un estacionamiento."
       );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // igual para registro
-    const idRegistro =
-      registro?.id_registro ?? registro?.id ?? registro?.id_registro;
-    if (!idRegistro) {
-      setErrorMessage(
-        "Datos de registro inválidos. Refresca e intenta de nuevo."
+    if (!km_regreso)
+      errs.km_regreso = t(
+        "register.regreso.err_km_required",
+        "El kilometraje de regreso es obligatorio."
       );
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (parseInt(km_regreso) < parseInt(kmAnterior)) {
-      setErrorMessage(
+    else if (Number.isNaN(Number(km_regreso)) || Number(km_regreso) < 0)
+      errs.km_regreso = t(
+        "register.regreso.err_km_invalid",
+        "Kilometraje inválido."
+      );
+    else if (
+      kmAnterior &&
+      !Number.isNaN(Number(kmAnterior)) &&
+      Number(km_regreso) < Number(kmAnterior)
+    )
+      errs.km_regreso = t(
+        "register.regreso.err_km_less",
         "El kilometraje de regreso no puede ser menor al de salida."
       );
+    if (fuel === "")
+      errs.fuel = t(
+        "register.regreso.err_fuel_required",
+        "El porcentaje de combustible es obligatorio."
+      );
+    else if (
+      Number.isNaN(Number(fuel)) ||
+      Number(fuel) < 0 ||
+      Number(fuel) > 100
+    )
+      errs.fuel = t(
+        "register.regreso.err_fuel_invalid",
+        "Porcentaje inválido (0-100)."
+      );
+    if (!observations || observations.trim().length < 3)
+      errs.observations = t(
+        "register.regreso.err_obs",
+        "Agrega una observación breve."
+      );
+    if (!images || images.length === 0)
+      errs.images = t(
+        "register.regreso.err_images",
+        "Agrega al menos una imagen."
+      );
+    return errs;
+  }, [
+    id_ubicacion_regreso,
+    km_regreso,
+    fuel,
+    observations,
+    images,
+    kmAnterior,
+    t,
+  ]);
+
+  // Submit handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMessage("");
+
+    // validar
+    if (Object.keys(validationErrors).length > 0) {
+      setErrorMessage(
+        t(
+          "register.regreso.err_fix_fields",
+          "Corrige los campos marcados antes de continuar."
+        )
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // resolver id empleado
+    const idEmpleado = resolveIdEmpleado();
+    if (!idEmpleado) {
+      setErrorMessage(
+        t(
+          "register.regreso.err_user_invalid",
+          "Datos de usuario inválidos. Por favor, inicia sesión de nuevo."
+        )
+      );
       setIsSubmitting(false);
       return;
     }
 
-    const formData = new FormData();
-    formData.append("id_registro", idRegistro);
-    formData.append("id_empleado", idEmpleado);
-    formData.append("id_ubicacion_regreso", id_ubicacion_regreso);
-    formData.append("km_regreso", parseInt(km_regreso));
-    formData.append("combustible_regreso", parseInt(fuel));
-    formData.append("comentario_regreso", observations);
+    // id_registro robusto
+    const idRegistro =
+      registro?.id_registro ?? registro?.id ?? registro?.registroId ?? null;
+    if (!idRegistro) {
+      setErrorMessage(
+        t(
+          "register.regreso.err_reg_invalid",
+          "Datos de registro inválidos. Refresca e intenta de nuevo."
+        )
+      );
+      setIsSubmitting(false);
+      return;
+    }
 
+    // validación adicional de kilometraje comparativo (ya en validationErrors, pero doble seguro)
+    if (
+      kmAnterior &&
+      !Number.isNaN(Number(kmAnterior)) &&
+      Number(km_regreso) < Number(kmAnterior)
+    ) {
+      setErrorMessage(
+        t(
+          "register.regreso.err_km_less",
+          "El kilometraje de regreso no puede ser menor al de salida."
+        )
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
+    // preparar FormData
+    const fd = new FormData();
+    fd.append("id_registro", idRegistro);
+    fd.append("id_empleado", idEmpleado);
+    fd.append("id_ubicacion_regreso", id_ubicacion_regreso);
+    fd.append("km_regreso", parseInt(km_regreso, 10));
+    fd.append("combustible_regreso", parseInt(fuel, 10));
+    fd.append("comentario_regreso", observations || "");
+
+    // images = array of File objects
     images.forEach((file) => {
-      formData.append("files", file);
+      // si tu UploadImages devuelve {file} objects, adaptarlo; aquí asumimos File[]
+      fd.append("files", file);
     });
 
     try {
-      const register = await registrarRegreso(formData);
+      const resp = await registrarRegreso(fd);
 
-      if (register) {
-        Swal.fire({
-          title: "¡Regreso registrado con éxito!",
-          text: "Regreso registrado con éxito 🚗",
+      if (resp) {
+        await Swal.fire({
+          title: t(
+            "register.regreso.success_title",
+            "¡Regreso registrado con éxito!"
+          ),
+          text: t(
+            "register.regreso.success_text",
+            "Regreso registrado correctamente 🚗"
+          ),
           icon: "success",
           confirmButtonColor: "#03624C",
-        }).then(() => {
-          navigate("/admin/panel-vehiculos", {
-            state: { mensaje: "Regreso registrado con éxito 🚗✅" },
-          });
         });
 
-        if (emailSupervisor?.supervisor_email) {
-          sendNotificacionRegreso({
-            to: [usuario.email, emailSupervisor?.supervisor_email].filter(
-              Boolean
-            ),
-            employeeName: usuario.nombre,
-            vehicleName: registro.placa,
-            supervisorName: emailSupervisor?.supervisor_nombre,
-            estacionamiento: estacionamientoNombre,
-          });
+        // envío de correo (no bloqueante)
+        try {
+          if (emailSupervisor?.supervisor_email) {
+            sendNotificacionRegreso({
+              to: [usuario?.email, emailSupervisor.supervisor_email].filter(
+                Boolean
+              ),
+              employeeName: usuario?.nombre,
+              vehicleName: registro?.placa,
+              supervisorName: emailSupervisor?.supervisor_nombre,
+              estacionamiento: estacionamientoNombre,
+            }).catch((err) =>
+              console.warn("sendNotificacionRegreso failed:", err)
+            );
+          }
+        } catch (err) {
+          console.warn("sendNotificacionRegreso error:", err);
         }
-      }
-    } catch (error) {
-      console.error("Error al registrar el regreso:", error);
-      const errorMessage =
-        error?.response?.data?.error || // si usas axios
-        error?.message || // mensaje de JS
-        "Ocurrió un error al registrar el regreso. Intenta de nuevo.";
 
-      Swal.fire({
-        title: "Error",
-        text: errorMessage,
+        navigate("/admin/panel-vehiculos", {
+          state: {
+            mensaje: t(
+              "register.regreso.success_toast",
+              "Regreso registrado con éxito 🚗✅"
+            ),
+          },
+        });
+      } else {
+        throw new Error(
+          t(
+            "register.regreso.err_server",
+            "Ocurrió un error al registrar el regreso. Intenta de nuevo."
+          )
+        );
+      }
+    } catch (err) {
+      console.error("[Regreso] registrarRegreso error:", err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.message ||
+        t(
+          "register.regreso.err_server",
+          "Ocurrió un error al registrar el regreso. Intenta de nuevo."
+        );
+      await Swal.fire({
+        title: t("register.regreso.error_title", "Error"),
+        text: errMsg,
         icon: "error",
       });
     } finally {
@@ -285,9 +339,7 @@ export default function RegisterRegresoForm({
     }
   };
 
-  const handleCancel = () => {
-    navigate("/admin/panel-vehiculos");
-  };
+  const handleCancel = () => navigate("/admin/panel-vehiculos");
 
   return (
     <Stack
@@ -308,163 +360,179 @@ export default function RegisterRegresoForm({
         </Alert>
       )}
 
-      <Card component={"form"} onSubmit={handleSubmit}>
-        <>
-          <Box sx={{ mb: 1 }}>
-            <Typography level="title-md">
-              Realiza el Registro de Regreso
-            </Typography>
-            <Typography level="body-sm">
-              Realiza el registro de regreso de tu vehículo en el sistema de
-              registro de vehículos. Este proceso es importante para que el
-              vehículo esté registrado en el sistema y se puedan realizar las
-              operaciones correspondientes.
-            </Typography>
-          </Box>
-          <Divider />
-          <Stack spacing={2} sx={{ flexGrow: 1 }}>
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={3}
-              sx={{ my: 1 }}>
-              <Stack spacing={2} sx={{ flexGrow: 1 }}>
-                <Stack width={"60%"} spacing={1}>
-                  <FormLabel>Vehiculo En Uso</FormLabel>
-                  <FormControl
-                    sx={{
-                      display: { sm: "flex-column", md: "flex-row" },
-                      gap: 2,
-                    }}>
-                    <Input
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                      }}
-                      size="sm"
-                      type="text"
-                      placeholder="Ingrese el Kilometraje"
-                      value={`${registro.placa} - Estado: ${registro.estado}`}
-                      readOnly
-                    />
-                  </FormControl>
-                </Stack>
-                <Stack width={"60%"} spacing={1}>
-                  <FormLabel>Estacionamiento</FormLabel>
-                  <FormControl
-                    sx={{
-                      display: { sm: "flex-column", md: "flex-row" },
-                      gap: 2,
-                    }}>
-                    <Select
-                      value={id_ubicacion_regreso}
-                      onChange={(_, value) =>
-                        setIdUbicacionRegreso(Number(value))
-                      }
-                      placeholder="Selecciona un estacionamiento..."
-                      indicator={<KeyboardArrowDown />}
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                        [`& .${selectClasses.indicator}`]: {
-                          transition: "0.2s",
-                          [`&.${selectClasses.expanded}`]: {
-                            transform: "rotate(-180deg)",
-                          },
-                        },
-                      }}>
-                      <Option value="">Selecciona un estacionamiento</Option>
-                      {estacionamientos.map((e) => (
-                        <Option key={e.id} value={e.id}>
-                          {e.nombre_ubicacion}
-                        </Option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Stack>
-                <Stack width={"60%"} spacing={1}>
-                  <FormControl>
-                    <FormLabel>
-                      {kmAnterior && (
-                        <div>
-                          Último kilometraje registrado:{" "}
-                          <strong>{kmAnterior} km</strong>
-                        </div>
-                      )}
-                    </FormLabel>
-                    <Input
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                      }}
-                      size="sm"
-                      type="text"
-                      placeholder="Ingrese el Kilometraje"
-                      value={km_regreso}
-                      onChange={(e) => setkm_regreso(e.target.value)}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <Stack width={"60%"} spacing={1}>
-                  <FormControl>
-                    <FormLabel>Porcentaje de Combustible</FormLabel>
-                    <Input
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                      }}
-                      size="sm"
-                      type="number"
-                      placeholder="Porcentaje (%)"
-                      value={fuel}
-                      onChange={(e) => setFuel(e.target.value)}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <Stack width={"60%"} spacing={1}>
-                  <FormControl>
-                    <FormLabel>Observaciones</FormLabel>
-                    <Textarea
-                      value={observations}
-                      onChange={(e) => setObservations(e.target.value)}
-                      maxRows={3}
-                      placeholder="Obervaciones"
-                      minRows={2}
-                      sx={{
-                        width: { xs: "118%", md: 280 },
-                        "--Textarea-focusedInset": "var(--any, )",
-                        "--Textarea-focusedThickness": "0.25rem",
-                        "--Textarea-focusedHighlight": "rgba(13,110,253,.25)",
-                        "&::before": {
-                          transition: "box-shadow .15s ease-in-out",
-                        },
-                        "&:focus-within": {
-                          borderColor: "#86b7fe",
-                        },
-                      }}
-                    />
-                  </FormControl>
-                </Stack>
-                {/* Otro campo */}
-                <UploadImages value={images} onChange={setImages} />
-              </Stack>
-            </Stack>
-          </Stack>
-        </>
-        <CardOverflow sx={{ borderTop: "1px solid", borderColor: "divider" }}>
-          <CardActions sx={{ alignSelf: "flex-end", pt: 2 }}>
+      <Card
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+        <Box sx={{ mb: 1 }}>
+          <Typography level="title-md">
+            {t("register.regreso.title", "Realiza el Registro de Regreso")}
+          </Typography>
+          <Typography level="body-sm">
+            {t(
+              "register.regreso.subtitle",
+              "Registra el regreso del vehículo para liberar la unidad y registrar evidencias."
+            )}
+          </Typography>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Stack spacing={2}>
+          <FormControl fullWidth>
+            <FormLabel>
+              {t("register.regreso.field_vehicle_in_use", "Vehículo en uso")}
+            </FormLabel>
+            <Input
+              value={`${registro?.placa ?? ""} · ${registro?.estado ?? ""}`}
+              readOnly
+            />
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>
+              {t("register.regreso.field_parking", "Estacionamiento")}
+            </FormLabel>
+            <Select
+              value={id_ubicacion_regreso ?? ""}
+              onChange={(_, v) => setIdUbicacionRegreso(v)}
+              placeholder={t(
+                "register.regreso.ph_parking",
+                "Selecciona un estacionamiento..."
+              )}
+              indicator={<KeyboardArrowDown />}
+              sx={{
+                width: "100%",
+                [`& .${selectClasses.indicator}`]: {
+                  transition: "0.2s",
+                  [`&.${selectClasses.expanded}`]: {
+                    transform: "rotate(-180deg)",
+                  },
+                },
+              }}>
+              <Option value="">
+                {t(
+                  "register.regreso.ph_select_parking",
+                  "Selecciona un estacionamiento"
+                )}
+              </Option>
+              {estacionamientos.map((e) => (
+                <Option key={e.id} value={e.id}>
+                  {e.nombre_ubicacion}
+                </Option>
+              ))}
+            </Select>
+            {validationErrors.id_ubicacion_regreso && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.id_ubicacion_regreso}
+              </Typography>
+            )}
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>
+              {t(
+                "register.regreso.field_last_km",
+                "Último kilometraje registrado"
+              )}
+              {kmAnterior ? (
+                <>
+                  &nbsp;•&nbsp;<strong>{kmAnterior} km</strong>
+                </>
+              ) : null}
+            </FormLabel>
+            <Input
+              value={km_regreso}
+              onChange={(e) => setKmRegreso(e.target.value)}
+              placeholder={t(
+                "register.regreso.ph_km",
+                "Ingrese el kilometraje de regreso"
+              )}
+              type="number"
+            />
+            {validationErrors.km_regreso && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.km_regreso}
+              </Typography>
+            )}
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>
+              {t("register.regreso.field_fuel", "Porcentaje de Combustible")}
+            </FormLabel>
+            <Input
+              value={fuel}
+              onChange={(e) => setFuel(e.target.value)}
+              placeholder={t("register.regreso.ph_fuel", "Porcentaje (%)")}
+              type="number"
+            />
+            {validationErrors.fuel && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.fuel}
+              </Typography>
+            )}
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>
+              {t("register.regreso.field_observations", "Observaciones")}
+            </FormLabel>
+            <Textarea
+              value={observations}
+              onChange={(e) => setObservations(e.target.value)}
+              placeholder={t(
+                "register.regreso.ph_observations",
+                "Observaciones (opcional)"
+              )}
+              minRows={2}
+              maxRows={4}
+            />
+            {validationErrors.observations && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.observations}
+              </Typography>
+            )}
+          </FormControl>
+
+          <FormControl fullWidth>
+            <FormLabel>
+              {t("register.regreso.field_images", "Evidencias (fotos)")}
+            </FormLabel>
+            <UploadImages
+              value={images}
+              onChange={setImages}
+              maxCount={6}
+              maxSizeMB={6}
+            />
+            {validationErrors.images && (
+              <Typography level="body-xs" color="danger">
+                {validationErrors.images}
+              </Typography>
+            )}
+          </FormControl>
+        </Stack>
+
+        <CardOverflow
+          sx={{ borderTop: "1px solid", borderColor: "divider", mt: 3 }}>
+          <CardActions sx={{ justifyContent: "flex-end", pt: 2 }}>
             <Button
               size="sm"
               variant="plain"
               color="neutral"
-              onClick={handleCancel}>
-              Cancelar
+              onClick={handleCancel}
+              disabled={isSubmitting}>
+              {t("register.regreso.cancel", "Cancelar")}
             </Button>
             <Button
               size="sm"
               variant="solid"
               type="submit"
-              loading={isSubmitting} // MUI Joy soporta esto
-              disabled={isSubmitting} // para evitar doble clic
-            >
-              {isSubmitting ? "Guardando..." : "Guardar"}
+              loading={isSubmitting}
+              disabled={isSubmitting}>
+              {isSubmitting
+                ? t("register.regreso.saving", "Guardando...")
+                : t("register.regreso.save", "Guardar")}
             </Button>
           </CardActions>
         </CardOverflow>

@@ -47,12 +47,24 @@ export function SettingsProvider({ children }) {
       try {
         setLoading(true);
         const data = await SettingsService.getAllSettings();
+
         if (!mounted) return;
-        setSettings(data || {});
+
+        const idiomaSection = data.idioma || data.region || {};
+
+        const normalizedData = {
+          ...data,
+          timeFormat: idiomaSection.timeFormat || data.timeFormat || "12h",
+          dateFormat:
+            idiomaSection.dateFormat || data.dateFormat || "DD/MM/YYYY",
+          language: idiomaSection.language || data.language || "es-HN",
+          timezone:
+            idiomaSection.timezone || data.timezone || "America/Tegucigalpa",
+        };
+
+        setSettings(normalizedData);
       } catch (err) {
         console.error(err);
-        // Evita usar toast aquí si causa loops, o asegúrate de que toast sea estable.
-        // Por seguridad en el arranque, podemos omitirlo o usar console.error
       } finally {
         if (mounted) setLoading(false);
       }
