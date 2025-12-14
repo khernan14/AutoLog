@@ -24,6 +24,7 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded"; // Nuevo Icono
 
 import MyAccountForm from "../../../components/Users/MyAccount/MyAccountForm";
 import SecuritySettingsForm from "../../../components/Users/MyAccount/SecuritySettingsForm";
@@ -32,7 +33,7 @@ import { getUsersById } from "../../../services/AuthServices";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function MyAccount() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation(); // Agregamos i18n para el idioma de la fecha
   const { userData } = useAuth();
   const theme = useTheme();
 
@@ -82,6 +83,24 @@ export default function MyAccount() {
     const parts = name.trim().split(" ");
     if (parts.length === 1) return parts[0][0]?.toUpperCase();
     return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
+  };
+
+  // --- Helper para formatear fecha ---
+  const formatLastReset = (dateString) => {
+    if (!dateString) return null;
+    try {
+      return new Date(dateString).toLocaleString(i18n.language, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "UTC",
+        hour12: true,
+      });
+    } catch (e) {
+      return null;
+    }
   };
 
   // --- Skeleton Loading ---
@@ -273,9 +292,33 @@ export default function MyAccount() {
                   <Typography level="h3" mb={1}>
                     {t("account.security.title")}
                   </Typography>
-                  <Typography level="body-sm" mb={3} color="neutral">
-                    {t("account.security.subtitle")}
-                  </Typography>
+
+                  {/* --- AQUÍ ESTÁ EL CAMBIO --- */}
+                  <Box mb={3}>
+                    <Typography level="body-sm" color="neutral">
+                      {t("account.security.subtitle")}
+                    </Typography>
+
+                    {/* Solo mostramos si user.last_password_change tiene valor */}
+                    {user.last_password_change && (
+                      <Typography
+                        level="body-xs"
+                        color="success"
+                        sx={{
+                          mt: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          fontWeight: "md",
+                        }}>
+                        <HistoryRoundedIcon style={{ fontSize: 16 }} />
+                        {t("account.security.last_reset")}:{" "}
+                        {formatLastReset(user.last_password_change)}
+                      </Typography>
+                    )}
+                  </Box>
+                  {/* --------------------------- */}
+
                   <Divider sx={{ mb: 3 }} />
                   <SecuritySettingsForm
                     user={user}

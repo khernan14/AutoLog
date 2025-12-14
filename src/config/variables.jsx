@@ -159,6 +159,11 @@ export const endpoints = {
   getSection: `${API_BASE_URL}/settings/`,
   patchSection: `${API_BASE_URL}/settings/`,
   getSectionHistory: `${API_BASE_URL}/settings/`,
+
+  // sesiones
+  sessions: `${API_BASE_URL}/auth/sessions`,
+  activityLogs: `${API_BASE_URL}/auth/activity-logs`,
+  revokeSessions: `${API_BASE_URL}/auth/sessions/revoke`,
 };
 
 // src/js/config/variables.js

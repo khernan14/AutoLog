@@ -33,9 +33,9 @@ const Sections = {
   apariencia: React.lazy(() => import("./sections/Apariencia.jsx")),
   idioma: React.lazy(() => import("./sections/IdiomaRegion.jsx")),
   accesibilidad: React.lazy(() => import("./sections/Accesibilidad.jsx")),
-  integraciones: React.lazy(() => import("./sections/Integraciones.jsx")),
-  privacidad: React.lazy(() => import("./sections/Privacidad.jsx")),
-  backups: React.lazy(() => import("./sections/Backups.jsx")),
+  // integraciones: React.lazy(() => import("./sections/Integraciones.jsx")),
+  // privacidad: React.lazy(() => import("./sections/Privacidad.jsx")),
+  // backups: React.lazy(() => import("./sections/Backups.jsx")),
   acerca: React.lazy(() => import("./sections/Acerca.jsx")),
 };
 
@@ -46,9 +46,9 @@ const lazyLoaders = {
   apariencia: () => import("./sections/Apariencia.jsx"),
   idioma: () => import("./sections/IdiomaRegion.jsx"),
   accesibilidad: () => import("./sections/Accesibilidad.jsx"),
-  integraciones: () => import("./sections/Integraciones.jsx"),
-  privacidad: () => import("./sections/Privacidad.jsx"),
-  backups: () => import("./sections/Backups.jsx"),
+  //integraciones: () => import("./sections/Integraciones.jsx"),
+  // privacidad: () => import("./sections/Privacidad.jsx"),
+  //backups: () => import("./sections/Backups.jsx"),
   acerca: () => import("./sections/Acerca.jsx"),
 };
 
@@ -95,21 +95,21 @@ function SettingsInner() {
       label: t("settings.menu.accessibility"),
       icon: <AccessibilityIcon size={16} />,
     },
-    {
-      key: "integraciones",
-      label: t("settings.menu.integrations"),
-      icon: <Plug size={16} />,
-    },
-    {
-      key: "privacidad",
-      label: t("settings.menu.privacy"),
-      icon: <Shield size={16} />,
-    },
-    {
-      key: "backups",
-      label: t("settings.menu.backups"),
-      icon: <Database size={16} />,
-    },
+    // {
+    //   key: "integraciones",
+    //   label: t("settings.menu.integrations"),
+    //   icon: <Plug size={16} />,
+    // },
+    // {
+    //   key: "privacidad",
+    //   label: t("settings.menu.privacy"),
+    //   icon: <Shield size={16} />,
+    // },
+    // {
+    //   key: "backups",
+    //   label: t("settings.menu.backups"),
+    //   icon: <Database size={16} />,
+    // },
     {
       key: "acerca",
       label: t("settings.menu.about"),

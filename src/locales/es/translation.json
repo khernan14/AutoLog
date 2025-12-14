@@ -5,7 +5,8 @@
     "status": {
       "all": "Todos",
       "active": "Activo",
-      "inactive": "Inactivo"
+      "inactive": "Inactivo",
+      "now": "Activo"
     },
     "actions": {
       "save": "Guardar",
@@ -32,7 +33,8 @@
       "restore": "Restaurar",
       "deactivate_selected": "Inhabilitar ({{count}})",
       "send": "Enviar",
-      "save_changes": "Guardar Cambios"
+      "save_changes": "Guardar Cambios",
+      "confirm": "Confirmar"
     },
     "showing_results": "Mostrando {{count}} de {{total}}",
     "unknown_error": "Error desconocido",
@@ -223,6 +225,20 @@
         "input_label": "Ingresa el código de 6 dígitos",
         "verify_btn": "Verificar y Activar",
         "error_invalid": "Código incorrecto. Inténtalo de nuevo."
+      },
+      "sessions": {
+        "title": "Sesiones Activas",
+        "desc": "Dispositivos en los que has iniciado sesión actualmente.",
+        "current": "Este dispositivo",
+        "revoke_all": "Cerrar Sesiones",
+        "revoked_success": "Sesiones cerradas correctamente"
+      },
+      "logs": {
+        "title": "Registro de Actividad",
+        "desc": "Historial reciente de seguridad de tu cuenta.",
+        "action": "Acción",
+        "device": "Dispositivo",
+        "date": "Fecha"
       }
     },
     "appearance": {
@@ -287,6 +303,28 @@
         "title": "Vista Previa",
         "desc": "Así se mostrarán las fechas y horas en tus reportes y dashboard."
       }
+    },
+    "about": {
+      "version": "Versión",
+      "build": "Build",
+      "browser": "Navegador",
+      "platform": "Plataforma",
+      "language": "Idioma",
+      "commit": "Número de Compilación",
+      "status_title": "Estado de los Servicios",
+      "tech_info": "Información Técnica",
+      "report_bug": "Reportar un problema",
+      "rights": "Todos los derechos reservados."
+    },
+    "accessibility": {
+      "title": "Accesibilidad",
+      "subtitle": "Personaliza la interfaz para que se adapte mejor a tus necesidades visuales.",
+      "font_size": "Tamaño de texto",
+      "font_size_desc": "Ajusta el tamaño del texto en toda la aplicación para facilitar la lectura.",
+      "reduced_motion": "Reducir movimiento",
+      "reduced_motion_desc": "Desactiva las animaciones y transiciones suaves de la interfaz.",
+      "high_contrast": "Alto contraste",
+      "high_contrast_desc": "Aumenta la definición de bordes y reduce el uso de sombras sutiles."
     }
   },
   "login": {
@@ -1313,6 +1351,7 @@
       "confirm_title": "¿Deseas cambiar la contraseña?",
       "confirm_text": "Se actualizará tu contraseña actual. Asegúrate de recordarla.",
       "success_update": "La contraseña fue actualizada correctamente.",
+      "last_reset": "Último cambio de contraseña",
       "strength": {
         "weak": "Débil",
         "medium": "Media",
@@ -1348,5 +1387,33 @@
       "city": "Ciudad"
     },
     "info_readonly": "Estos datos son administrados por el sistema. Contacta a soporte si necesitas corregir tu nombre o ubicación."
+  },
+  "reset": {
+    "title": "Restablecer Contraseña",
+    "subtitle": "Crea una contraseña nueva y segura para tu cuenta.",
+    "new_password": "Nueva contraseña",
+    "confirm_password": "Confirmar contraseña",
+    "submit_button": "Cambiar contraseña",
+    "success_title": "¡Contraseña actualizada!",
+    "success_desc": "Tu contraseña ha sido cambiada. Redirigiendo al login...",
+    "error_no_token": "Enlace inválido o incompleto. Solicita uno nuevo.",
+    "error_mismatch": "Las contraseñas no coinciden.",
+    "error_min_length": "La contraseña debe tener al menos 8 caracteres.",
+    "error_generic": "Ocurrió un error. Intenta nuevamente.",
+    "placeholder_pass": "Mínimo 8 caracteres",
+    "placeholder_confirm": "Repite la contraseña"
+  },
+  "strength": {
+    "title": "Seguridad:",
+    "weak": "Débil",
+    "medium": "Regular",
+    "strong": "Segura"
+  },
+  "req": {
+    "min_chars": "Mínimo 8 caracteres",
+    "uppercase": "Al menos una mayúscula (A-Z)",
+    "lowercase": "Al menos una minúscula (a-z)",
+    "number": "Al menos un número (0-9)",
+    "special": "Al menos un carácter especial (@$!%*?&._-)"
   }
 }

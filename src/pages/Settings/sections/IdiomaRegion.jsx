@@ -262,7 +262,7 @@ export default function IdiomaRegion({ initialData = {}, onSave }) {
 
   return (
     <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 2, boxShadow: 1, p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 16, boxShadow: "sm", p: 3 }}>
         <SectionHeader
           title={t("settings.region.title")}
           subtitle={t("settings.region.subtitle")}

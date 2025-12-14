@@ -31,3 +31,66 @@ html, body { font-family: 'Poppins', sans-serif; overflow: hidden; }
     @apply border-border outline-ring/50; }
   body {
     @apply bg-background text-foreground; } }
+
+/* --- Accesibilidad: Reducción de Movimiento --- */
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* --- Accesibilidad: Alto Contraste --- */
+
+/* 1. MODO CLARO (Alto Contraste) */
+body.high-contrast {
+  /* Fondo Blanco Puro */
+  --joy-palette-background-body: #ffffff !important;
+  --joy-palette-background-surface: #ffffff !important;
+  --joy-palette-background-level1: #ffffff !important;
+  --joy-palette-background-level2: #ffffff !important;
+  
+  /* Texto Negro Puro */
+  --joy-palette-text-primary: #000000 !important;
+  --joy-palette-text-secondary: #000000 !important;
+  --joy-palette-text-tertiary: #000000 !important;
+  
+  /* Iconos Negros */
+  --joy-palette-text-icon: #000000 !important;
+}
+
+/* 2. MODO OSCURO (Alto Contraste) */
+/* Se activa solo si el usuario tiene el tema oscuro activo en la app */
+[data-joy-color-scheme="dark"] body.high-contrast {
+  /* Fondo Negro Puro */
+  --joy-palette-background-body: #000000 !important;
+  --joy-palette-background-surface: #000000 !important;
+  --joy-palette-background-level1: #000000 !important;
+  --joy-palette-background-level2: #000000 !important;
+  
+  /* Texto Blanco Puro */
+  --joy-palette-text-primary: #ffffff !important;
+  --joy-palette-text-secondary: #ffffff !important;
+  --joy-palette-text-tertiary: #ffffff !important;
+  
+  /* Iconos Blancos */
+  --joy-palette-text-icon: #ffffff !important;
+}
+
+/* 3. BORDES Y SEPARADORES (Para ambos modos) */
+/* Forzamos bordes visibles porque quitamos las sombras */
+body.high-contrast .MuiCard-root,
+body.high-contrast .MuiSheet-root,
+body.high-contrast .MuiButton-root,
+body.high-contrast .MuiInput-root,
+body.high-contrast .MuiSelect-root {
+  box-shadow: none !important;
+  border: 2px solid currentColor !important;
+}
+
+body.high-contrast .MuiDivider-root {
+  background-color: currentColor !important;
+  opacity: 1 !important;
+}
