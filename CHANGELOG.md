@@ -1,3 +1,11 @@
+## v2.3.1 - 2025-12-16
+
+* chore(release): v2.3.1 (152a498)
+* feat: Add asset inventory list with filtering, sorting, pagination, and i18n, along with a client assets page. (b6edc8e)
+* docs(changelog): v2.3.0 (0bc1cb9)
+
+🔗 **Comparación:** https://github.com/khernan14/AutoLog/compare/v2.3.0...v2.3.1
+
 ## v2.3.0 - 2025-12-14
 
 * chore(release): v2.3.0 (d255efe)
@@ -156,6 +164,7 @@
 - Full changelog: https://github.com/khernan14/AutoLog/compare/prod-2025-11-04...v1.0.0
 
 > Nota: si sigues **Conventional Commits** (`feat:`, `fix:`, `chore:`…), herramientas como `conventional-changelog` te generan estas secciones solitas.
+
 
 
 
