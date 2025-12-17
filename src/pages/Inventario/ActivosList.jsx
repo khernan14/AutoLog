@@ -505,8 +505,9 @@ export default function ActivosList() {
             <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.7 }}>
               {t("inventory.list.stats", {
                 total: rows.length,
-                filtered:
-                  rows.length !== filtered.length ? filtered.length : null,
+                filtered: filtered.length,
+                context:
+                  rows.length !== filtered.length ? "filtered" : undefined,
               })}
             </Typography>
           </Box>
@@ -595,7 +596,7 @@ export default function ActivosList() {
             borderRadius: "lg",
             overflow: "hidden",
             bgcolor: "background.surface",
-            minHeight: 300,
+            height: "auto",
           }}>
           {filtered.length === 0 && (
             <Box sx={{ width: "100%", textAlign: "center", py: 8 }}>

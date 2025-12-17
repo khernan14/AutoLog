@@ -784,7 +784,8 @@
     "assets": {
       "title": "Activos del Cliente",
       "subtitle": "Inventario de activos asignados al cliente",
-      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtrados: {{filtered}}}}",
+      "stats": "Total: {{total}}",
+      "stats_filtered": "Total: {{total}} · Filtrados: {{filtered}}",
       "search_placeholder": "Buscar por código, nombre, serie...",
       "actions": {
         "move_to_warehouse": "Mover a Bodega",
@@ -1084,7 +1085,8 @@
     "list": {
       "title": "Activos Globales",
       "subtitle": "Gestión centralizada de todo el inventario",
-      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtrados: {{filtered}}}}",
+      "stats": "Total: {{total}}",
+      "stats_filtered": "Total: {{total}} · Filtrados: {{filtered}}",
       "search_placeholder": "Buscar...",
       "filters_title": "Filtros de Activos",
       "actions": {

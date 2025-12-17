@@ -409,8 +409,8 @@ export default function ClienteActivos() {
           <Typography level="body-xs" sx={{ opacity: 0.7, mt: 0.5 }}>
             {t("clients.assets.stats", {
               total: rows.length,
-              filtered:
-                filtered.length !== rows.length ? filtered.length : null,
+              filtered: filtered.length,
+              context: filtered.length !== rows.length ? "filtered" : undefined,
             })}
           </Typography>
         </Box>

@@ -774,7 +774,8 @@
     "assets": {
       "title": "Client Assets",
       "subtitle": "Inventory of assets assigned to the client",
-      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtered: {{filtered}}",
+      "stats": "Total: {{total}}",
+      "stats_filtered": "Total: {{total}} · Filtered: {{filtered}}",
       "search_placeholder": "Search by code, name, serial...",
       "actions": {
         "move_to_warehouse": "Move to Warehouse",
@@ -1074,7 +1075,8 @@
     "list": {
       "title": "Assets List",
       "subtitle": "Centralized management of all inventory",
-      "stats": "Total: {{total}} {{filtered, select, null {} other {· Filtered: {{filtered}}",
+      "stats": "Total: {{total}}",
+      "stats_filtered": "Total: {{total}} · Filtered: {{filtered}}",
       "search_placeholder": "Search...",
       "filters_title": "Assets Filters",
       "actions": {
