@@ -245,7 +245,7 @@ export default function VehiculoModal({
                 name="placa"
                 value={formik.values.placa}
                 onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
+                onBlur={() => formik.setFieldTouched("placa", true)}
                 placeholder={t(
                   "vehiculos.modal.placeholders.placa",
                   "Ej. ABC123"
@@ -277,7 +277,7 @@ export default function VehiculoModal({
                 name="marca"
                 value={formik.values.marca}
                 onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
+                onBlur={() => formik.setFieldTouched("marca", true)}
                 placeholder={t(
                   "vehiculos.modal.placeholders.marca",
                   "Ej. Toyota"
@@ -308,7 +308,7 @@ export default function VehiculoModal({
                 name="modelo"
                 value={formik.values.modelo}
                 onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
+                onBlur={() => formik.setFieldTouched("modelo", true)}
                 placeholder={t(
                   "vehiculos.modal.placeholders.modelo",
                   "Ej. Corolla"
@@ -338,7 +338,7 @@ export default function VehiculoModal({
               <Select
                 value={formik.values.estado || null}
                 onChange={(_, value) => formik.setFieldValue("estado", value)}
-                onBlur={formik.handleBlur}
+                onBlur={() => formik.setFieldTouched("estado", true)}
                 disabled={isBusy}
                 placeholder={t(
                   "vehiculos.modal.placeholders.estado",
@@ -388,7 +388,9 @@ export default function VehiculoModal({
                     typeof value === "string" ? Number(value) : value
                   )
                 }
-                onBlur={formik.handleBlur}
+                onBlur={() =>
+                  formik.setFieldTouched("id_ubicacion_actual", true)
+                }
                 disabled={isBusy || isUbicacionesLoading}
                 placeholder={
                   isUbicacionesLoading
